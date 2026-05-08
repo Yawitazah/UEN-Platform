@@ -34,6 +34,7 @@ app.use(authenticate);
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api", centralRoutes);
 app.use("/shopify/api", shopifyRoutes);
+app.use("/shopify", shopifyRoutes);
 
 const clientDir = path.resolve(process.cwd(), "dist/client");
 app.use(express.static(clientDir));
