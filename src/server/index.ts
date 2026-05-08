@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import { ensureFirstBuildTarget } from "./bootstrap";
 import { config } from "./config";
 import { authenticate } from "./security";
 import centralRoutes from "./routes/central";
@@ -40,6 +41,17 @@ app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDir, "index.html"));
 });
 
-app.listen(config.port, () => {
-  console.log(`Universal Exchange Note app listening on http://localhost:${config.port}`);
+async function start() {
+  if (config.bootstrapFirstBuildTarget) {
+    await ensureFirstBuildTarget();
+  }
+
+  app.listen(config.port, () => {
+    console.log(`Universal Exchange Note app listening on http://localhost:${config.port}`);
+  });
+}
+
+start().catch((error) => {
+  console.error("Failed to start Universal Exchange Note app", error);
+  process.exit(1);
 });

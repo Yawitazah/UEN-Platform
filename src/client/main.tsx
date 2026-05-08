@@ -5,7 +5,7 @@ import { Link2, Pause, Play, RefreshCw, Shield, Ticket, UploadCloud } from "luci
 import "./styles.css";
 
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
-const shopDomain = () => localStorage.getItem("uen_shop_domain") ?? "merchant-a.myshopify.com";
+const shopDomain = () => new URLSearchParams(window.location.search).get("shopDomain") ?? localStorage.getItem("uen_shop_domain") ?? "merchant-a.myshopify.com";
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
@@ -356,6 +356,8 @@ function SyncLogs() {
 
 function ShopifyApp() {
   const [shop, setShop] = useState(shopDomain());
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [token, setToken] = useState("uen_dev_merchant_token");
   const dashboard = useData<any>(() => shopifyApi("/dashboard"), [shop]);
   const logs = useData<any[]>(() => shopifyApi("/sync-logs"), [shop]);
@@ -366,17 +368,32 @@ function ShopifyApp() {
     void logs.reload();
   };
   const connect = async () => {
-    await fetch("/shopify/api/platform-connection", {
+    setActionError(null);
+    setActionMessage(null);
+    const response = await fetch("/shopify/api/platform-connection", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ shopDomain: shop, connectionToken: token })
     });
+    if (!response.ok) {
+      const payload = await response.json();
+      setActionError(payload.error ?? "Could not link store");
+      return;
+    }
+    setActionMessage("Store linked");
     saveShop();
   };
   const sync = async () => {
-    await shopifyApi("/sync", { method: "POST", body: JSON.stringify({}) });
-    await dashboard.reload();
-    await logs.reload();
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const result = await shopifyApi<any>("/sync", { method: "POST", body: JSON.stringify({}) });
+      setActionMessage(result.message ?? "Sync completed");
+      await dashboard.reload();
+      await logs.reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Sync failed");
+    }
   };
   const updateOffer = async () => {
     await shopifyApi("/offer-settings", { method: "POST", body: JSON.stringify(offer) });
@@ -389,7 +406,7 @@ function ShopifyApp() {
   return (
     <>
       <Header title="Shopify Merchant App" subtitle="Connect a store, configure merchant offer rules, and sync allowed UENs." />
-      <section className="split">
+        <section className="split">
         <div className="panel">
           <h2>Platform Connection</h2>
           <Input label="Shop domain" value={shop} onChange={setShop} />
@@ -412,7 +429,9 @@ function ShopifyApp() {
             <button className="ghost" onClick={pause}><Pause size={16} /> Pause</button>
           </div>
         </div>
-      </section>
+        </section>
+        {actionError && <Notice tone="bad">{actionError}</Notice>}
+        {actionMessage && <Notice>{actionMessage}</Notice>}
       <section className="panel">
         <h2>Offer Settings</h2>
         <FormGrid>
