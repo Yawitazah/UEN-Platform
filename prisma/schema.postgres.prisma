@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         String    @default("OPERATIONS")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model ExchangeHub {
+  id                     String                  @id @default(cuid())
+  name                   String
+  displayName            String
+  hubType                String
+  status                 String                  @default("ACTIVE")
+  billingStatus          String                  @default("ACTIVE")
+  logoUrl                String?
+  brandColor             String?
+  customDomain           String?
+  subdomain              String?                 @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  holders                Holder[]
+  universalExchangeNotes UniversalExchangeNote[]
+  linkedMerchants        Merchant[]              @relation("LinkedExchangeHub")
+  accessRules            MerchantAccessRule[]
+}
+
+model Holder {
+  id                     String                  @id @default(cuid())
+  exchangeHubId          String
+  firstName              String
+  lastName               String
+  email                  String
+  phone                  String?
+  status                 String                  @default("ACTIVE")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  exchangeHub            ExchangeHub             @relation(fields: [exchangeHubId], references: [id])
+  universalExchangeNotes UniversalExchangeNote[]
+
+  @@index([exchangeHubId])
+  @@unique([exchangeHubId, email])
+}
+
+model UniversalExchangeNote {
+  id             String               @id @default(cuid())
+  code           String               @unique
+  exchangeHubId  String
+  holderId       String
+  campaignId     String?
+  status         String               @default("ACTIVE")
+  issuedAt       DateTime             @default(now())
+  expiresAt      DateTime?
+  disabledAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  exchangeHub    ExchangeHub          @relation(fields: [exchangeHubId], references: [id])
+  holder         Holder               @relation(fields: [holderId], references: [id])
+  syncedNotes    ShopifySyncedNote[]
+
+  @@index([exchangeHubId])
+  @@index([holderId])
+}
+
+model Merchant {
+  id                  String                @id @default(cuid())
+  businessName        String
+  platformType        String                @default("SHOPIFY")
+  status              String                @default("ACTIVE")
+  isExchangeHub       Boolean               @default(false)
+  linkedExchangeHubId String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  linkedExchangeHub   ExchangeHub?          @relation("LinkedExchangeHub", fields: [linkedExchangeHubId], references: [id])
+  offers              MerchantOffer[]
+  accessRules         MerchantAccessRule[]
+  shopifyConnections  ShopifyConnection[]
+  syncedNotes         ShopifySyncedNote[]
+  syncLogs            SyncLog[]
+  apiKeys             MerchantApiKey[]
+}
+
+model MerchantOffer {
+  id                 String    @id @default(cuid())
+  merchantId         String
+  discountType       String
+  discountValue      Decimal?
+  minimumOrderAmount Decimal?
+  usageLimitPerNote  Int       @default(1)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  status             String    @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  merchant           Merchant  @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+}
+
+model MerchantAccessRule {
+  id            String      @id @default(cuid())
+  merchantId    String
+  exchangeHubId String
+  status        String      @default("ACTIVE")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  merchant      Merchant    @relation(fields: [merchantId], references: [id])
+  exchangeHub   ExchangeHub @relation(fields: [exchangeHubId], references: [id])
+
+  @@unique([merchantId, exchangeHubId])
+  @@index([exchangeHubId])
+}
+
+model ShopifyConnection {
+  id          String    @id @default(cuid())
+  merchantId  String
+  shopDomain  String
+  accessToken String
+  scopes      String
+  status      String    @default("ACTIVE")
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  merchant    Merchant  @relation(fields: [merchantId], references: [id])
+
+  @@unique([shopDomain])
+  @@index([merchantId])
+}
+
+model ShopifySyncedNote {
+  id                      String                @id @default(cuid())
+  merchantId              String
+  shopDomain              String
+  universalExchangeNoteId String
+  uenCode                 String
+  shopifyDiscountId       String?
+  shopifyDiscountCodeId   String?
+  syncStatus              String                @default("PENDING")
+  lastSyncedAt            DateTime?
+  errorMessage            String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  merchant                Merchant              @relation(fields: [merchantId], references: [id])
+  universalExchangeNote   UniversalExchangeNote @relation(fields: [universalExchangeNoteId], references: [id])
+
+  @@unique([merchantId, universalExchangeNoteId])
+  @@index([shopDomain])
+}
+
+model SyncLog {
+  id           String   @id @default(cuid())
+  merchantId   String
+  shopDomain   String?
+  syncType     String
+  status       String
+  totalFetched Int      @default(0)
+  totalCreated Int      @default(0)
+  totalUpdated Int      @default(0)
+  totalSkipped Int      @default(0)
+  totalErrors  Int      @default(0)
+  message      String?
+  createdAt    DateTime @default(now())
+  merchant     Merchant @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  actorId    String?
+  actorType  String   @default("system")
+  entityType String
+  entityId   String
+  message    String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+}
+
+model MerchantApiKey {
+  id         String    @id @default(cuid())
+  merchantId String
+  keyHash    String    @unique
+  label      String
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  merchant   Merchant  @relation(fields: [merchantId], references: [id])
+}

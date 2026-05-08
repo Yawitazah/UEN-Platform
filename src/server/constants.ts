@@ -1,0 +1,36 @@
+export const AdminRole = {
+  SUPER_ADMIN: "SUPER_ADMIN",
+  OPERATIONS: "OPERATIONS",
+  SUPPORT: "SUPPORT",
+  MERCHANT: "MERCHANT"
+} as const;
+
+export type AdminRoleValue = (typeof AdminRole)[keyof typeof AdminRole];
+
+export const HubStatus = {
+  ACTIVE: "ACTIVE",
+  SUSPENDED: "SUSPENDED",
+  DISABLED: "DISABLED"
+} as const;
+
+export const UenStatus = {
+  ACTIVE: "ACTIVE",
+  DISABLED: "DISABLED",
+  SUSPENDED: "SUSPENDED",
+  GRACE_PERIOD: "GRACE_PERIOD"
+} as const;
+
+export const MerchantStatus = {
+  ACTIVE: "ACTIVE",
+  PAUSED: "PAUSED"
+} as const;
+
+export const AuditAction = {
+  UEN_GENERATED: "UEN_GENERATED",
+  UEN_DISABLED: "UEN_DISABLED",
+  EXCHANGE_HUB_SUSPENDED: "EXCHANGE_HUB_SUSPENDED",
+  MERCHANT_OFFER_CHANGED: "MERCHANT_OFFER_CHANGED",
+  SYNC_EVENT: "SYNC_EVENT",
+  MERCHANT_ACCESS_RULE_CHANGED: "MERCHANT_ACCESS_RULE_CHANGED",
+  SHOPIFY_CONNECTION_CHANGED: "SHOPIFY_CONNECTION_CHANGED"
+} as const;
