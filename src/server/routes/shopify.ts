@@ -29,6 +29,24 @@ function verifyShopifyHmac(query: express.Request["query"]) {
   return hmac.length === digest.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
 }
 
+function verifyShopifyWebhook(req: express.Request) {
+  const hmac = req.header("x-shopify-hmac-sha256") ?? "";
+  if (!config.shopifyApiSecret || !req.rawBody || !hmac) return false;
+  const digest = crypto.createHmac("sha256", config.shopifyApiSecret).update(req.rawBody).digest("base64");
+  return hmac.length === digest.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
+}
+
+async function generateIssuedCode(prefix = "") {
+  const normalizedPrefix = prefix.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const number = Math.floor(Math.random() * 9_999_999) + 1;
+    const code = `${normalizedPrefix}${number}UEN`;
+    const existing = await prisma.universalExchangeNote.findUnique({ where: { code } });
+    if (!existing) return code;
+  }
+  throw new Error("Could not generate a unique UEN code");
+}
+
 function handleError(res: express.Response, error: unknown) {
   if (error instanceof ZodError) {
     return res.status(400).json({ error: "Validation failed", details: error.flatten() });
@@ -52,6 +70,39 @@ async function connectionFromRequest(req: express.Request, res: express.Response
     return null;
   }
   return connection;
+}
+
+async function subscribeOrdersPaidWebhook(shopDomain: string, accessToken: string) {
+  const uri = `${config.shopifyAppUrl.replace(/\/$/, "")}/shopify/webhooks/orders-paid`;
+  const response = await fetch(`https://${shopDomain}/admin/api/${config.shopifyApiVersion}/graphql.json`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-shopify-access-token": accessToken
+    },
+    body: JSON.stringify({
+      query: `
+        mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+          webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) {
+            webhookSubscription { id topic uri }
+            userErrors { field message }
+          }
+        }
+      `,
+      variables: {
+        topic: "ORDERS_PAID",
+        webhookSubscription: {
+          uri,
+          includeFields: ["id", "email", "customer", "line_items"]
+        }
+      }
+    })
+  });
+  const payload = await response.json();
+  const errors = payload.data?.webhookSubscriptionCreate?.userErrors ?? payload.errors ?? [];
+  if (errors.length) {
+    console.warn("Shopify webhook subscription warning", errors);
+  }
 }
 
 router.get("/auth", async (req, res) => {
@@ -131,10 +182,90 @@ router.get("/auth/callback", async (req, res) => {
       message: "Shopify OAuth install completed"
     });
 
+    await subscribeOrdersPaidWebhook(shop, tokenPayload.access_token);
+
     res.clearCookie("shopify_oauth_state");
     res.redirect(`/shopify?shopDomain=${encodeURIComponent(shop)}`);
   } catch (error) {
     handleError(res, error);
+  }
+});
+
+router.post("/webhooks/orders-paid", async (req, res) => {
+  try {
+    if (!verifyShopifyWebhook(req)) {
+      return res.status(401).send("Invalid Shopify webhook HMAC");
+    }
+
+    const shopDomain = normalizeShop(req.header("x-shopify-shop-domain"));
+    if (!shopDomain) return res.status(400).send("Missing shop domain");
+
+    const order = req.body as {
+      id?: number | string;
+      email?: string;
+      customer?: { email?: string; first_name?: string; last_name?: string };
+      line_items?: Array<{ id?: number | string; product_id?: number | string; title?: string }>;
+    };
+    const orderId = String(order.id ?? "");
+    const customerEmail = order.email ?? order.customer?.email;
+    if (!orderId || !customerEmail) return res.status(200).send("Order missing id or customer email");
+
+    for (const lineItem of order.line_items ?? []) {
+      const productId = String(lineItem.product_id ?? "");
+      if (!productId) continue;
+
+      const mappedProduct = await prisma.shopifyIssuanceProduct.findFirst({
+        where: { shopDomain, shopifyProductId: productId, status: "ACTIVE" },
+        include: { exchangeHub: true }
+      });
+      if (!mappedProduct) continue;
+
+      const lineItemId = String(lineItem.id ?? productId);
+      const existingLog = await prisma.uenIssuanceLog.findUnique({
+        where: { shopDomain_shopifyOrderId_shopifyLineItemId: { shopDomain, shopifyOrderId: orderId, shopifyLineItemId: lineItemId } }
+      });
+      if (existingLog) continue;
+
+      const holder = await prisma.holder.upsert({
+        where: { exchangeHubId_email: { exchangeHubId: mappedProduct.exchangeHubId, email: customerEmail } },
+        update: {
+          firstName: order.customer?.first_name ?? "Shopify",
+          lastName: order.customer?.last_name ?? "Customer"
+        },
+        create: {
+          exchangeHubId: mappedProduct.exchangeHubId,
+          firstName: order.customer?.first_name ?? "Shopify",
+          lastName: order.customer?.last_name ?? "Customer",
+          email: customerEmail
+        }
+      });
+
+      const note = await prisma.universalExchangeNote.create({
+        data: {
+          exchangeHubId: mappedProduct.exchangeHubId,
+          holderId: holder.id,
+          code: await generateIssuedCode(mappedProduct.exchangeHub.codePrefix ?? "")
+        }
+      });
+
+      await prisma.uenIssuanceLog.create({
+        data: {
+          issuanceProductId: mappedProduct.id,
+          shopDomain,
+          shopifyOrderId: orderId,
+          shopifyLineItemId: lineItemId,
+          customerEmail,
+          universalExchangeNoteId: note.id,
+          status: "ISSUED",
+          message: mappedProduct.digitalAssetUrl ? `Digital asset: ${mappedProduct.digitalAssetUrl}; UEN: ${note.code}` : `UEN: ${note.code}`
+        }
+      });
+    }
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Webhook processing failed");
   }
 });
 

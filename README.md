@@ -121,7 +121,9 @@ Restart the server and use `/shopify` to sync `1234567UEN`.
 - The central platform is the source of truth for UEN validity, Exchange Hub status, merchant access, and offers.
 - Shopify is only the redemption layer. The Shopify app cannot create or delete UENs.
 - Exchange Hubs sell access through their own systems. For a Shopify-based Exchange Hub, the sale can be a normal Shopify product, and a post-purchase integration can call the central platform to create the Holder and generate the UEN.
-- Generated UENs use `1234567UEN` by default, with an optional Exchange Hub prefix such as `NUBREED1234567UEN`. The numeric portion is 1 to 7 digits.
+- Exchange Hubs can save a code prefix. Generated UENs use `1234567UEN` by default, or `NUBREED1234567UEN` when the hub has `NUBREED` as its prefix. The numeric portion is 1 to 7 digits.
+- The Product Issuance page maps a Shopify product ID to an Exchange Hub. Paid Shopify orders for mapped products issue UENs through the `orders/paid` webhook endpoint at `/shopify/webhooks/orders-paid`.
+- For digital artwork delivery, keep the artwork product/download in Shopify or a digital-download app, and store the download/asset URL on the Product Issuance mapping so the issued UEN and asset can be tracked together.
 - One UEN can sync to many merchants, with merchant-specific offer values.
 - Suspended Exchange Hubs cannot generate new UENs. Suspending a hub marks active UENs as suspended so they stop syncing.
 - Admins can disable a UEN or remove it from circulation, which marks synced Shopify records inactive.

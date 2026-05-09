@@ -10,6 +10,7 @@ import {
   createAccessRuleSchema,
   createHolderSchema,
   createHubSchema,
+  createIssuanceProductSchema,
   createMerchantSchema,
   createOfferSchema,
   createUenSchema,
@@ -77,7 +78,7 @@ router.post("/exchange-hubs", requireRole(writeRoles), async (req, res) => {
   try {
     const data = createHubSchema.parse(req.body);
     const hub = await prisma.exchangeHub.create({
-      data: { ...data, logoUrl: data.logoUrl || undefined }
+      data: { ...data, logoUrl: data.logoUrl || undefined, codePrefix: data.codePrefix?.toUpperCase() || undefined }
     });
     res.status(201).json(hub);
   } catch (error) {
@@ -149,7 +150,7 @@ router.post("/exchange-hubs/:exchangeHubId/uens", requireRole(writeRoles), async
       data: {
         exchangeHubId,
         holderId: data.holderId,
-        code: data.code?.toUpperCase() ?? (await generatedCode(data.codePrefix)),
+        code: data.code?.toUpperCase() ?? (await generatedCode(data.codePrefix ?? hub.codePrefix ?? "")),
         campaignId: data.campaignId,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined
       }
@@ -306,6 +307,46 @@ router.get("/shopify-synced-notes", requireRole(adminRoles), async (_req, res) =
 
 router.get("/sync-logs", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.syncLog.findMany({ orderBy: { createdAt: "desc" }, include: { merchant: true } }));
+});
+
+router.get("/issuance-products", requireRole(adminRoles), async (_req, res) => {
+  res.json(
+    await prisma.shopifyIssuanceProduct.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { exchangeHub: true }
+    })
+  );
+});
+
+router.post("/issuance-products", requireRole(writeRoles), async (req, res) => {
+  try {
+    const data = createIssuanceProductSchema.parse(req.body);
+    const product = await prisma.shopifyIssuanceProduct.upsert({
+      where: { shopDomain_shopifyProductId: { shopDomain: data.shopDomain, shopifyProductId: data.shopifyProductId } },
+      update: {
+        exchangeHubId: data.exchangeHubId,
+        productTitle: data.productTitle,
+        digitalAssetUrl: data.digitalAssetUrl || undefined,
+        status: data.status
+      },
+      create: {
+        ...data,
+        digitalAssetUrl: data.digitalAssetUrl || undefined
+      }
+    });
+    res.status(201).json(product);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get("/issuance-logs", requireRole(adminRoles), async (_req, res) => {
+  res.json(
+    await prisma.uenIssuanceLog.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { issuanceProduct: { include: { exchangeHub: true } } }
+    })
+  );
 });
 
 router.get("/audit-logs", requireRole(adminRoles), async (_req, res) => {

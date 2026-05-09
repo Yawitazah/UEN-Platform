@@ -33,6 +33,7 @@ async function main() {
       status: HubStatus.ACTIVE,
       billingStatus: "ACTIVE",
       brandColor: "#1f6f5b",
+      codePrefix: "",
       subdomain: "hub-a"
     }
   });

@@ -13,7 +13,12 @@ const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({
+  limit: "1mb",
+  verify: (req, _res, buffer) => {
+    (req as express.Request).rawBody = Buffer.from(buffer);
+  }
+}));
 app.use((req, _res, next) => {
   const cookieHeader = req.header("cookie") ?? "";
   req.cookies = Object.fromEntries(

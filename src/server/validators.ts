@@ -6,6 +6,7 @@ export const createHubSchema = z.object({
   hubType: z.string().min(2),
   logoUrl: z.string().url().optional().or(z.literal("")),
   brandColor: z.string().optional(),
+  codePrefix: z.string().max(24).regex(/^[A-Z0-9]*$/i).optional(),
   customDomain: z.string().optional(),
   subdomain: z.string().optional()
 });
@@ -56,4 +57,13 @@ export const platformConnectionSchema = z.object({
   connectionToken: z.string().min(8),
   shopDomain: z.string().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
   accessToken: z.string().optional()
+});
+
+export const createIssuanceProductSchema = z.object({
+  exchangeHubId: z.string().min(1),
+  shopDomain: z.string().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
+  shopifyProductId: z.string().min(1),
+  productTitle: z.string().optional(),
+  digitalAssetUrl: z.string().url().optional().or(z.literal("")),
+  status: z.enum(["ACTIVE", "PAUSED", "DISABLED"]).default("ACTIVE")
 });

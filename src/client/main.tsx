@@ -70,6 +70,7 @@ function Shell() {
               ["/holders", "Holders"],
               ["/uens", "Universal Exchange Notes"],
               ["/merchants", "Merchants"],
+              ["/issuance-products", "Product Issuance"],
               ["/offers", "Merchant Offers"],
               ["/access-rules", "Access Rules"],
               ["/connections", "Shopify Connections"],
@@ -89,6 +90,7 @@ function Shell() {
             <Route path="/holders" element={<Holders />} />
             <Route path="/uens" element={<Uens />} />
             <Route path="/merchants" element={<Merchants />} />
+            <Route path="/issuance-products" element={<IssuanceProducts />} />
             <Route path="/offers" element={<Offers />} />
             <Route path="/access-rules" element={<AccessRules />} />
             <Route path="/connections" element={<Connections />} />
@@ -179,10 +181,10 @@ function Dashboard() {
 
 function ExchangeHubs() {
   const { data, reload } = useData<any[]>(() => api("/api/exchange-hubs"));
-  const [form, setForm] = useState({ name: "", displayName: "", hubType: "creator", subdomain: "" });
+  const [form, setForm] = useState({ name: "", displayName: "", hubType: "creator", codePrefix: "", subdomain: "" });
   const create = async () => {
     await api("/api/exchange-hubs", { method: "POST", body: JSON.stringify(form) });
-    setForm({ name: "", displayName: "", hubType: "creator", subdomain: "" });
+    setForm({ name: "", displayName: "", hubType: "creator", codePrefix: "", subdomain: "" });
     await reload();
   };
   const suspend = async (id: string) => {
@@ -196,6 +198,7 @@ function ExchangeHubs() {
         <Input label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} />
         <Input label="Display name" value={form.displayName} onChange={(displayName) => setForm({ ...form, displayName })} />
         <Input label="Hub type" value={form.hubType} onChange={(hubType) => setForm({ ...form, hubType })} />
+        <Input label="Code prefix" value={form.codePrefix} onChange={(codePrefix) => setForm({ ...form, codePrefix })} />
         <Input label="Subdomain" value={form.subdomain} onChange={(subdomain) => setForm({ ...form, subdomain })} />
         <button onClick={create}><UploadCloud size={16} /> Create Hub</button>
       </FormGrid>
@@ -204,6 +207,7 @@ function ExchangeHubs() {
         columns={[
           ["Display Name", (row) => row.displayName],
           ["Type", (row) => row.hubType],
+          ["Code Prefix", (row) => row.codePrefix ?? "-"],
           ["Status", (row) => <Status value={row.status} />],
           ["Billing", (row) => row.billingStatus],
           ["Action", (row) => <button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button>]
@@ -293,6 +297,40 @@ function Merchants() {
         <button onClick={create}><UploadCloud size={16} /> Create Merchant</button>
       </FormGrid>
       <DataTable rows={merchants.data ?? []} columns={[["Business", (r) => r.businessName], ["Platform", (r) => r.platformType], ["Status", (r) => <Status value={r.status} />], ["Exchange Hub Merchant", (r) => r.isExchangeHub ? "Yes" : "No"]]} />
+    </>
+  );
+}
+
+function IssuanceProducts() {
+  const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
+  const products = useData<any[]>(() => api("/api/issuance-products"));
+  const logs = useData<any[]>(() => api("/api/issuance-logs"));
+  const [form, setForm] = useState({
+    exchangeHubId: "",
+    shopDomain: "nubreed-love.myshopify.com",
+    shopifyProductId: "",
+    productTitle: "",
+    digitalAssetUrl: ""
+  });
+  const create = async () => {
+    await api("/api/issuance-products", { method: "POST", body: JSON.stringify(form) });
+    await products.reload();
+    await logs.reload();
+  };
+  return (
+    <>
+      <Header title="Product Issuance" subtitle="Map Shopify products to Exchange Hubs so paid orders issue UENs." />
+      <FormGrid>
+        <Select label="Exchange Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
+        <Input label="Shop domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain })} />
+        <Input label="Shopify product ID" value={form.shopifyProductId} onChange={(shopifyProductId) => setForm({ ...form, shopifyProductId })} />
+        <Input label="Product title" value={form.productTitle} onChange={(productTitle) => setForm({ ...form, productTitle })} />
+        <Input label="Digital asset URL" value={form.digitalAssetUrl} onChange={(digitalAssetUrl) => setForm({ ...form, digitalAssetUrl })} />
+        <button onClick={create}><Link2 size={16} /> Map Product</button>
+      </FormGrid>
+      <DataTable rows={products.data ?? []} columns={[["Shop", (r) => r.shopDomain], ["Product ID", (r) => r.shopifyProductId], ["Title", (r) => r.productTitle ?? "-"], ["Hub", (r) => r.exchangeHub.displayName], ["Asset", (r) => r.digitalAssetUrl ?? "-"], ["Status", (r) => <Status value={r.status} />]]} />
+      <h2>Issuance Logs</h2>
+      <DataTable rows={logs.data ?? []} columns={[["Customer", (r) => r.customerEmail], ["Shop", (r) => r.shopDomain], ["Order", (r) => r.shopifyOrderId], ["Status", (r) => <Status value={r.status} />], ["Message", (r) => r.message ?? "-"]]} />
     </>
   );
 }

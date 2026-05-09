@@ -25,6 +25,7 @@ model ExchangeHub {
   billingStatus          String                  @default("ACTIVE")
   logoUrl                String?
   brandColor             String?
+  codePrefix             String?
   customDomain           String?
   subdomain              String?                 @unique
   createdAt              DateTime                @default(now())
@@ -33,6 +34,7 @@ model ExchangeHub {
   universalExchangeNotes UniversalExchangeNote[]
   linkedMerchants        Merchant[]              @relation("LinkedExchangeHub")
   accessRules            MerchantAccessRule[]
+  issuanceProducts       ShopifyIssuanceProduct[]
 }
 
 model Holder {
@@ -155,6 +157,40 @@ model ShopifySyncedNote {
 
   @@unique([merchantId, universalExchangeNoteId])
   @@index([shopDomain])
+}
+
+model ShopifyIssuanceProduct {
+  id               String           @id @default(cuid())
+  exchangeHubId    String
+  shopDomain       String
+  shopifyProductId String
+  productTitle     String?
+  digitalAssetUrl  String?
+  status           String           @default("ACTIVE")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  exchangeHub      ExchangeHub      @relation(fields: [exchangeHubId], references: [id])
+  issuanceLogs     UenIssuanceLog[]
+
+  @@unique([shopDomain, shopifyProductId])
+  @@index([exchangeHubId])
+}
+
+model UenIssuanceLog {
+  id                     String                 @id @default(cuid())
+  issuanceProductId       String
+  shopDomain              String
+  shopifyOrderId          String
+  shopifyLineItemId       String
+  customerEmail           String
+  universalExchangeNoteId String?
+  status                  String                 @default("ISSUED")
+  message                 String?
+  createdAt               DateTime               @default(now())
+  issuanceProduct         ShopifyIssuanceProduct @relation(fields: [issuanceProductId], references: [id])
+
+  @@unique([shopDomain, shopifyOrderId, shopifyLineItemId])
+  @@index([customerEmail])
 }
 
 model SyncLog {
