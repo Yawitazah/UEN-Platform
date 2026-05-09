@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { Link2, Pause, Play, RefreshCw, Shield, Ticket, UploadCloud } from "lucide-react";
+import { Link2, Pause, Play, RefreshCw, Shield, Ticket, UploadCloud, SlidersHorizontal, Zap, ShoppingBag, TrendingUp, Download, Users, Star, CheckCircle } from "lucide-react";
 import "./styles.css";
 
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
@@ -199,80 +199,161 @@ function MerchantRegister() {
       setError(err instanceof Error ? err.message : "Could not register merchant");
     }
   };
+  const valueItems = [
+    { Icon: SlidersHorizontal, title: "You control the offer", body: "Set percentage, fixed amount, minimum order, usage limits, and when to pause participation.", accent: "#a78bfa", bg: "rgba(167,139,250,0.15)" },
+    { Icon: Zap, title: "We sync the notes", body: "Approved Universal Exchange Notes are pushed into Shopify without manual CSV uploads or code management.", accent: "#fbbf24", bg: "rgba(251,191,36,0.13)" },
+    { Icon: ShoppingBag, title: "Your checkout stays yours", body: "Holders redeem through your existing Shopify checkout using the value you define.", accent: "#60a5fa", bg: "rgba(96,165,250,0.13)" },
+    { Icon: TrendingUp, title: "Traffic with a reason", body: "Supporter energy becomes a simple reason to discover your store and make a purchase.", accent: "#34d399", bg: "rgba(52,211,153,0.13)" },
+  ];
+  const stepItems = [
+    { Icon: Download, title: "Install the merchant app", body: "Connect your Shopify store in minutes without rebuilding your site." },
+    { Icon: SlidersHorizontal, title: "Set your offer", body: "Choose what UEN Holders receive when they shop with you." },
+    { Icon: RefreshCw, title: "Notes sync automatically", body: "The platform keeps approved notes available in your store." },
+    { Icon: ShoppingBag, title: "Holders shop with you", body: "Customers enter their note at checkout and receive your offer." },
+    { Icon: TrendingUp, title: "You gain new customers", body: "Join a network where more Exchange Hubs can send motivated traffic." },
+  ];
   return (
     <PublicShell>
-      <section className="public-band value-band">
-        <div className="section-heading">
-          <span className="eyebrow dark"><Shield size={16} /> Why merchants join</span>
-          <h2>Access warm traffic from trusted communities</h2>
-          <p>Holders are not random visitors. They received value through an Exchange Hub they support, and now they are looking for participating merchants where that value works.</p>
-        </div>
-        <div className="value-grid">
-          {[
-            ["You control the offer", "Set percentage, fixed amount, minimum order, usage limits, and when to pause participation."],
-            ["We sync the notes", "Approved Universal Exchange Notes are pushed into Shopify without manual CSV uploads or code management."],
-            ["Your checkout stays yours", "Holders redeem through your existing Shopify checkout using the value you define."],
-            ["Traffic with a reason", "Supporter energy becomes a simple reason to discover your store and make a purchase."]
-          ].map(([title, body]) => (
-            <article className="value-card" key={title}>
-              <Ticket size={20} />
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="public-band how-band" id="how-it-works">
-        <div className="section-heading">
-          <span className="eyebrow dark"><RefreshCw size={16} /> How it works</span>
-          <h2>Connect once. Start accepting notes.</h2>
-        </div>
-        <div className="steps-grid">
-          {[
-            ["Install the merchant app", "Connect your Shopify store in minutes without rebuilding your site."],
-            ["Set your offer", "Choose what UEN Holders receive when they shop with you."],
-            ["Notes sync automatically", "The platform keeps approved notes available in your store."],
-            ["Holders shop with you", "Customers enter their note at checkout and receive your offer."],
-            ["You gain new customers", "Join a network where more Exchange Hubs can send motivated traffic."]
-          ].map(([title, body], index) => (
-            <article className="step-card" key={title}>
-              <strong>{index + 1}</strong>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="public-card signup-card" id="merchant-signup">
-        <div className="signup-heading">
-          <span className="eyebrow dark"><Shield size={16} /> Merchant signup</span>
-          <h2>Join the Merchant Network</h2>
-          <p>Connect your Shopify store and turn Holder traffic into real customer opportunities.</p>
-        </div>
-        {error && <Notice tone="bad">{error}</Notice>}
-        {result ? (
-          <div className="success-panel">
-            <Ticket size={32} />
-            <h3>Registration created</h3>
-            <p>Your install page is ready. Open it to connect Shopify and activate the merchant app.</p>
-            <span>Store {result.onboarding.shopDomain}</span>
-            <a className="button-link button-link-large" href={result.installUrl}>Open Install Instructions</a>
+      {/* ── Value band ── */}
+      <section className="value-band">
+        <div className="section-inner">
+          <div className="section-heading">
+            <span className="eyebrow value-eyebrow"><Shield size={16} /> Why merchants join</span>
+            <h2>Access warm traffic from trusted communities</h2>
+            <p>Holders are not random visitors. They received value through an Exchange Hub they support, and now they are looking for participating merchants where that value works.</p>
           </div>
-        ) : (
-          <FormGrid>
-            <Input label="Business name" value={form.businessName} onChange={(businessName) => setForm({ ...form, businessName })} />
-            <Input label="Contact name" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} />
-            <Input label="Contact email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
-            <Input label="Shopify store domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain: shopDomain.toLowerCase().trim() })} />
-            <Select label="UEN hub to accept" value={form.requestedExchangeHubId} options={hubs.data ?? []} onChange={(requestedExchangeHubId) => setForm({ ...form, requestedExchangeHubId })} />
-            <button onClick={submit}><Link2 size={16} /> Join the Merchant Network</button>
-          </FormGrid>
-        )}
+          <div className="value-grid">
+            {valueItems.map(({ Icon, title, body, accent, bg }, i) => (
+              <article className="value-card" key={title} style={{ "--card-accent": accent, "--card-bg": bg, animationDelay: `${i * 80}ms` } as React.CSSProperties}>
+                <div className="value-icon" style={{ background: bg, color: accent }}><Icon size={22} /></div>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
-      <section className="public-band benefit-strip">
-        {["Shopify app connection", "Automatic note syncing", "Access to Holder traffic", "Controlled discounts", "No manual code uploads", "Your store stays in control"].map((item) => (
-          <span key={item}><Ticket size={16} /> {item}</span>
-        ))}
+
+      {/* ── Community image band ── */}
+      <section className="community-band">
+        <div className="community-inner">
+          <div className="community-text">
+            <span className="eyebrow dark"><Users size={16} /> Real buyers, real communities</span>
+            <h2>Not cold ads. Warm Holders.</h2>
+            <p>Every Holder has a UEN tied to a creator, ministry, or organization they already support. When they shop with you, they bring real intent — not impulse scrolling.</p>
+            <ul className="community-list">
+              <li><CheckCircle size={18} /><span>Holders are pre-qualified — they already have value to spend with you</span></li>
+              <li><CheckCircle size={18} /><span>Zero ad spend needed to reach them</span></li>
+              <li><CheckCircle size={18} /><span>Each Exchange Hub brings its own community of motivated buyers</span></li>
+            </ul>
+          </div>
+          <div className="community-visual">
+            <div className="comm-img-wrap">
+              <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=800&auto=format&fit=crop" alt="People shopping together" />
+              <div className="comm-badge"><CheckCircle size={14} /><span>Verified merchant network</span></div>
+              <div className="comm-stat-bubble comm-stat-1"><TrendingUp size={14} /><div><strong>Warm traffic</strong><span>from 12+ hub types</span></div></div>
+              <div className="comm-stat-bubble comm-stat-2"><Users size={14} /><div><strong>Real intent</strong><span>not cold ad clicks</span></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── How it works ── */}
+      <section className="how-band" id="how-it-works">
+        <div className="section-inner">
+          <div className="section-heading">
+            <span className="eyebrow dark"><RefreshCw size={16} /> How it works</span>
+            <h2>Connect once. Start accepting notes.</h2>
+            <p>Five simple steps from installation to your first Holder checkout — no technical rebuilds required.</p>
+          </div>
+          <div className="steps-grid">
+            {stepItems.map(({ Icon, title, body }, index) => (
+              <article className="step-card" key={title} style={{ animationDelay: `${index * 80}ms` }}>
+                <div className="step-num-wrap"><strong>{index + 1}</strong></div>
+                <div className="step-icon-wrap"><Icon size={18} /></div>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Network image band ── */}
+      <section className="network-band">
+        <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1400&auto=format&fit=crop" alt="" className="network-bg-img" />
+        <div className="network-overlay" />
+        <div className="network-content section-inner">
+          <span className="eyebrow"><Star size={16} /> Growing network</span>
+          <h2>Every hub adds more Holders to your store</h2>
+          <div className="network-stats">
+            <div><strong>Auto</strong><span>Note syncing</span></div>
+            <div><strong>0</strong><span>Manual uploads</span></div>
+            <div><strong>∞</strong><span>Hub connections</span></div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Signup card ── */}
+      <div className="public-card-wrap">
+        <section className="public-card signup-card" id="merchant-signup">
+          <div className="signup-inner">
+            <div className="signup-left">
+              <div className="signup-heading">
+                <span className="eyebrow dark"><Shield size={16} /> Merchant signup</span>
+                <h2>Join the Merchant Network</h2>
+                <p>Connect your Shopify store and turn Holder traffic into real customer opportunities.</p>
+              </div>
+              {error && <Notice tone="bad">{error}</Notice>}
+              {result ? (
+                <div className="success-panel">
+                  <Ticket size={32} />
+                  <h3>Registration created</h3>
+                  <p>Your install page is ready. Open it to connect Shopify and activate the merchant app.</p>
+                  <span>Store {result.onboarding.shopDomain}</span>
+                  <a className="button-link button-link-large" href={result.installUrl}>Open Install Instructions</a>
+                </div>
+              ) : (
+                <FormGrid>
+                  <Input label="Business name" value={form.businessName} onChange={(businessName) => setForm({ ...form, businessName })} />
+                  <Input label="Contact name" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} />
+                  <Input label="Contact email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
+                  <Input label="Shopify store domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain: shopDomain.toLowerCase().trim() })} />
+                  <Select label="UEN hub to accept" value={form.requestedExchangeHubId} options={hubs.data ?? []} onChange={(requestedExchangeHubId) => setForm({ ...form, requestedExchangeHubId })} />
+                  <button onClick={submit}><Link2 size={16} /> Join the Merchant Network</button>
+                </FormGrid>
+              )}
+            </div>
+            <div className="signup-right">
+              <div className="signup-perks">
+                <h3>What you get</h3>
+                <ul>
+                  {[
+                    [ShoppingBag, "Your existing Shopify checkout — no changes needed"],
+                    [Zap, "Automatic note syncing across all connected hubs"],
+                    [SlidersHorizontal, "Full control over offer type, value, and limits"],
+                    [TrendingUp, "Access to growing Holder traffic from multiple hubs"],
+                    [Shield, "Merchant dashboard for managing your participation"],
+                  ].map(([Icon, text], i) => (
+                    <li key={i}><span className="perk-icon"><Icon size={15} /></span><span>{text as string}</span></li>
+                  ))}
+                </ul>
+              </div>
+              <div className="signup-img-wrap">
+                <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=600&auto=format&fit=crop" alt="" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* ── Benefit strip ── */}
+      <section className="benefit-strip-outer">
+        <div className="benefit-strip section-inner">
+          {["Shopify app connection", "Automatic note syncing", "Access to Holder traffic", "Controlled discounts", "No manual code uploads", "Your store stays in control"].map((item) => (
+            <span key={item}><Ticket size={15} /> {item}</span>
+          ))}
+        </div>
       </section>
     </PublicShell>
   );
