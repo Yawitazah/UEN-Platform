@@ -120,7 +120,7 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/register";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -151,6 +151,8 @@ function Shell() {
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
           <Route path="/holder/portal" element={<HolderPortal />} />
           <Route path="/holder/register" element={<HolderRegister />} />
+          <Route path="/signup" element={<SignupGateway />} />
+          <Route path="/exchange-hub/register" element={<ExchangeHubRegister />} />
         </Routes>
       ) : (
       <div className="app">
@@ -281,8 +283,8 @@ function UeniteHome() {
       title: "Exchange Hubs",
       kicker: "Activate your audience",
       body: "Creators, influencers, ministries, organizations, and brands can turn supporter energy into portable value for Holders.",
-      cta: "Create an Exchange Hub",
-      href: "/login",
+      cta: "Apply as an Exchange Hub",
+      href: "/exchange-hub/register",
       className: "path-hub"
     },
     {
@@ -290,8 +292,8 @@ function UeniteHome() {
       title: "Holders",
       kicker: "Use your note with participating merchants",
       body: "Discover merchants, offers, and Exchange Hubs you want to support as the UENite network grows.",
-      cta: "Explore the Network",
-      href: "#featured-network",
+      cta: "Access My Wallet",
+      href: "/holder/register",
       className: "path-holder"
     }
   ];
@@ -332,6 +334,7 @@ function UeniteHome() {
           <div>
             <a href="#audiences">Who it is for</a>
             <a href="#featured-network">Network</a>
+            <a href="/signup" className="uenite-nav-cta">Get Started</a>
             <a href="/login">Sign in</a>
           </div>
         </nav>
@@ -2130,6 +2133,307 @@ function MerchantAnalyticsPanel({ merchantId }: { merchantId: string }) {
           <div className="analytics-stat highlight"><strong>${data.revenueInPeriod.toFixed(2)}</strong><span>UEN Revenue ({period})</span></div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── SignupGateway ───
+
+function SignupGateway() {
+  const roles = [
+    {
+      icon: ShoppingBag,
+      badge: "For store owners",
+      title: "I run a store",
+      body: "You have a Shopify store and want to reach motivated customers who already have a note to spend. Accept Universal Exchange Notes at checkout and grow your customer base through trusted communities.",
+      perks: [
+        "No changes to your Shopify checkout",
+        "Automatic note syncing — no CSV uploads",
+        "You set the offer, discount, and limits",
+        "Access to warm traffic from multiple hubs"
+      ],
+      cta: "Connect my store",
+      href: "/merchants/register",
+      accent: "#60a5fa",
+      bg: "rgba(96,165,250,0.10)",
+      accentDark: "#1e3a5f"
+    },
+    {
+      icon: Users,
+      badge: "For creators & communities",
+      title: "I lead a community",
+      body: "You have an audience, congregation, fan base, or following. You want to reward supporters with notes they can use at real stores — turning your community's energy into something tangible.",
+      perks: [
+        "Issue notes to anyone who supports you",
+        "Choose which stores your supporters can shop at",
+        "Keep your supporter list — it's your data",
+        "Works with your existing Shopify store"
+      ],
+      cta: "Apply as a Hub",
+      href: "/exchange-hub/register",
+      accent: "#a78bfa",
+      bg: "rgba(167,139,250,0.10)",
+      accentDark: "#2d1f5e"
+    },
+    {
+      icon: Ticket,
+      badge: "For note holders",
+      title: "I have a note to use",
+      body: "You received a Universal Exchange Note from a creator, church, community, or organization you support. Get your personal wallet link to see where you can use it and track your codes.",
+      perks: [
+        "See all your notes in one place",
+        "Find participating stores and their offers",
+        "Use your code at Shopify checkout",
+        "Track which codes you've used and where"
+      ],
+      cta: "Access my wallet",
+      href: "/holder/register",
+      accent: "#34d399",
+      bg: "rgba(52,211,153,0.10)",
+      accentDark: "#0d2e1e"
+    }
+  ];
+
+  return (
+    <div className="signup-gw-root">
+      <nav className="signup-gw-nav">
+        <a className="uenite-logo" href="/"><Shield size={22} /><span>UENite</span></a>
+        <div className="signup-gw-nav-links">
+          <a href="/login">Sign in</a>
+        </div>
+      </nav>
+
+      <div className="signup-gw-hero">
+        <span className="eyebrow"><Star size={16} /> Universal Exchange Note Network</span>
+        <h1>Choose how you want to participate</h1>
+        <p>UENite connects creators, stores, and supporters through a simple exchange system. Pick the role that fits you and get started in minutes — no complicated setup, no jargon.</p>
+      </div>
+
+      <div className="signup-gw-cards">
+        {roles.map(({ icon: Icon, badge, title, body, perks, cta, href, accent, bg, accentDark }) => (
+          <article
+            className="signup-gw-card"
+            key={title}
+            style={{ "--gw-accent": accent, "--gw-bg": bg, "--gw-dark": accentDark } as React.CSSProperties}
+          >
+            <div className="signup-gw-card-top">
+              <div className="signup-gw-icon" style={{ background: bg, color: accent }}>
+                <Icon size={30} />
+              </div>
+              <span className="signup-gw-badge" style={{ color: accent, background: bg }}>{badge}</span>
+            </div>
+            <h2 className="signup-gw-title">{title}</h2>
+            <p className="signup-gw-body">{body}</p>
+            <ul className="signup-gw-perks">
+              {perks.map((perk) => (
+                <li key={perk}>
+                  <CheckCircle size={15} style={{ color: accent, flexShrink: 0 }} />
+                  <span>{perk}</span>
+                </li>
+              ))}
+            </ul>
+            <a className="signup-gw-cta" href={href} style={{ background: accent, color: "#07120e" }}>
+              {cta}
+            </a>
+          </article>
+        ))}
+      </div>
+
+      <div className="signup-gw-footer">
+        <p>Already have an account? <a href="/login">Sign in here</a></p>
+        <p className="signup-gw-powered"><Shield size={14} /> Powered by UENite (Universal Exchange Note)</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── ExchangeHubRegister ───
+
+function ExchangeHubRegister() {
+  const [form, setForm] = useState({
+    displayName: "",
+    hubType: "creator",
+    contactName: "",
+    contactEmail: "",
+    website: "",
+    description: ""
+  });
+  const [result, setResult] = useState<any | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const hubTypeOptions = [
+    { value: "creator", label: "Creator or Influencer" },
+    { value: "ministry", label: "Ministry or Church" },
+    { value: "community", label: "Community or Group" },
+    { value: "brand", label: "Brand or Business" },
+    { value: "sports", label: "Sports Team or Club" },
+    { value: "nonprofit", label: "Nonprofit or Charity" },
+    { value: "other", label: "Other" }
+  ];
+
+  const submit = async () => {
+    setError("");
+    if (!form.displayName.trim() || !form.contactEmail.trim()) {
+      setError("Your name and contact email are required.");
+      return;
+    }
+    if (!form.contactEmail.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/exchange-hub/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Could not submit application");
+      setResult(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const whatYouGet = [
+    [Ticket, "Issue Universal Exchange Notes to your supporters"],
+    [ShoppingBag, "Choose which stores accept notes from your community"],
+    [Users, "Keep your supporter data — it stays with you"],
+    [Globe, "Your community gets a private wallet to track their notes"],
+    [Zap, "Works with Shopify — no complex technical setup"],
+    [Shield, "Full admin dashboard to manage your hub"]
+  ];
+
+  return (
+    <div className="hub-apply-root">
+      <nav className="hub-apply-nav">
+        <a className="uenite-logo" href="/"><Shield size={22} /><span>UENite</span></a>
+        <a className="hub-apply-back" href="/signup">← All options</a>
+      </nav>
+
+      <div className="hub-apply-body">
+        <div className="hub-apply-form-col">
+          {!result ? (
+            <div className="hub-apply-card">
+              <div className="hub-apply-icon"><Users size={32} /></div>
+              <h1 className="hub-apply-title">Apply as an Exchange Hub</h1>
+              <p className="hub-apply-sub">Tell us about your community. Our team reviews every application and will reach out within a few business days. There is no cost to apply right now.</p>
+
+              {error && <div className="hub-apply-error">{error}</div>}
+
+              <div className="hub-apply-form">
+                <label className="hub-apply-label">
+                  Your name or organization name <span className="req">*</span>
+                  <input
+                    className="hub-apply-input"
+                    value={form.displayName}
+                    onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                    placeholder="e.g. NuBreed Love, Cornerstone Church, The Collective"
+                  />
+                </label>
+
+                <label className="hub-apply-label">
+                  What best describes you? <span className="req">*</span>
+                  <select
+                    className="hub-apply-input"
+                    value={form.hubType}
+                    onChange={(e) => setForm({ ...form, hubType: e.target.value })}
+                  >
+                    {hubTypeOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="hub-apply-label">
+                  Your name (contact person) <span className="req">*</span>
+                  <input
+                    className="hub-apply-input"
+                    value={form.contactName}
+                    onChange={(e) => setForm({ ...form, contactName: e.target.value })}
+                    placeholder="First and last name"
+                  />
+                </label>
+
+                <label className="hub-apply-label">
+                  Email address <span className="req">*</span>
+                  <input
+                    className="hub-apply-input"
+                    type="email"
+                    value={form.contactEmail}
+                    onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                    placeholder="you@yourdomain.com"
+                  />
+                </label>
+
+                <label className="hub-apply-label">
+                  Website or social link <span className="hub-apply-opt">(optional)</span>
+                  <input
+                    className="hub-apply-input"
+                    value={form.website}
+                    onChange={(e) => setForm({ ...form, website: e.target.value })}
+                    placeholder="https://yourwebsite.com or @yourhandle"
+                  />
+                </label>
+
+                <label className="hub-apply-label">
+                  Tell us about your community <span className="hub-apply-opt">(optional)</span>
+                  <textarea
+                    className="hub-apply-input hub-apply-textarea"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="How many supporters do you have? What kind of content or community do you run? How do you think UENite could help?"
+                    rows={4}
+                  />
+                </label>
+
+                <button className="hub-apply-btn" onClick={submit} disabled={loading}>
+                  {loading ? "Submitting…" : <><Users size={16} /> Submit My Application</>}
+                </button>
+
+                <p className="hub-apply-fine">
+                  By submitting, you agree that our team may contact you at the email provided. No credit card or payment required to apply.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="hub-apply-card hub-apply-success">
+              <div className="hub-apply-success-icon"><CheckCircle size={44} /></div>
+              <h1>Application received!</h1>
+              <p>Thank you, <strong>{form.contactName || form.displayName}</strong>. We've received your application for <strong>{result.displayName}</strong> and our team will review it shortly.</p>
+              <p className="hub-apply-success-note">We'll reach out to <strong>{form.contactEmail}</strong> within a few business days. While you wait, feel free to explore the platform.</p>
+              <div className="hub-apply-success-links">
+                <a className="hub-apply-btn" href="/">Back to home</a>
+                <a className="hub-apply-btn-ghost" href="/merchants/register">Register a store instead</a>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="hub-apply-side">
+          <div className="hub-apply-side-content">
+            <span className="eyebrow"><Star size={16} /> What you get as a Hub</span>
+            <h2>Turn your audience into a real exchange network</h2>
+            <p>As an approved Exchange Hub, you can issue Universal Exchange Notes to anyone in your community — and those notes become real value they can spend at participating stores.</p>
+            <ul className="hub-apply-perks">
+              {whatYouGet.map(([Icon, text], i) => (
+                <li key={i}>
+                  <span className="hub-apply-perk-icon"><Icon size={16} /></span>
+                  <span>{text as string}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="hub-apply-note">
+              <Shield size={16} />
+              <span>Every application is reviewed by our team before approval. This keeps the network trusted and high-quality for all participants.</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

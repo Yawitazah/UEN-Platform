@@ -26,8 +26,8 @@ import {
 const router: Router = express.Router();
 const adminRoles = [AdminRole.SUPER_ADMIN, AdminRole.OPERATIONS, AdminRole.SUPPORT];
 const writeRoles = [AdminRole.SUPER_ADMIN, AdminRole.OPERATIONS];
-const siteContentClient = (prisma as any).siteContent;
 const siteContentSchema = z.object({ value: z.unknown() });
+type SiteContentRow = { id: string; key: string; value: string; createdAt?: Date; updatedAt?: Date };
 
 function param(req: express.Request, name: string) {
   const value = req.params[name];
@@ -126,7 +126,13 @@ router.get("/admin/dashboard", requireRole(adminRoles), async (_req, res) => {
 });
 
 router.get("/public/site-content", async (_req, res) => {
-  const rows = await siteContentClient.findMany();
+  let rows: SiteContentRow[] = [];
+  try {
+    rows = await prisma.$queryRaw<SiteContentRow[]>`SELECT * FROM "SiteContent"`;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("SiteContent")) return res.json({});
+    throw error;
+  }
   const content = rows.reduce((acc: Record<string, unknown>, row: { key: string; value: string }) => {
     try {
       acc[row.key] = JSON.parse(row.value);
@@ -139,7 +145,7 @@ router.get("/public/site-content", async (_req, res) => {
 });
 
 router.get("/site-content", requireRole(adminRoles), async (_req, res) => {
-  const rows = await siteContentClient.findMany({ orderBy: { key: "asc" } });
+  const rows = await prisma.$queryRaw<SiteContentRow[]>`SELECT * FROM "SiteContent" ORDER BY "key" ASC`;
   res.json(rows.map((row: { key: string; value: string }) => ({ ...row, value: JSON.parse(row.value) })));
 });
 
@@ -147,11 +153,14 @@ router.patch("/site-content/:key", requireRole(writeRoles), async (req, res) => 
   try {
     const key = param(req, "key");
     const data = siteContentSchema.parse(req.body);
-    const saved = await siteContentClient.upsert({
-      where: { key },
-      update: { value: JSON.stringify(data.value) },
-      create: { key, value: JSON.stringify(data.value) }
-    });
+    const value = JSON.stringify(data.value);
+    const id = crypto.randomUUID();
+    await prisma.$executeRaw`
+      INSERT INTO "SiteContent" ("id", "key", "value", "createdAt", "updatedAt")
+      VALUES (${id}, ${key}, ${value}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT ("key") DO UPDATE SET "value" = ${value}, "updatedAt" = CURRENT_TIMESTAMP
+    `;
+    const [saved] = await prisma.$queryRaw<SiteContentRow[]>`SELECT * FROM "SiteContent" WHERE "key" = ${key} LIMIT 1`;
     await audit({ action: AuditAction.MERCHANT_OFFER_CHANGED, entityType: "SiteContent", entityId: saved.id, message: `Updated ${key} public content` });
     res.json({ ...saved, value: JSON.parse(saved.value) });
   } catch (error) {
@@ -170,6 +179,58 @@ router.get("/public/exchange-hubs", async (_req, res) => {
     select: { id: true, displayName: true, hubType: true, logoUrl: true, brandColor: true }
   });
   res.json(hubs);
+});
+
+// POST /api/exchange-hub/apply — public self-registration for new Exchange Hubs
+router.post("/exchange-hub/apply", async (req, res) => {
+  try {
+    const { displayName, hubType, contactName, contactEmail, website, description } = req.body as {
+      displayName?: string;
+      hubType?: string;
+      contactName?: string;
+      contactEmail?: string;
+      website?: string;
+      description?: string;
+    };
+
+    if (!displayName || !contactEmail) {
+      return res.status(400).json({ error: "Organization name and contact email are required" });
+    }
+
+    const normalizedEmail = contactEmail.trim().toLowerCase();
+    const slug = displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+    const hub = await prisma.exchangeHub.create({
+      data: {
+        name: slug,
+        displayName: displayName.trim(),
+        hubType: (hubType ?? "creator").toLowerCase().trim(),
+        status: "PENDING_REVIEW",
+        billingStatus: "PENDING",
+        uenValue: 1.00
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "EXCHANGE_HUB_APPLICATION",
+        actorType: "public",
+        entityType: "ExchangeHub",
+        entityId: hub.id,
+        message: `New hub application: ${displayName} (${normalizedEmail})`,
+        metadata: JSON.stringify({ contactName, contactEmail: normalizedEmail, website, description })
+      }
+    });
+
+    res.status(201).json({
+      id: hub.id,
+      displayName: hub.displayName,
+      message: "Your application has been received. Our team will review it and reach out to you within a few business days."
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not submit application" });
+  }
 });
 
 router.post("/merchant-onboarding/register", async (req, res) => {
