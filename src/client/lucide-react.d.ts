@@ -29,3 +29,8 @@ declare module "lucide-react" {
   export const X: LucideIcon;
   export const Zap: LucideIcon;
 }
+
+declare module "*.png" {
+  const src: string;
+  export default src;
+}

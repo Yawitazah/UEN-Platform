@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Pause, Play, RefreshCw, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
+import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
@@ -164,9 +165,9 @@ type HomeSiteContent = {
 
 const defaultHomeContent: HomeSiteContent = {
   pageBackground: "",
-  heroEyebrow: "A smarter way to fundraise, sell, and support",
-  heroTitle: "The smarter way to fundraise, sell, and support.",
-  heroBody: "UENITE turns audience support into a merchant-backed value network. Creators and Exchange Hubs keep direct supporter relationships, Holders receive Universal Exchange Notes and digital rewards, and participating merchants give those notes real checkout utility.",
+  heroEyebrow: "The possibilities are endless when we UENITE",
+  heroTitle: "THE SMARTER WAY TO FUNDRAISE, SELL, AND SUPPORT.",
+  heroBody: "UENITE helps people raise money while giving supporters something valuable back. Supporters become Holders, receive Notes and digital rewards, and can redeem value with participating merchants.",
   primaryCtaText: "Join the Merchant Network",
   primaryCtaHref: "/merchants/register",
   secondaryCtaText: "Choose your path",
@@ -210,7 +211,7 @@ const defaultHomeContent: HomeSiteContent = {
   flowBody: "Instead of giving and receiving nothing back, supporters receive a UEN and, at minimum, a digital item. Exchange Hubs can add music, art, books, collectibles, campaign rewards, limited releases, and future perks.",
   flow1Title: "Supporters fund a cause or creator",
   flow1Body: "A Holder contributes to a fundraiser, campaign, creator, ministry, community, or pay-it-forward mission through the Exchange Hub's own commerce flow.",
-  flow1Image: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=900&auto=format&fit=crop",
+  flow1Image: creatorLiveSupport,
   flow1Badge: "Support",
   flow1Value: "$",
   flow2Title: "They receive more than a receipt",
@@ -290,13 +291,16 @@ function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined
     textColors: value?.textColors && typeof value.textColors === "object" ? value.textColors : {},
     textLinks: value?.textLinks && typeof value.textLinks === "object" ? value.textLinks : {}
   };
-  if (merged.heroTitle === "When we UENite, the possibilities are endless." || merged.heroTitle === "A smarter way to fundraise, sell, support, and UENite.") {
+  if (merged.heroTitle === "When we UENite, the possibilities are endless." || merged.heroTitle === "A smarter way to fundraise, sell, support, and UENite." || merged.heroTitle === "The smarter way to fundraise, sell, and support.") {
     merged.heroTitle = defaultHomeContent.heroTitle;
   }
-  if (merged.heroBody === "Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.") {
+  if (merged.heroBody === "Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store." || merged.heroBody === "UENITE turns audience support into a merchant-backed value network. Creators and Exchange Hubs keep direct supporter relationships, Holders receive Universal Exchange Notes and digital rewards, and participating merchants give those notes real checkout utility.") {
     merged.heroBody = defaultHomeContent.heroBody;
   }
-  if (merged.flow1Image === "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop") {
+  if (merged.heroEyebrow === "The possibilities are endless when we UENite" || merged.heroEyebrow === "A smarter way to fundraise, sell, and support") {
+    merged.heroEyebrow = defaultHomeContent.heroEyebrow;
+  }
+  if (merged.flow1Image === "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop" || merged.flow1Image.includes("1611162617474")) {
     merged.flow1Image = defaultHomeContent.flow1Image;
   }
   return merged;
@@ -364,7 +368,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -390,6 +394,7 @@ function Shell() {
       {isPublicRoute ? (
         <Routes>
           <Route path="/" element={<UeniteHome />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
@@ -610,6 +615,7 @@ function UeniteHome() {
           <div>
             <a href="#audiences">Who it is for</a>
             <a href="#featured-network">Network</a>
+            <a href="/about">About</a>
             <a href="/signup" className="uenite-nav-cta">Get Started</a>
             <a href="/login">Sign in</a>
           </div>
@@ -833,6 +839,45 @@ function UeniteHome() {
         <a {...editableAnchor("finalCtaText", content.finalCtaHref, "button-link button-link-large")}>{content.finalCtaText}</a>
       </section>
       {publicAdmin && <SiteEditor initialContent={content} onPreview={setPreviewContent} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={(nextOpen) => { setEditorOpen(nextOpen); if (!nextOpen) setSelectedField(null); }} onSelect={setSelectedField} />}
+      <PoweredByFooter />
+    </main>
+  );
+}
+
+function AboutPage() {
+  return (
+    <main className="about-page">
+      <nav className="uenite-nav about-nav">
+        <a className="uenite-logo" href="/"><Shield size={24} /><BrandWord /></a>
+        <div>
+          <a href="/">Home</a>
+          <a href="/signup" className="uenite-nav-cta">Get Started</a>
+          <a href="/login">Sign in</a>
+        </div>
+      </nav>
+      <section className="about-hero">
+        <span className="eyebrow dark"><Star size={16} /> About UENITE</span>
+        <h1>Support with memory, value, and momentum.</h1>
+        <p>UENITE is a smarter way to fundraise, sell, and support. It turns contributions into Universal Exchange Notes, digital rewards, collectibles, badges, and merchant offers that Holders can keep, redeem, and remember.</p>
+      </section>
+      <section className="about-grid">
+        {[
+          ["Exchange Hubs", "Creators, causes, ministries, businesses, and communities can raise money while giving supporters something meaningful in return."],
+          ["Holders", "Supporters become Holders with a growing vault of Notes, downloads, badges, campaign memories, and future value."],
+          ["Merchants", "Participating merchants accept Universal Exchange Notes and turn supporter energy into customer activity."],
+          ["Collections", "Every item can tell the story of what was supported, when it happened, what was unlocked, and why it matters."]
+        ].map(([title, body]) => (
+          <article key={title}>
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </article>
+        ))}
+      </section>
+      <section className="about-statement">
+        <h2>The future of support is an exchange.</h2>
+        <p>People should be able to support what they believe in and hold something that reflects that goodwill. UENITE gives every campaign a collection, every Holder a reason to return, and every Merchant a new way to connect with motivated customers.</p>
+        <a className="button-link button-link-large" href="/signup">Start with UENITE</a>
+      </section>
       <PoweredByFooter />
     </main>
   );
@@ -1417,6 +1462,7 @@ function SharePanel() {
 function PublicPreviews() {
   const pages = [
     ["Homepage", "/"],
+    ["About", "/about"],
     ["Login", "/login"],
     ["Signup Gateway", "/signup"],
     ["Merchant Signup", "/merchants/register"],
