@@ -886,6 +886,61 @@ th {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.preset-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.preset-tile {
+  align-items: flex-end;
+  border: 1px solid #d5e1db;
+  border-radius: 8px;
+  color: white;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 72px;
+  overflow: hidden;
+  padding: 10px;
+  text-align: left;
+}
+
+.preset-tile.active {
+  border-color: #17201b;
+  box-shadow: 0 0 0 2px rgba(117, 227, 173, 0.45);
+}
+
+.preset-emerald {
+  background: radial-gradient(circle at 20% 20%, #fbbf24, transparent 28%), linear-gradient(135deg, #07120e, #1f6f5b);
+}
+
+.preset-gold {
+  background: radial-gradient(circle at 20% 20%, #34d399, transparent 28%), linear-gradient(135deg, #150f05, #9a6a18);
+}
+
+.preset-violet {
+  background: radial-gradient(circle at 20% 20%, #ec4899, transparent 28%), linear-gradient(135deg, #0a1024, #5b2b86);
+}
+
+.preset-midnight {
+  background: radial-gradient(circle at 20% 20%, #38bdf8, transparent 28%), linear-gradient(135deg, #020617, #0f2f2e);
+}
+
+.upload-drop {
+  background: #eef5f1;
+  border: 1px dashed #9ab2a7;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.upload-drop input {
+  background: transparent;
+  border: 0;
+  min-height: 0;
+  padding: 6px 0 0;
+}
+
 .media-library-list button {
   background: white;
   border: 1px solid #d5e1db;

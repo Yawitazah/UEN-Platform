@@ -1,5 +1,7 @@
 import type { Router } from "express";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import express from "express";
 import { z, ZodError } from "zod";
 import { audit } from "../audit";
@@ -27,6 +29,11 @@ const router: Router = express.Router();
 const adminRoles = [AdminRole.SUPER_ADMIN, AdminRole.OPERATIONS, AdminRole.SUPPORT];
 const writeRoles = [AdminRole.SUPER_ADMIN, AdminRole.OPERATIONS];
 const siteContentSchema = z.object({ value: z.unknown() });
+const siteMediaSchema = z.object({
+  filename: z.string().min(1).max(160),
+  dataUrl: z.string().startsWith("data:"),
+  mediaType: z.enum(["image", "video"]).default("image")
+});
 type SiteContentRow = { id: string; key: string; value: string; createdAt?: Date; updatedAt?: Date };
 
 function param(req: express.Request, name: string) {
@@ -163,6 +170,24 @@ router.patch("/site-content/:key", requireRole(writeRoles), async (req, res) => 
     const [saved] = await prisma.$queryRaw<SiteContentRow[]>`SELECT * FROM "SiteContent" WHERE "key" = ${key} LIMIT 1`;
     await audit({ action: AuditAction.MERCHANT_OFFER_CHANGED, entityType: "SiteContent", entityId: saved.id, message: `Updated ${key} public content` });
     res.json({ ...saved, value: JSON.parse(saved.value) });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post("/site-media", requireRole(writeRoles), async (req, res) => {
+  try {
+    const data = siteMediaSchema.parse(req.body);
+    const [header, base64] = data.dataUrl.split(",");
+    if (!base64 || !header.includes(";base64")) return res.status(400).json({ error: "Invalid media upload" });
+    if (data.mediaType === "image" && !header.startsWith("data:image/")) return res.status(400).json({ error: "Only image uploads are allowed here" });
+    if (data.mediaType === "video" && !header.startsWith("data:video/")) return res.status(400).json({ error: "Only video uploads are allowed here" });
+    const safeName = data.filename.replace(/[^a-z0-9._-]/gi, "-").toLowerCase();
+    const filename = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${safeName}`;
+    const uploadDir = path.resolve(process.cwd(), "uploads");
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(path.join(uploadDir, filename), Buffer.from(base64, "base64"));
+    res.json({ url: `/uploads/${filename}`, mediaType: data.mediaType, filename });
   } catch (error) {
     handleError(res, error);
   }

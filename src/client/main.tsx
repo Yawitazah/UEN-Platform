@@ -68,6 +68,76 @@ type HomeSiteContent = {
   orbitHubLabel: string;
   orbitHolderLabel: string;
   orbitMerchantLabel: string;
+  audienceEyebrow: string;
+  audienceTitle: string;
+  audienceBody: string;
+  merchantPathKicker: string;
+  merchantPathTitle: string;
+  merchantPathBody: string;
+  merchantPathCta: string;
+  hubPathKicker: string;
+  hubPathTitle: string;
+  hubPathBody: string;
+  hubPathCta: string;
+  holderPathKicker: string;
+  holderPathTitle: string;
+  holderPathBody: string;
+  holderPathCta: string;
+  flowEyebrow: string;
+  flowTitle: string;
+  flowBody: string;
+  flow1Title: string;
+  flow1Body: string;
+  flow1Image: string;
+  flow1Badge: string;
+  flow1Value: string;
+  flow2Title: string;
+  flow2Body: string;
+  flow2Image: string;
+  flow2Badge: string;
+  flow2Value: string;
+  flow3Title: string;
+  flow3Body: string;
+  flow3Image: string;
+  flow3Badge: string;
+  flow3Value: string;
+  flow4Title: string;
+  flow4Body: string;
+  flow4Image: string;
+  flow4Badge: string;
+  flow4Value: string;
+  creatorEyebrow: string;
+  creatorTitle: string;
+  creatorBody: string;
+  creatorCard1Title: string;
+  creatorCard1Body: string;
+  creatorCard2Title: string;
+  creatorCard2Body: string;
+  creatorCard3Title: string;
+  creatorCard3Body: string;
+  creatorCard4Title: string;
+  creatorCard4Body: string;
+  storyImage: string;
+  storyEyebrow: string;
+  storyTitle: string;
+  storyBody: string;
+  storyStep1: string;
+  storyStep2: string;
+  storyStep3: string;
+  storyStep4: string;
+  featuredEyebrow: string;
+  featuredTitle: string;
+  featuredBody: string;
+  featured1Title: string;
+  featured1Body: string;
+  featured2Title: string;
+  featured2Body: string;
+  featured3Title: string;
+  featured3Body: string;
+  finalTitle: string;
+  finalBody: string;
+  finalCtaText: string;
+  finalCtaHref: string;
 };
 
 const defaultHomeContent: HomeSiteContent = {
@@ -94,7 +164,77 @@ const defaultHomeContent: HomeSiteContent = {
   orbitCoreSubtitle: "Universal Exchange Note",
   orbitHubLabel: "Exchange Hub",
   orbitHolderLabel: "Holder",
-  orbitMerchantLabel: "Merchant"
+  orbitMerchantLabel: "Merchant",
+  audienceEyebrow: "Built for the whole exchange",
+  audienceTitle: "Every participant has a reason to show up.",
+  audienceBody: "UENite is not just a coupon app. It is a network where support, access, discovery, and redemption move together.",
+  merchantPathKicker: "Turn Holders into customers",
+  merchantPathTitle: "Merchants",
+  merchantPathBody: "Accept Universal Exchange Notes in Shopify, set your own offer, and get access to motivated traffic from trusted communities.",
+  merchantPathCta: "Join the Merchant Network",
+  hubPathKicker: "Activate your audience",
+  hubPathTitle: "Exchange Hubs",
+  hubPathBody: "Creators, influencers, ministries, organizations, and brands can turn supporter energy into portable value for Holders.",
+  hubPathCta: "Apply as an Exchange Hub",
+  holderPathKicker: "Use your note with participating merchants",
+  holderPathTitle: "Holders",
+  holderPathBody: "Discover merchants, offers, and Exchange Hubs you want to support as the UENite network grows.",
+  holderPathCta: "Access My Wallet",
+  flowEyebrow: "The UENite exchange flow",
+  flowTitle: "Support becomes a note. A note becomes a reason to shop.",
+  flowBody: "UENite turns audience loyalty into portable value that travels from the creator to the Holder to participating merchants.",
+  flow1Title: "Audience Supports the Hub",
+  flow1Body: "A creator, influencer, ministry, brand, or community receives direct support through their own commerce flow.",
+  flow1Image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop",
+  flow1Badge: "Support",
+  flow1Value: "$",
+  flow2Title: "Holder Receives a UEN",
+  flow2Body: "The supporter becomes a Holder and receives a Universal Exchange Note connected to that relationship.",
+  flow2Image: "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?q=80&w=900&auto=format&fit=crop",
+  flow2Badge: "UEN issued",
+  flow2Value: "UEN",
+  flow3Title: "Holder Shops With a Merchant",
+  flow3Body: "The Holder discovers participating merchants and uses the note through the existing Shopify checkout.",
+  flow3Image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=900&auto=format&fit=crop",
+  flow3Badge: "Checkout",
+  flow3Value: "15%",
+  flow4Title: "Merchant Delivers Real Value",
+  flow4Body: "The merchant controls the offer, gains warm traffic, and turns supporter energy into customer activity.",
+  flow4Image: "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=900&auto=format&fit=crop",
+  flow4Badge: "Offer active",
+  flow4Value: "SALE",
+  creatorEyebrow: "Creator owned support",
+  creatorTitle: "Audience support should build your own customer list, not someone else's platform.",
+  creatorBody: "Exchange Hubs can sell notes through their own Shopify store, collect supporter data directly, and stay connected after the sale. Instead of audience value being trapped inside social platforms, UENite helps turn support into owned relationships and merchant-ready value.",
+  creatorCard1Title: "Direct data",
+  creatorCard1Body: "Supporter names, emails, and purchase history flow through your own commerce stack.",
+  creatorCard2Title: "Lower-friction support",
+  creatorCard2Body: "A note purchase can compete with tip-style support while creating value the Holder can use.",
+  creatorCard3Title: "Ongoing engagement",
+  creatorCard3Body: "Holders can be contacted, rewarded, and directed to participating merchants.",
+  creatorCard4Title: "Shopify ecosystem",
+  creatorCard4Body: "Creators with stores can pair note sales, digital products, merch, and merchant redemption.",
+  storyImage: "https://images.unsplash.com/photo-1556745757-8d76bdb6984b?q=80&w=1200&auto=format&fit=crop",
+  storyEyebrow: "How value moves",
+  storyTitle: "Support becomes access. Access becomes traffic. Traffic becomes sales.",
+  storyBody: "A Holder receives a Universal Exchange Note from an Exchange Hub they trust. That note gives them a reason to discover participating merchants, unlock value, and come back again.",
+  storyStep1: "Exchange Hub issues notes",
+  storyStep2: "Holder receives value",
+  storyStep3: "Merchant accepts notes",
+  storyStep4: "Checkout creates sales",
+  featuredEyebrow: "Featured network",
+  featuredTitle: "Holders will discover where their notes have value.",
+  featuredBody: "Featured merchants and Exchange Hubs become the discovery layer that helps Holders choose who to support and where to shop.",
+  featured1Title: "Featured Merchants",
+  featured1Body: "Participating stores, offers, perks, and product categories.",
+  featured2Title: "Featured Exchange Hubs",
+  featured2Body: "Creators, communities, ministries, brands, and organizations issuing notes.",
+  featured3Title: "Holder Wallet",
+  featured3Body: "A future holder view for owned notes, eligible stores, and redemption history.",
+  finalTitle: "Ready to UENite your audience, customers, and community?",
+  finalBody: "Start with a merchant connection today, then grow into the full exchange network.",
+  finalCtaText: "Join the Merchant Network",
+  finalCtaHref: "/merchants/register"
 };
 
 function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined): HomeSiteContent {
@@ -283,28 +423,28 @@ function UeniteHome() {
   const paths = [
     {
       Icon: ShoppingBag,
-      title: "Merchants",
-      kicker: "Turn Holders into customers",
-      body: "Accept Universal Exchange Notes in Shopify, set your own offer, and get access to motivated traffic from trusted communities.",
-      cta: "Join the Merchant Network",
+      titleField: "merchantPathTitle" as keyof HomeSiteContent,
+      kickerField: "merchantPathKicker" as keyof HomeSiteContent,
+      bodyField: "merchantPathBody" as keyof HomeSiteContent,
+      ctaField: "merchantPathCta" as keyof HomeSiteContent,
       href: "/merchants/register",
       className: "path-merchant"
     },
     {
       Icon: Users,
-      title: "Exchange Hubs",
-      kicker: "Activate your audience",
-      body: "Creators, influencers, ministries, organizations, and brands can turn supporter energy into portable value for Holders.",
-      cta: "Apply as an Exchange Hub",
+      titleField: "hubPathTitle" as keyof HomeSiteContent,
+      kickerField: "hubPathKicker" as keyof HomeSiteContent,
+      bodyField: "hubPathBody" as keyof HomeSiteContent,
+      ctaField: "hubPathCta" as keyof HomeSiteContent,
       href: "/exchange-hub/register",
       className: "path-hub"
     },
     {
       Icon: Ticket,
-      title: "Holders",
-      kicker: "Use your note with participating merchants",
-      body: "Discover merchants, offers, and Exchange Hubs you want to support as the UENite network grows.",
-      cta: "Access My Wallet",
+      titleField: "holderPathTitle" as keyof HomeSiteContent,
+      kickerField: "holderPathKicker" as keyof HomeSiteContent,
+      bodyField: "holderPathBody" as keyof HomeSiteContent,
+      ctaField: "holderPathCta" as keyof HomeSiteContent,
       href: "/holder/register",
       className: "path-holder"
     }
@@ -318,6 +458,10 @@ function UeniteHome() {
   };
   const editableClass = (field: keyof HomeSiteContent | "heroBackground" | "share") =>
     publicAdmin ? `editable-surface ${selectedField === field ? "selected" : ""}` : "";
+  const editableText = (field: keyof HomeSiteContent, className = "") => ({
+    className: `${className} ${editableClass(field)}`,
+    onClick: selectField(field)
+  });
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
       .then((response) => (response.ok ? response.json() : null))
@@ -391,18 +535,18 @@ function UeniteHome() {
       <section className="audience-section" id="audiences">
         <div className="section-inner">
           <div className="section-heading colorful-heading">
-            <span className="eyebrow dark"><Zap size={16} /> Built for the whole exchange</span>
-            <h2>Every participant has a reason to show up.</h2>
-            <p>UENite is not just a coupon app. It is a network where support, access, discovery, and redemption move together.</p>
+            <span {...editableText("audienceEyebrow", "eyebrow dark")}><Zap size={16} /> {content.audienceEyebrow}</span>
+            <h2 {...editableText("audienceTitle")}>{content.audienceTitle}</h2>
+            <p {...editableText("audienceBody")}>{content.audienceBody}</p>
           </div>
           <div className="path-grid">
-            {paths.map(({ Icon, title, kicker, body, cta, href, className }) => (
-              <article className={`path-card ${className}`} key={title}>
+            {paths.map(({ Icon, titleField, kickerField, bodyField, ctaField, href, className }) => (
+              <article className={`path-card ${className}`} key={titleField}>
                 <div className="path-icon"><Icon size={28} /></div>
-                <span>{kicker}</span>
-                <h3>{title}</h3>
-                <p>{body}</p>
-                <a href={href}>{cta}</a>
+                <span {...editableText(kickerField)}>{String(content[kickerField])}</span>
+                <h3 {...editableText(titleField)}>{String(content[titleField])}</h3>
+                <p {...editableText(bodyField)}>{String(content[bodyField])}</p>
+                <a className={editableClass(ctaField)} onClick={selectField(ctaField)} href={href}>{String(content[ctaField])}</a>
               </article>
             ))}
           </div>
@@ -412,51 +556,51 @@ function UeniteHome() {
       <section className="exchange-flow-section">
         <div className="section-inner">
           <div className="section-heading flow-heading">
-            <span className="eyebrow"><RefreshCw size={16} /> The UENite exchange flow</span>
-            <h2>Support becomes a note. A note becomes a reason to shop.</h2>
-            <p>UENite turns audience loyalty into portable value that travels from the creator to the Holder to participating merchants.</p>
+            <span {...editableText("flowEyebrow", "eyebrow")}><RefreshCw size={16} /> {content.flowEyebrow}</span>
+            <h2 {...editableText("flowTitle")}>{content.flowTitle}</h2>
+            <p {...editableText("flowBody")}>{content.flowBody}</p>
           </div>
           <div className="exchange-flow-grid">
             {[
               {
-                title: "Audience Supports the Hub",
-                body: "A creator, influencer, ministry, brand, or community receives direct support through their own commerce flow.",
-                image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop",
-                badge: "Support",
-                value: "$"
+                titleField: "flow1Title" as keyof HomeSiteContent,
+                bodyField: "flow1Body" as keyof HomeSiteContent,
+                imageField: "flow1Image" as keyof HomeSiteContent,
+                badgeField: "flow1Badge" as keyof HomeSiteContent,
+                valueField: "flow1Value" as keyof HomeSiteContent
               },
               {
-                title: "Holder Receives a UEN",
-                body: "The supporter becomes a Holder and receives a Universal Exchange Note connected to that relationship.",
-                image: "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?q=80&w=900&auto=format&fit=crop",
-                badge: "UEN issued",
-                value: "UEN"
+                titleField: "flow2Title" as keyof HomeSiteContent,
+                bodyField: "flow2Body" as keyof HomeSiteContent,
+                imageField: "flow2Image" as keyof HomeSiteContent,
+                badgeField: "flow2Badge" as keyof HomeSiteContent,
+                valueField: "flow2Value" as keyof HomeSiteContent
               },
               {
-                title: "Holder Shops With a Merchant",
-                body: "The Holder discovers participating merchants and uses the note through the existing Shopify checkout.",
-                image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=900&auto=format&fit=crop",
-                badge: "Checkout",
-                value: "15%"
+                titleField: "flow3Title" as keyof HomeSiteContent,
+                bodyField: "flow3Body" as keyof HomeSiteContent,
+                imageField: "flow3Image" as keyof HomeSiteContent,
+                badgeField: "flow3Badge" as keyof HomeSiteContent,
+                valueField: "flow3Value" as keyof HomeSiteContent
               },
               {
-                title: "Merchant Delivers Real Value",
-                body: "The merchant controls the offer, gains warm traffic, and turns supporter energy into customer activity.",
-                image: "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=900&auto=format&fit=crop",
-                badge: "Offer active",
-                value: "SALE"
+                titleField: "flow4Title" as keyof HomeSiteContent,
+                bodyField: "flow4Body" as keyof HomeSiteContent,
+                imageField: "flow4Image" as keyof HomeSiteContent,
+                badgeField: "flow4Badge" as keyof HomeSiteContent,
+                valueField: "flow4Value" as keyof HomeSiteContent
               }
             ].map((step, index) => (
-              <article className="exchange-flow-card" key={step.title} style={{ animationDelay: `${index * 120}ms` }}>
-                <div className="flow-image-wrap">
-                  <img src={step.image} alt="" />
-                  <div className="flow-value-chip">{step.value}</div>
-                  <div className="flow-badge">{step.badge}</div>
+              <article className="exchange-flow-card" key={step.titleField} style={{ animationDelay: `${index * 120}ms` }}>
+                <div className={`flow-image-wrap ${editableClass(step.imageField)}`} onClick={selectField(step.imageField)}>
+                  <img src={String(content[step.imageField])} alt="" />
+                  <div {...editableText(step.valueField, "flow-value-chip")}>{String(content[step.valueField])}</div>
+                  <div {...editableText(step.badgeField, "flow-badge")}>{String(content[step.badgeField])}</div>
                 </div>
                 <div className="flow-card-copy">
                   <strong>{String(index + 1).padStart(2, "0")}</strong>
-                  <h3>{step.title}</h3>
-                  <p>{step.body}</p>
+                  <h3 {...editableText(step.titleField)}>{String(content[step.titleField])}</h3>
+                  <p {...editableText(step.bodyField)}>{String(content[step.bodyField])}</p>
                 </div>
               </article>
             ))}
@@ -466,37 +610,37 @@ function UeniteHome() {
 
       <section className="creator-economy-section">
         <div className="creator-economy-copy">
-          <span className="eyebrow dark"><strong className="mini-money">$</strong> Creator owned support</span>
-          <h2>Audience support should build your own customer list, not someone else’s platform.</h2>
-          <p>Exchange Hubs can sell notes through their own Shopify store, collect supporter data directly, and stay connected after the sale. Instead of audience value being trapped inside social platforms, UENite helps turn support into owned relationships and merchant-ready value.</p>
+          <span {...editableText("creatorEyebrow", "eyebrow dark")}><strong className="mini-money">$</strong> {content.creatorEyebrow}</span>
+          <h2 {...editableText("creatorTitle")}>{content.creatorTitle}</h2>
+          <p {...editableText("creatorBody")}>{content.creatorBody}</p>
         </div>
         <div className="creator-economy-cards">
           {[
-            ["Direct data", "Supporter names, emails, and purchase history flow through your own commerce stack."],
-            ["Lower-friction support", "A note purchase can compete with tip-style support while creating value the Holder can use."],
-            ["Ongoing engagement", "Holders can be contacted, rewarded, and directed to participating merchants."],
-            ["Shopify ecosystem", "Creators with stores can pair note sales, digital products, merch, and merchant redemption."]
+            ["creatorCard1Title", "creatorCard1Body"],
+            ["creatorCard2Title", "creatorCard2Body"],
+            ["creatorCard3Title", "creatorCard3Body"],
+            ["creatorCard4Title", "creatorCard4Body"]
           ].map(([title, body]) => (
             <article key={title}>
               <strong className="card-money">$</strong>
-              <h3>{title}</h3>
-              <p>{body}</p>
+              <h3 {...editableText(title as keyof HomeSiteContent)}>{String(content[title as keyof HomeSiteContent])}</h3>
+              <p {...editableText(body as keyof HomeSiteContent)}>{String(content[body as keyof HomeSiteContent])}</p>
             </article>
           ))}
         </div>
       </section>
 
       <section className="story-section">
-        <div className="story-image">
-          <img src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?q=80&w=1200&auto=format&fit=crop" alt="Merchant helping a customer" />
+        <div className={`story-image ${editableClass("storyImage")}`} onClick={selectField("storyImage")}>
+          <img src={content.storyImage} alt="Merchant helping a customer" />
         </div>
         <div className="story-panel">
-          <span className="eyebrow dark"><RefreshCw size={16} /> How value moves</span>
-          <h2>Support becomes access. Access becomes traffic. Traffic becomes sales.</h2>
-          <p>A Holder receives a Universal Exchange Note from an Exchange Hub they trust. That note gives them a reason to discover participating merchants, unlock value, and come back again.</p>
+          <span {...editableText("storyEyebrow", "eyebrow dark")}><RefreshCw size={16} /> {content.storyEyebrow}</span>
+          <h2 {...editableText("storyTitle")}>{content.storyTitle}</h2>
+          <p {...editableText("storyBody")}>{content.storyBody}</p>
           <div className="story-flow">
-            {["Exchange Hub issues notes", "Holder receives value", "Merchant accepts notes", "Checkout creates sales"].map((item, index) => (
-              <div key={item}><strong>{index + 1}</strong><span>{item}</span></div>
+            {["storyStep1", "storyStep2", "storyStep3", "storyStep4"].map((field, index) => (
+              <div key={field}><strong>{index + 1}</strong><span {...editableText(field as keyof HomeSiteContent)}>{String(content[field as keyof HomeSiteContent])}</span></div>
             ))}
           </div>
         </div>
@@ -505,19 +649,19 @@ function UeniteHome() {
       <section className="featured-section" id="featured-network">
         <div className="section-inner">
           <div className="section-heading colorful-heading">
-            <span className="eyebrow dark"><Star size={16} /> Featured network</span>
-            <h2>Holders will discover where their notes have value.</h2>
-            <p>Featured merchants and Exchange Hubs become the discovery layer that helps Holders choose who to support and where to shop.</p>
+            <span {...editableText("featuredEyebrow", "eyebrow dark")}><Star size={16} /> {content.featuredEyebrow}</span>
+            <h2 {...editableText("featuredTitle")}>{content.featuredTitle}</h2>
+            <p {...editableText("featuredBody")}>{content.featuredBody}</p>
           </div>
           <div className="featured-grid">
             {[
-              ["Featured Merchants", "Participating stores, offers, perks, and product categories."],
-              ["Featured Exchange Hubs", "Creators, communities, ministries, brands, and organizations issuing notes."],
-              ["Holder Wallet", "A future holder view for owned notes, eligible stores, and redemption history."]
+              ["featured1Title", "featured1Body"],
+              ["featured2Title", "featured2Body"],
+              ["featured3Title", "featured3Body"]
             ].map(([title, body]) => (
               <article className="featured-card" key={title}>
-                <h3>{title}</h3>
-                <p>{body}</p>
+                <h3 {...editableText(title as keyof HomeSiteContent)}>{String(content[title as keyof HomeSiteContent])}</h3>
+                <p {...editableText(body as keyof HomeSiteContent)}>{String(content[body as keyof HomeSiteContent])}</p>
               </article>
             ))}
           </div>
@@ -526,10 +670,10 @@ function UeniteHome() {
 
       <section className="uenite-final">
         <div>
-          <h2>Ready to UENite your audience, customers, and community?</h2>
-          <p>Start with a merchant connection today, then grow into the full exchange network.</p>
+          <h2 {...editableText("finalTitle")}>{content.finalTitle}</h2>
+          <p {...editableText("finalBody")}>{content.finalBody}</p>
         </div>
-        <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
+        <a className={`button-link button-link-large ${editableClass("finalCtaText")}`} onClick={selectField("finalCtaText")} href={content.finalCtaHref}>{content.finalCtaText}</a>
       </section>
       {publicAdmin && <SiteEditor initialContent={content} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={setEditorOpen} onSelect={setSelectedField} />}
     </main>
@@ -553,6 +697,7 @@ function SiteEditor({
 }) {
   const [draft, setDraft] = useState<HomeSiteContent>(initialContent);
   const [status, setStatus] = useState("");
+  const [uploading, setUploading] = useState(false);
   const fieldLabels: Record<string, string> = {
     heroBackground: "Hero background",
     heroEyebrow: "Hero eyebrow",
@@ -566,7 +711,13 @@ function SiteEditor({
     orbitMerchantLabel: "Merchant icon label",
     share: "Share and site settings"
   };
-  const textFields = new Set<keyof HomeSiteContent>(["heroEyebrow", "heroTitle", "heroBody", "primaryCtaText", "secondaryCtaText", "orbitCoreTitle", "orbitHubLabel", "orbitHolderLabel", "orbitMerchantLabel"]);
+  const imageFields = new Set<keyof HomeSiteContent>(["heroBgImage", "flow1Image", "flow2Image", "flow3Image", "flow4Image", "storyImage"]);
+  const linkFields: Partial<Record<keyof HomeSiteContent, keyof HomeSiteContent>> = {
+    primaryCtaText: "primaryCtaHref",
+    secondaryCtaText: "secondaryCtaHref",
+    finalCtaText: "finalCtaHref"
+  };
+  const formatFieldLabel = (field: string) => fieldLabels[field] ?? field.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase());
   const shareLinks = [
     ["Homepage", `${window.location.origin}/`],
     ["Merchant signup", `${window.location.origin}/merchants/register`],
@@ -584,6 +735,27 @@ function SiteEditor({
     await navigator.clipboard.writeText(url);
     setStatus("Copied link");
   };
+  const uploadMedia = async (file: File, mediaType: "image" | "video", targetField?: keyof HomeSiteContent) => {
+    setUploading(true);
+    setStatus("Uploading...");
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const saved = await api<{ url: string }>("/api/site-media", {
+      method: "POST",
+      body: JSON.stringify({ filename: file.name, dataUrl, mediaType })
+    });
+    const nextLibrary = Array.from(new Set([saved.url, ...draft.mediaLibrary]));
+    update({ mediaLibrary: nextLibrary, ...(targetField ? { [targetField]: saved.url } : {}) } as Partial<HomeSiteContent>);
+    setStatus("Uploaded");
+    setUploading(false);
+  };
+  const selectedKey = selectedField as keyof HomeSiteContent;
+  const selectedIsImage = selectedField && imageFields.has(selectedKey);
+  const selectedIsText = selectedField && selectedField !== "heroBackground" && selectedField !== "share" && !selectedIsImage && selectedField !== "heroVideoUrl" && selectedField !== "faviconUrl" && selectedField !== "mediaLibrary";
   return (
     <>
       <button className={`site-edit-toggle ${open ? "active" : ""}`} onClick={() => { onOpenChange(!open); if (!open && !selectedField) onSelect("share"); }} title="Edit public page">
@@ -593,25 +765,24 @@ function SiteEditor({
         <aside className="site-editor-panel">
           <div className="editor-head">
             <div>
-              <strong>{selectedField ? fieldLabels[String(selectedField)] : "Click anything to edit"}</strong>
+              <strong>{selectedField ? formatFieldLabel(String(selectedField)) : "Click anything to edit"}</strong>
               <span>{status || "Select visible text, buttons, icons, or the hero background"}</span>
             </div>
             <button className="icon-button" onClick={() => onOpenChange(false)} title="Close editor"><X size={16} /></button>
           </div>
           <div className="editor-scroll">
             {!selectedField && <Notice>Click a visible page element to edit that exact element.</Notice>}
-            {selectedField && textFields.has(selectedField as keyof HomeSiteContent) && (
+            {selectedIsText && (
               <>
                 <label>Text
-                  {selectedField === "heroBody" || selectedField === "heroTitle" ? (
-                    <textarea value={String(draft[selectedField as keyof HomeSiteContent] ?? "")} onChange={(event) => update({ [selectedField]: event.target.value } as Partial<HomeSiteContent>)} />
+                  {String(selectedField).includes("Body") || selectedField === "heroTitle" || selectedField === "creatorTitle" || selectedField === "finalTitle" ? (
+                    <textarea value={String(draft[selectedKey] ?? "")} onChange={(event) => update({ [selectedKey]: event.target.value } as Partial<HomeSiteContent>)} />
                   ) : (
-                    <input value={String(draft[selectedField as keyof HomeSiteContent] ?? "")} onChange={(event) => update({ [selectedField]: event.target.value } as Partial<HomeSiteContent>)} />
+                    <input value={String(draft[selectedKey] ?? "")} onChange={(event) => update({ [selectedKey]: event.target.value } as Partial<HomeSiteContent>)} />
                   )}
                 </label>
                 {selectedField === "orbitCoreTitle" && <label>Subtitle<input value={draft.orbitCoreSubtitle} onChange={(event) => update({ orbitCoreSubtitle: event.target.value })} /></label>}
-                {selectedField === "primaryCtaText" && <label>Button link<input value={draft.primaryCtaHref} onChange={(event) => update({ primaryCtaHref: event.target.value })} /></label>}
-                {selectedField === "secondaryCtaText" && <label>Link URL<input value={draft.secondaryCtaHref} onChange={(event) => update({ secondaryCtaHref: event.target.value })} /></label>}
+                {linkFields[selectedKey] && <label>Link URL<input value={String(draft[linkFields[selectedKey]!] ?? "")} onChange={(event) => update({ [linkFields[selectedKey]!]: event.target.value } as Partial<HomeSiteContent>)} /></label>}
                 <div className="editor-grid">
                   <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
                   <label>Accent<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
@@ -619,18 +790,40 @@ function SiteEditor({
                 {selectedField === "heroTitle" && <label>Size<input type="range" min="52" max="104" value={draft.heroTitleSize} onChange={(event) => update({ heroTitleSize: Number(event.target.value) })} /></label>}
               </>
             )}
+            {selectedIsImage && (
+              <>
+                <label>Image URL<input value={String(draft[selectedKey] ?? "")} onChange={(event) => update({ [selectedKey]: event.target.value } as Partial<HomeSiteContent>)} placeholder="https://..." /></label>
+                <label className="upload-drop">Upload image<input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "image", selectedKey)} /></label>
+                <div className="media-library-list">
+                  {draft.mediaLibrary.map((url) => (
+                    <button key={url} type="button" onClick={() => update({ [selectedKey]: url } as Partial<HomeSiteContent>)}>
+                      <img src={url} alt="" />
+                      <span>Use</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {selectedField === "heroBackground" && (
               <>
-                <label>Preset
-                  <select value={draft.heroPreset} onChange={(event) => update({ heroPreset: event.target.value })}>
-                    <option value="emerald">Emerald network</option>
-                    <option value="gold">Gold exchange</option>
-                    <option value="violet">Violet creator</option>
-                    <option value="midnight">Midnight market</option>
-                  </select>
-                </label>
+                <div className="preset-grid">
+                  {[
+                    ["emerald", "Emerald network"],
+                    ["gold", "Gold exchange"],
+                    ["violet", "Violet creator"],
+                    ["midnight", "Midnight market"]
+                  ].map(([preset, label]) => (
+                    <button className={`preset-tile preset-${preset} ${draft.heroPreset === preset ? "active" : ""}`} key={preset} type="button" onClick={() => update({ heroPreset: preset })}>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
                 <label>Background image URL<input value={draft.heroBgImage} onChange={(event) => update({ heroBgImage: event.target.value })} placeholder="https://..." /></label>
                 <label>Video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>
+                <div className="editor-grid">
+                  <label className="upload-drop">Upload image<input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "image", "heroBgImage")} /></label>
+                  <label className="upload-drop">Upload video<input type="file" accept="video/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "video", "heroVideoUrl")} /></label>
+                </div>
                 <div className="editor-grid">
                   <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
                   <label>Accent<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
@@ -648,6 +841,7 @@ function SiteEditor({
             {selectedField === "share" && (
               <>
                 <label>Favicon URL<input value={draft.faviconUrl} onChange={(event) => update({ faviconUrl: event.target.value })} placeholder="https://.../favicon.png" /></label>
+                <label className="upload-drop">Upload image<input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "image")} /></label>
                 <label>Media library URLs<textarea value={draft.mediaLibrary.join("\n")} onChange={(event) => update({ mediaLibrary: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
                 <div className="editor-share">
                   <strong>Share</strong>
@@ -662,7 +856,7 @@ function SiteEditor({
           </div>
           <div className="editor-actions">
             <button className="ghost" onClick={() => setDraft(initialContent)}>Undo</button>
-            <button onClick={save}><UploadCloud size={16} /> Save live</button>
+            <button onClick={save} disabled={uploading}><UploadCloud size={16} /> {uploading ? "Uploading..." : "Save live"}</button>
           </div>
         </aside>
       )}

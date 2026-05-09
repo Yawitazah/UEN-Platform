@@ -16,7 +16,7 @@ const app = express();
 app.use(helmet({ contentSecurityPolicy: false, xFrameOptions: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({
-  limit: "1mb",
+  limit: "10mb",
   verify: (req, _res, buffer) => {
     (req as express.Request).rawBody = Buffer.from(buffer);
   }
@@ -46,6 +46,8 @@ app.use("/shopify/api", shopifyRoutes);
 app.use("/shopify", shopifyRoutes);
 
 const clientDir = path.resolve(process.cwd(), "dist/client");
+const uploadDir = path.resolve(process.cwd(), "uploads");
+app.use("/uploads", express.static(uploadDir));
 app.use(express.static(clientDir));
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDir, "index.html"));
