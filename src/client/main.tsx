@@ -64,6 +64,8 @@ type HomeSiteContent = {
   heroTitleSize: number;
   faviconUrl: string;
   mediaLibrary: string[];
+  textColors: Record<string, string>;
+  textLinks: Record<string, string>;
   orbitCoreTitle: string;
   orbitCoreSubtitle: string;
   orbitHubLabel: string;
@@ -168,6 +170,8 @@ const defaultHomeContent: HomeSiteContent = {
     "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=1200&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=1200&auto=format&fit=crop"
   ],
+  textColors: {},
+  textLinks: {},
   orbitCoreTitle: "UEN",
   orbitCoreSubtitle: "Universal Exchange Note",
   orbitHubLabel: "Exchange Hub",
@@ -256,7 +260,9 @@ function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined
     ...defaultHomeContent,
     ...(value ?? {}),
     heroTitleSize: Number(value?.heroTitleSize ?? defaultHomeContent.heroTitleSize),
-    mediaLibrary: Array.isArray(value?.mediaLibrary) ? value.mediaLibrary : defaultHomeContent.mediaLibrary
+    mediaLibrary: Array.isArray(value?.mediaLibrary) ? value.mediaLibrary : defaultHomeContent.mediaLibrary,
+    textColors: value?.textColors && typeof value.textColors === "object" ? value.textColors : {},
+    textLinks: value?.textLinks && typeof value.textLinks === "object" ? value.textLinks : {}
   };
 }
 
@@ -479,7 +485,14 @@ function UeniteHome() {
     publicAdmin ? `editable-surface ${selectedField === field ? "selected" : ""}` : "";
   const editableText = (field: keyof HomeSiteContent, className = "") => ({
     className: `${className} ${editableClass(field)}`,
-    onClick: selectField(field)
+    onClick: selectField(field),
+    style: content.textColors[String(field)] ? { color: content.textColors[String(field)] } : undefined
+  });
+  const editableAnchor = (field: keyof HomeSiteContent, defaultHref: string, className = "") => ({
+    className: `${className} ${editableClass(field)}`,
+    onClick: selectField(field),
+    href: content.textLinks[String(field)] || defaultHref,
+    style: content.textColors[String(field)] ? { color: content.textColors[String(field)] } : undefined
   });
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -531,8 +544,8 @@ function UeniteHome() {
             <h1 className={editableClass("heroTitle")} onClick={selectField("heroTitle")} style={{ color: content.heroTextColor, fontSize: `clamp(46px, 7vw, ${content.heroTitleSize}px)` }}>{content.heroTitle}</h1>
             <p className={editableClass("heroBody")} onClick={selectField("heroBody")} style={{ color: content.heroTextColor }}>{content.heroBody}</p>
             <div className="hero-actions">
-              <a className={`button-link button-link-large ${editableClass("primaryCtaText")}`} onClick={selectField("primaryCtaText")} href={content.primaryCtaHref}>{content.primaryCtaText}</a>
-              <a className={`text-link ${editableClass("secondaryCtaText")}`} onClick={selectField("secondaryCtaText")} href={content.secondaryCtaHref}>{content.secondaryCtaText}</a>
+              <a {...editableAnchor("primaryCtaText", content.primaryCtaHref, "button-link button-link-large")}>{content.primaryCtaText}</a>
+              <a {...editableAnchor("secondaryCtaText", content.secondaryCtaHref, "text-link")}>{content.secondaryCtaText}</a>
             </div>
             <div className="creator-proof">
               <span><strong className="mini-money">$</strong> Sell notes through your own Shopify store</span>
@@ -568,7 +581,7 @@ function UeniteHome() {
                 <span {...editableText(kickerField)}>{String(content[kickerField])}</span>
                 <h3 {...editableText(titleField)}>{String(content[titleField])}</h3>
                 <p {...editableText(bodyField)}>{String(content[bodyField])}</p>
-                <a className={editableClass(ctaField)} onClick={selectField(ctaField)} href={href}>{String(content[ctaField])}</a>
+                <a {...editableAnchor(ctaField, href)}>{String(content[ctaField])}</a>
               </article>
             ))}
           </div>
@@ -695,7 +708,7 @@ function UeniteHome() {
           <h2 {...editableText("finalTitle")}>{content.finalTitle}</h2>
           <p {...editableText("finalBody")}>{content.finalBody}</p>
         </div>
-        <a className={`button-link button-link-large ${editableClass("finalCtaText")}`} onClick={selectField("finalCtaText")} href={content.finalCtaHref}>{content.finalCtaText}</a>
+        <a {...editableAnchor("finalCtaText", content.finalCtaHref, "button-link button-link-large")}>{content.finalCtaText}</a>
       </section>
       {publicAdmin && <SiteEditor initialContent={content} onPreview={setPreviewContent} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={setEditorOpen} onSelect={setSelectedField} />}
     </main>
@@ -799,11 +812,11 @@ function SiteEditor({
   const selectedIsText = selectedField && !selectedIsBackground && selectedField !== "share" && !selectedIsImage && selectedField !== "heroVideoUrl" && selectedField !== "faviconUrl" && selectedField !== "mediaLibrary";
   return (
     <>
-      <button className={`site-edit-toggle ${open ? "active" : ""}`} onClick={() => { onOpenChange(!open); if (!open && !selectedField) onSelect("share"); }} title="Edit public page">
+      <button className={`site-edit-toggle ${open ? "active" : ""}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onOpenChange(!open); if (!open && !selectedField) onSelect("share"); }} title="Edit public page">
         <SlidersHorizontal size={18} />
       </button>
       {open && (
-        <aside className="site-editor-panel">
+        <aside className="site-editor-panel" onClick={(event) => event.stopPropagation()}>
           <div className="editor-head">
             <div>
               <strong>{selectedField ? formatFieldLabel(String(selectedField)) : "Click anything to edit"}</strong>
@@ -825,9 +838,10 @@ function SiteEditor({
                 {selectedField === "orbitCoreTitle" && <label>Subtitle<input value={draft.orbitCoreSubtitle} onChange={(event) => update({ orbitCoreSubtitle: event.target.value })} /></label>}
                 {linkFields[selectedKey] && <label>Link URL<input value={String(draft[linkFields[selectedKey]!] ?? "")} onChange={(event) => update({ [linkFields[selectedKey]!]: event.target.value } as Partial<HomeSiteContent>)} /></label>}
                 <div className="editor-grid">
-                  <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
+                  <label>Text color<input type="color" value={draft.textColors[String(selectedKey)] || draft.heroTextColor} onChange={(event) => update({ textColors: { ...draft.textColors, [String(selectedKey)]: event.target.value } })} /></label>
                   <label>Accent<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
                 </div>
+                <label>Hyperlink URL<input value={draft.textLinks[String(selectedKey)] || String(draft[linkFields[selectedKey]!] ?? "") || ""} onChange={(event) => update({ textLinks: { ...draft.textLinks, [String(selectedKey)]: event.target.value }, ...(linkFields[selectedKey] ? { [linkFields[selectedKey]!]: event.target.value } : {}) } as Partial<HomeSiteContent>)} placeholder="https://... or /signup" /></label>
                 {selectedField === "heroTitle" && <label>Size<input type="range" min="52" max="104" value={draft.heroTitleSize} onChange={(event) => update({ heroTitleSize: Number(event.target.value) })} /></label>}
               </>
             )}
