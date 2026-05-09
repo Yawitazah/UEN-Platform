@@ -278,6 +278,61 @@ function UeniteHome() {
         </div>
       </section>
 
+      <section className="exchange-flow-section">
+        <div className="section-inner">
+          <div className="section-heading flow-heading">
+            <span className="eyebrow"><RefreshCw size={16} /> The UENite exchange flow</span>
+            <h2>Support becomes a note. A note becomes a reason to shop.</h2>
+            <p>UENite turns audience loyalty into portable value that travels from the creator to the Holder to participating merchants.</p>
+          </div>
+          <div className="exchange-flow-grid">
+            {[
+              {
+                title: "Audience Supports the Hub",
+                body: "A creator, influencer, ministry, brand, or community receives direct support through their own commerce flow.",
+                image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop",
+                badge: "Support",
+                value: "$"
+              },
+              {
+                title: "Holder Receives a UEN",
+                body: "The supporter becomes a Holder and receives a Universal Exchange Note connected to that relationship.",
+                image: "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?q=80&w=900&auto=format&fit=crop",
+                badge: "UEN issued",
+                value: "UEN"
+              },
+              {
+                title: "Holder Shops With a Merchant",
+                body: "The Holder discovers participating merchants and uses the note through the existing Shopify checkout.",
+                image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=900&auto=format&fit=crop",
+                badge: "Checkout",
+                value: "15%"
+              },
+              {
+                title: "Merchant Delivers Real Value",
+                body: "The merchant controls the offer, gains warm traffic, and turns supporter energy into customer activity.",
+                image: "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=900&auto=format&fit=crop",
+                badge: "Offer active",
+                value: "SALE"
+              }
+            ].map((step, index) => (
+              <article className="exchange-flow-card" key={step.title} style={{ animationDelay: `${index * 120}ms` }}>
+                <div className="flow-image-wrap">
+                  <img src={step.image} alt="" />
+                  <div className="flow-value-chip">{step.value}</div>
+                  <div className="flow-badge">{step.badge}</div>
+                </div>
+                <div className="flow-card-copy">
+                  <strong>{String(index + 1).padStart(2, "0")}</strong>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="creator-economy-section">
         <div className="creator-economy-copy">
           <span className="eyebrow dark"><strong className="mini-money">$</strong> Creator owned support</span>

@@ -742,6 +742,168 @@ th {
   text-decoration: none;
 }
 
+.exchange-flow-section {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(251, 191, 36, 0.18), transparent 26%),
+    radial-gradient(circle at 88% 16%, rgba(96, 165, 250, 0.18), transparent 24%),
+    linear-gradient(180deg, #101b17 0%, #07120e 100%);
+  color: white;
+  overflow: hidden;
+  padding: 98px 0;
+  position: relative;
+}
+
+.exchange-flow-section::before {
+  background: linear-gradient(90deg, transparent, rgba(117, 227, 173, 0.14), transparent);
+  content: "";
+  height: 220px;
+  left: -20%;
+  position: absolute;
+  top: 36%;
+  transform: rotate(-8deg);
+  width: 140%;
+}
+
+.flow-heading h2 {
+  color: white;
+  font-size: clamp(34px, 5vw, 62px);
+  line-height: 1;
+  max-width: 860px;
+}
+
+.flow-heading p {
+  color: #bfd7cb;
+  font-size: 18px;
+  line-height: 1.65;
+  margin-top: 14px;
+  max-width: 720px;
+}
+
+.exchange-flow-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 42px;
+  position: relative;
+  z-index: 1;
+}
+
+.exchange-flow-grid::before {
+  background: linear-gradient(90deg, #fbbf24, #75e3ad, #60a5fa, #a78bfa);
+  border-radius: 999px;
+  content: "";
+  height: 5px;
+  left: 10%;
+  opacity: 0.8;
+  position: absolute;
+  right: 10%;
+  top: 142px;
+  z-index: 0;
+}
+
+.exchange-flow-card {
+  animation: riseUp 760ms ease both;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.25);
+  min-height: 470px;
+  overflow: hidden;
+  position: relative;
+  transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+  z-index: 1;
+}
+
+.exchange-flow-card:hover {
+  border-color: rgba(117, 227, 173, 0.5);
+  box-shadow: 0 32px 110px rgba(0, 0, 0, 0.35), 0 0 38px rgba(117, 227, 173, 0.16);
+  transform: translateY(-8px);
+}
+
+.flow-image-wrap {
+  height: 250px;
+  overflow: hidden;
+  position: relative;
+}
+
+.flow-image-wrap::after {
+  background: linear-gradient(180deg, transparent 35%, rgba(7, 18, 14, 0.9) 100%);
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.flow-image-wrap img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.02);
+  transition: transform 360ms ease;
+  width: 100%;
+}
+
+.exchange-flow-card:hover .flow-image-wrap img {
+  transform: scale(1.08);
+}
+
+.flow-value-chip {
+  align-items: center;
+  animation: moneyFloat 4.6s ease-in-out infinite alternate;
+  background: linear-gradient(135deg, #fbbf24, #fef3c7);
+  border-radius: 999px;
+  box-shadow: 0 18px 42px rgba(251, 191, 36, 0.28);
+  color: #321b05;
+  display: inline-flex;
+  font-size: 22px;
+  font-weight: 900;
+  height: 72px;
+  justify-content: center;
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 72px;
+  z-index: 2;
+}
+
+.flow-badge {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  bottom: 16px;
+  color: #17201b;
+  font-size: 12px;
+  font-weight: 800;
+  left: 16px;
+  padding: 8px 12px;
+  position: absolute;
+  text-transform: uppercase;
+  z-index: 2;
+}
+
+.flow-card-copy {
+  padding: 22px;
+}
+
+.flow-card-copy strong {
+  color: #75e3ad;
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  margin-bottom: 12px;
+}
+
+.flow-card-copy h3 {
+  color: white;
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+
+.flow-card-copy p {
+  color: #a8c8b7;
+  line-height: 1.62;
+  margin: 0;
+}
+
 .story-section {
   background: #0c1a12;
   color: white;
@@ -1830,6 +1992,7 @@ th {
   .story-section,
   .creator-economy-section,
   .creator-economy-cards,
+  .exchange-flow-grid,
   .featured-grid {
     grid-template-columns: 1fr;
   }
@@ -1906,6 +2069,10 @@ th {
 
   .story-panel {
     padding: 48px 28px;
+  }
+
+  .exchange-flow-grid::before {
+    display: none;
   }
 
   .uenite-final {
