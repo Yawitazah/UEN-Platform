@@ -128,6 +128,18 @@ type HomeSiteContent = {
   storyStep2: string;
   storyStep3: string;
   storyStep4: string;
+  collectionEyebrow: string;
+  collectionTitle: string;
+  collectionBody: string;
+  collectionItem1Title: string;
+  collectionItem1Body: string;
+  collectionItem2Title: string;
+  collectionItem2Body: string;
+  collectionItem3Title: string;
+  collectionItem3Body: string;
+  collectionValueLabel: string;
+  collectionValueAmount: string;
+  collectionBadgeLabel: string;
   featuredEyebrow: string;
   featuredTitle: string;
   featuredBody: string;
@@ -151,9 +163,9 @@ type HomeSiteContent = {
 
 const defaultHomeContent: HomeSiteContent = {
   pageBackground: "",
-  heroEyebrow: "The possibilities are endless when we UENite",
-  heroTitle: "When we UENite, the possibilities are endless.",
-  heroBody: "Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.",
+  heroEyebrow: "A smarter way to fundraise, sell, and support",
+  heroTitle: "When we UENite, support becomes something people can keep.",
+  heroBody: "Fundraisers, creators, ministries, causes, brands, and communities can receive support through their own store while giving supporters real value in return: Universal Exchange Notes, digital downloads, collectibles, badges, and offers from participating merchants.",
   primaryCtaText: "Join the Merchant Network",
   primaryCtaHref: "/merchants/register",
   secondaryCtaText: "Choose your path",
@@ -179,72 +191,84 @@ const defaultHomeContent: HomeSiteContent = {
   orbitMerchantLabel: "Merchant",
   audienceEyebrow: "Built for the whole exchange",
   audienceTitle: "Every participant has a reason to show up.",
-  audienceBody: "UENite is not just a coupon app. It is a network where support, access, discovery, and redemption move together.",
+  audienceBody: "UENite is not just a checkout or a coupon app. It is a support ecosystem where fundraising, digital products, audience data, collections, merchant offers, and proof of goodwill move together.",
   merchantPathKicker: "Turn Holders into customers",
   merchantPathTitle: "Merchants",
-  merchantPathBody: "Accept Universal Exchange Notes in Shopify, set your own offer, and get access to motivated traffic from trusted communities.",
+  merchantPathBody: "Accept Universal Exchange Notes in Shopify and reach Holders who already supported something they care about and now have a reason to shop with you.",
   merchantPathCta: "Join the Merchant Network",
   hubPathKicker: "Activate your audience",
   hubPathTitle: "Exchange Hubs",
-  hubPathBody: "Creators, influencers, ministries, organizations, and brands can turn supporter energy into portable value for Holders.",
+  hubPathBody: "Creators, influencers, ministries, causes, organizations, and brands can fundraise or sell through their own store while giving supporters notes, downloads, and memorable rewards.",
   hubPathCta: "Apply as an Exchange Hub",
   holderPathKicker: "Use your note with participating merchants",
   holderPathTitle: "Holders",
-  holderPathBody: "Discover merchants, offers, and Exchange Hubs you want to support as the UENite network grows.",
+  holderPathBody: "Build a collection of notes, downloads, badges, campaign rewards, and merchant offers that proves what you supported and unlocks where you can go next.",
   holderPathCta: "Access My Wallet",
   flowEyebrow: "The UENite exchange flow",
-  flowTitle: "Support becomes a note. A note becomes a reason to shop.",
-  flowBody: "UENite turns audience loyalty into portable value that travels from the creator to the Holder to participating merchants.",
-  flow1Title: "Audience Supports the Hub",
-  flow1Body: "A creator, influencer, ministry, brand, or community receives direct support through their own commerce flow.",
+  flowTitle: "Support becomes value. Value becomes a collection. Collections can keep growing.",
+  flowBody: "Instead of giving and receiving nothing back, supporters receive a UEN and, at minimum, a digital item. Exchange Hubs can add music, art, books, collectibles, campaign rewards, limited releases, and future perks.",
+  flow1Title: "Supporters fund a cause or creator",
+  flow1Body: "A Holder contributes to a fundraiser, campaign, creator, ministry, community, or pay-it-forward mission through the Exchange Hub's own commerce flow.",
   flow1Image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop",
   flow1Badge: "Support",
   flow1Value: "$",
-  flow2Title: "Holder Receives a UEN",
-  flow2Body: "The supporter becomes a Holder and receives a Universal Exchange Note connected to that relationship.",
+  flow2Title: "They receive more than a receipt",
+  flow2Body: "The supporter receives a Universal Exchange Note plus a digital download, reward, badge, or collectible tied to the story of what they supported.",
   flow2Image: "https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?q=80&w=900&auto=format&fit=crop",
   flow2Badge: "UEN issued",
   flow2Value: "UEN",
-  flow3Title: "Holder Shops With a Merchant",
-  flow3Body: "The Holder discovers participating merchants and uses the note through the existing Shopify checkout.",
+  flow3Title: "Their UEN unlocks merchant value",
+  flow3Body: "The Holder can use the note with participating merchants to unlock offers, savings, perks, or special access through normal checkout.",
   flow3Image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=900&auto=format&fit=crop",
   flow3Badge: "Checkout",
   flow3Value: "15%",
-  flow4Title: "Merchant Delivers Real Value",
-  flow4Body: "The merchant controls the offer, gains warm traffic, and turns supporter energy into customer activity.",
+  flow4Title: "The ecosystem keeps giving back",
+  flow4Body: "Merchants gain warm customer traffic, Exchange Hubs keep supporter relationships, and Holders build a collection that can become more useful over time.",
   flow4Image: "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=900&auto=format&fit=crop",
   flow4Badge: "Offer active",
   flow4Value: "SALE",
-  creatorEyebrow: "Creator owned support",
-  creatorTitle: "Audience support should build your own customer list, not someone else's platform.",
-  creatorBody: "Exchange Hubs can sell notes through their own Shopify store, collect supporter data directly, and stay connected after the sale. Instead of audience value being trapped inside social platforms, UENite helps turn support into owned relationships and merchant-ready value.",
-  creatorCard1Title: "Direct data",
-  creatorCard1Body: "Supporter names, emails, and purchase history flow through your own commerce stack.",
-  creatorCard2Title: "Lower-friction support",
-  creatorCard2Body: "A note purchase can compete with tip-style support while creating value the Holder can use.",
-  creatorCard3Title: "Ongoing engagement",
-  creatorCard3Body: "Holders can be contacted, rewarded, and directed to participating merchants.",
-  creatorCard4Title: "Shopify ecosystem",
-  creatorCard4Body: "Creators with stores can pair note sales, digital products, merch, and merchant redemption.",
+  creatorEyebrow: "Own the supporter relationship",
+  creatorTitle: "Fundraising should build your community, not just process a donation.",
+  creatorBody: "People have used donation platforms for years and often receive little more than a thank-you. UENite helps Exchange Hubs turn support into an owned relationship, a digital product moment, and a value system that can continue rewarding the Holder.",
+  creatorCard1Title: "Direct supporter data",
+  creatorCard1Body: "Supporter names, emails, purchase history, and campaign activity can stay connected to your own commerce stack.",
+  creatorCard2Title: "More value than a tip",
+  creatorCard2Body: "A UEN can be paired with downloads, art, music, books, limited items, collectibles, crypto-linked perks, or merchant offers.",
+  creatorCard3Title: "Campaign flexibility",
+  creatorCard3Body: "Run fundraisers, pay-it-forward campaigns, limited releases, cause drives, loyalty drops, and community reward programs.",
+  creatorCard4Title: "Built on Shopify rails",
+  creatorCard4Body: "Use the store, products, checkout, digital delivery, customer records, and fulfillment tools you already understand.",
   storyImage: "https://images.unsplash.com/photo-1556745757-8d76bdb6984b?q=80&w=1200&auto=format&fit=crop",
   storyEyebrow: "How value moves",
-  storyTitle: "Support becomes access. Access becomes traffic. Traffic becomes sales.",
-  storyBody: "A Holder receives a Universal Exchange Note from an Exchange Hub they trust. That note gives them a reason to discover participating merchants, unlock value, and come back again.",
+  storyTitle: "Support becomes proof. Proof becomes access. Access can become value.",
+  storyBody: "A Holder can look back at what they supported, what they received, what badges they earned, what downloads they own, and which merchants now recognize that value.",
   storyStep1: "Exchange Hub issues notes",
   storyStep2: "Holder receives value",
   storyStep3: "Merchant accepts notes",
   storyStep4: "Checkout creates sales",
+  collectionEyebrow: "Supporter collection",
+  collectionTitle: "Support should become something you can keep, show, and build on.",
+  collectionBody: "With UENite, Holders can collect Universal Exchange Notes, digital downloads, artwork, music, books, memorabilia, badges, and campaign rewards in one beautiful wallet. Every item can carry the story of what they supported, when they supported it, and what value it unlocked.",
+  collectionItem1Title: "Digital downloads and collectibles",
+  collectionItem1Body: "Exchange Hubs can offer music, art, books, limited-time items, campaign files, memorabilia, and other digital goods alongside the UEN.",
+  collectionItem2Title: "Achievement badges",
+  collectionItem2Body: "Supporters can earn visible proof of good will: fundraiser badges, pay-it-forward milestones, early supporter status, and cause-specific achievements.",
+  collectionItem3Title: "Future value layer",
+  collectionItem3Body: "Collections can show estimated value, organize/filter items, and later support transfers, trades, or resale between Holders where appropriate.",
+  collectionValueLabel: "Collection value",
+  collectionValueAmount: "$248.00",
+  collectionBadgeLabel: "Founding Supporter",
   featuredEyebrow: "Featured network",
-  featuredTitle: "Holders will discover where their notes have value.",
-  featuredBody: "Featured merchants and Exchange Hubs become the discovery layer that helps Holders choose who to support and where to shop.",
+  featuredTitle: "The network makes good will visible and useful.",
+  featuredBody: "Featured merchants, Exchange Hubs, campaigns, and Holder collections become the discovery layer that helps people decide who to support, what to collect, and where to redeem value.",
   featured1Title: "Featured Merchants",
   featured1Body: "Participating stores, offers, perks, and product categories.",
   featured2Title: "Featured Exchange Hubs",
   featured2Body: "Creators, communities, ministries, brands, and organizations issuing notes.",
-  featured3Title: "Holder Wallet",
-  featured3Body: "A future holder view for owned notes, eligible stores, and redemption history.",
-  finalTitle: "Ready to UENite your audience, customers, and community?",
-  finalBody: "Start with a merchant connection today, then grow into the full exchange network.",
+  featured3Title: "Holder Collections",
+  featured3Body: "A future-ready collection view for notes, downloads, badges, campaign memories, value, and redemption history.",
+  finalTitle: "Ready to take support into the future?",
+  finalBody: "UENite turns giving, fundraising, selling, and loyalty into an ecosystem where supporters receive value and the network keeps growing.",
   finalCtaText: "Join the Merchant Network",
   finalCtaHref: "/merchants/register",
   audienceBackground: "",
@@ -679,6 +703,38 @@ function UeniteHome() {
               <div key={field}><strong>{index + 1}</strong><span {...editableText(field as keyof HomeSiteContent)}>{String(content[field as keyof HomeSiteContent])}</span></div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="collection-section">
+        <div className="collection-copy">
+          <span {...editableText("collectionEyebrow", "eyebrow")}><Wallet size={16} /> {content.collectionEyebrow}</span>
+          <h2 {...editableText("collectionTitle")}>{content.collectionTitle}</h2>
+          <p {...editableText("collectionBody")}>{content.collectionBody}</p>
+          <div className="collection-filter-row">
+            {["All", "Downloads", "Badges", "Campaigns", "Offers"].map((filter) => <span key={filter}>{filter}</span>)}
+          </div>
+        </div>
+        <div className="collection-showcase">
+          <div className="collection-value-card">
+            <span {...editableText("collectionValueLabel")}>{content.collectionValueLabel}</span>
+            <strong {...editableText("collectionValueAmount")}>{content.collectionValueAmount}</strong>
+            <small>Estimated holder value</small>
+          </div>
+          {[
+            ["collectionItem1Title", "collectionItem1Body", Ticket, "Digital item"],
+            ["collectionItem2Title", "collectionItem2Body", Star, content.collectionBadgeLabel],
+            ["collectionItem3Title", "collectionItem3Body", RefreshCw, "Future utility"]
+          ].map(([titleField, bodyField, Icon, badge], index) => (
+            <article className={`collection-item collection-item-${index + 1}`} key={String(titleField)}>
+              <div className="collection-item-top">
+                <div className="collection-icon"><Icon size={24} /></div>
+                <span>{String(badge)}</span>
+              </div>
+              <h3 {...editableText(titleField as keyof HomeSiteContent)}>{String(content[titleField as keyof HomeSiteContent])}</h3>
+              <p {...editableText(bodyField as keyof HomeSiteContent)}>{String(content[bodyField as keyof HomeSiteContent])}</p>
+            </article>
+          ))}
         </div>
       </section>
 
