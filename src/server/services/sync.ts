@@ -177,7 +177,7 @@ export async function syncCodesToGroupedShopifyDiscount(input: {
         : await prisma.shopifyInventorySyncedCode.findUnique({
             where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: code.id } }
           });
-    if (existing?.syncStatus === "SYNCED") {
+    if (existing?.syncStatus === "SYNCED" && existing.shopifyDiscountId === group.shopifyDiscountId) {
       skipped += 1;
       continue;
     }
