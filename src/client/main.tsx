@@ -59,7 +59,7 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/");
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/");
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -84,6 +84,8 @@ function Shell() {
     <Router>
       {isPublicRoute ? (
         <Routes>
+          <Route path="/" element={<UeniteHome />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
         </Routes>
@@ -99,7 +101,7 @@ function Shell() {
           </div>
           <nav>
             {[
-              ["/", "Admin Dashboard"],
+              ["/admin", "Dashboard"],
               ["/exchange-hubs", "Exchange Hubs"],
               ["/holders", "Holders"],
               ["/uens", "Universal Exchange Notes"],
@@ -124,7 +126,7 @@ function Shell() {
             <LoginPanel onLogin={refreshAuth} />
           ) : (
             <Routes>
-              <Route path="/" element={<Dashboard user={user} />} />
+              <Route path="/admin" element={<Dashboard user={user} />} />
               <Route path="/exchange-hubs" element={<ExchangeHubs user={user} />} />
               <Route path="/holders" element={<Holders user={user} />} />
               <Route path="/uens" element={<Uens user={user} />} />
@@ -150,7 +152,7 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
       <section className="public-hero">
         <div className="hero-grid">
           <div className="hero-copy">
-            <div className="brand public-brand"><Shield size={24} /><div><strong>UEN Platform</strong><span>Merchant acceptance network</span></div></div>
+            <div className="brand public-brand"><Shield size={24} /><div><strong>UENite</strong><span>Merchant acceptance network</span></div></div>
             <span className="eyebrow"><Ticket size={16} /> New customer channel for Shopify merchants</span>
             <h1>Turn creator support into sales for your store</h1>
             <p>Accept Universal Exchange Notes and reach motivated Holders from creators, influencers, organizations, ministries, and communities. You control the offer. We handle the note syncing. Your store gets access to warm traffic.</p>
@@ -178,6 +180,150 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
         </div>
       </section>
       {children}
+    </main>
+  );
+}
+
+function UeniteHome() {
+  const paths = [
+    {
+      Icon: ShoppingBag,
+      title: "Merchants",
+      kicker: "Turn Holders into customers",
+      body: "Accept Universal Exchange Notes in Shopify, set your own offer, and get access to motivated traffic from trusted communities.",
+      cta: "Join the Merchant Network",
+      href: "/merchants/register",
+      className: "path-merchant"
+    },
+    {
+      Icon: Users,
+      title: "Exchange Hubs",
+      kicker: "Activate your audience",
+      body: "Creators, influencers, ministries, organizations, and brands can turn supporter energy into portable value for Holders.",
+      cta: "Create an Exchange Hub",
+      href: "/login",
+      className: "path-hub"
+    },
+    {
+      Icon: Ticket,
+      title: "Holders",
+      kicker: "Use your note with participating merchants",
+      body: "Discover merchants, offers, and Exchange Hubs you want to support as the UENite network grows.",
+      cta: "Explore the Network",
+      href: "#featured-network",
+      className: "path-holder"
+    }
+  ];
+  return (
+    <main className="uenite-main">
+      <section className="uenite-hero">
+        <nav className="uenite-nav">
+          <a className="uenite-logo" href="/">
+            <Shield size={24} />
+            <span>UENite</span>
+          </a>
+          <div>
+            <a href="#audiences">Who it is for</a>
+            <a href="#featured-network">Network</a>
+            <a href="/login">Sign in</a>
+          </div>
+        </nav>
+        <div className="uenite-hero-grid">
+          <div className="uenite-copy">
+            <span className="eyebrow"><Star size={16} /> Your potential is unlimited when we UENite</span>
+            <h1>One exchange network for creators, merchants, and Holders.</h1>
+            <p>Universal Exchange Notes connect audience support to real-world purchasing power. Exchange Hubs issue value, Holders carry it, and merchants turn it into sales.</p>
+            <div className="hero-actions">
+              <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
+              <a className="text-link" href="#audiences">Choose your path</a>
+            </div>
+          </div>
+          <div className="uenite-orbit" aria-hidden="true">
+            <div className="orbit-core"><strong>UEN</strong><span>Universal Exchange Note</span></div>
+            <div className="orbit-node node-hub"><Users size={18} /><span>Exchange Hub</span></div>
+            <div className="orbit-node node-holder"><Ticket size={18} /><span>Holder</span></div>
+            <div className="orbit-node node-merchant"><ShoppingBag size={18} /><span>Merchant</span></div>
+            <div className="orbit-ring orbit-ring-one" />
+            <div className="orbit-ring orbit-ring-two" />
+          </div>
+        </div>
+      </section>
+
+      <section className="audience-section" id="audiences">
+        <div className="section-inner">
+          <div className="section-heading colorful-heading">
+            <span className="eyebrow dark"><Zap size={16} /> Built for the whole exchange</span>
+            <h2>Every participant has a reason to show up.</h2>
+            <p>UENite is not just a coupon app. It is a network where support, access, discovery, and redemption move together.</p>
+          </div>
+          <div className="path-grid">
+            {paths.map(({ Icon, title, kicker, body, cta, href, className }) => (
+              <article className={`path-card ${className}`} key={title}>
+                <div className="path-icon"><Icon size={28} /></div>
+                <span>{kicker}</span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+                <a href={href}>{cta}</a>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="story-section">
+        <div className="story-image">
+          <img src="https://images.unsplash.com/photo-1556745757-8d76bdb6984b?q=80&w=1200&auto=format&fit=crop" alt="Merchant helping a customer" />
+        </div>
+        <div className="story-panel">
+          <span className="eyebrow dark"><RefreshCw size={16} /> How value moves</span>
+          <h2>Support becomes access. Access becomes traffic. Traffic becomes sales.</h2>
+          <p>A Holder receives a Universal Exchange Note from an Exchange Hub they trust. That note gives them a reason to discover participating merchants, unlock value, and come back again.</p>
+          <div className="story-flow">
+            {["Exchange Hub issues notes", "Holder receives value", "Merchant accepts notes", "Checkout creates sales"].map((item, index) => (
+              <div key={item}><strong>{index + 1}</strong><span>{item}</span></div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="featured-section" id="featured-network">
+        <div className="section-inner">
+          <div className="section-heading colorful-heading">
+            <span className="eyebrow dark"><Star size={16} /> Featured network</span>
+            <h2>Holders will discover where their notes have value.</h2>
+            <p>Featured merchants and Exchange Hubs become the discovery layer that helps Holders choose who to support and where to shop.</p>
+          </div>
+          <div className="featured-grid">
+            {[
+              ["Featured Merchants", "Participating stores, offers, perks, and product categories."],
+              ["Featured Exchange Hubs", "Creators, communities, ministries, brands, and organizations issuing notes."],
+              ["Holder Wallet", "A future holder view for owned notes, eligible stores, and redemption history."]
+            ].map(([title, body]) => (
+              <article className="featured-card" key={title}>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="uenite-final">
+        <div>
+          <h2>Ready to UENite your audience, customers, and community?</h2>
+          <p>Start with a merchant connection today, then grow into the full exchange network.</p>
+        </div>
+        <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
+      </section>
+    </main>
+  );
+}
+
+function LoginPage() {
+  return (
+    <main className="public-main login-public">
+      <a className="uenite-logo login-logo" href="/"><Shield size={24} /><span>UENite</span></a>
+      <LoginPanel onLogin={() => { window.location.href = "/admin"; }} />
     </main>
   );
 }
@@ -426,8 +572,8 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
   };
   return (
     <section className="login-panel">
-      <h1>Admin Login</h1>
-      <p>Sign in to manage Exchange Hubs, UENs, merchants, product issuance, and Shopify sync.</p>
+      <h1>Sign in</h1>
+      <p>Access your UENite workspace, merchant tools, Exchange Hub controls, and platform dashboard.</p>
       {error && <Notice tone="bad">{error}</Notice>}
       <Input label="Email" value={email} onChange={setEmail} />
       <Input label="Password" value={password} onChange={setPassword} type="password" />
