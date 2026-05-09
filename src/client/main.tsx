@@ -165,8 +165,8 @@ type HomeSiteContent = {
 const defaultHomeContent: HomeSiteContent = {
   pageBackground: "",
   heroEyebrow: "A smarter way to fundraise, sell, and support",
-  heroTitle: "A smarter way to fundraise, sell, support, and UENite.",
-  heroBody: "Turn every contribution into a memorable exchange. Exchange Hubs can sell through their own Shopify store, issue Universal Exchange Notes, deliver digital rewards, keep direct supporter relationships, and send Holders into a merchant network where their support unlocks real value.",
+  heroTitle: "The smarter way to fundraise, sell, and support.",
+  heroBody: "UENITE turns audience support into a merchant-backed value network. Creators and Exchange Hubs keep direct supporter relationships, Holders receive Universal Exchange Notes and digital rewards, and participating merchants give those notes real checkout utility.",
   primaryCtaText: "Join the Merchant Network",
   primaryCtaHref: "/merchants/register",
   secondaryCtaText: "Choose your path",
@@ -192,7 +192,7 @@ const defaultHomeContent: HomeSiteContent = {
   orbitMerchantLabel: "Merchant",
   audienceEyebrow: "Built for the whole exchange",
   audienceTitle: "Every participant has a reason to show up.",
-  audienceBody: "UENite is not just a checkout or a coupon app. It is a support ecosystem where fundraising, digital products, audience data, collections, merchant offers, and proof of goodwill move together.",
+  audienceBody: "UENITE is not just a checkout or a coupon app. It is a support ecosystem where fundraising, digital products, audience data, collections, merchant offers, and proof of goodwill move together.",
   merchantPathKicker: "Turn Holders into customers",
   merchantPathTitle: "Merchants",
   merchantPathBody: "Accept Universal Exchange Notes in Shopify and reach Holders who already supported something they care about and now have a reason to shop with you.",
@@ -205,12 +205,12 @@ const defaultHomeContent: HomeSiteContent = {
   holderPathTitle: "Holders",
   holderPathBody: "Build a collection of notes, downloads, badges, campaign rewards, and merchant offers that proves what you supported and unlocks where you can go next.",
   holderPathCta: "Access My Wallet",
-  flowEyebrow: "The UENite exchange flow",
+  flowEyebrow: "The UENITE exchange flow",
   flowTitle: "Support becomes value. Value becomes a collection. Collections can keep growing.",
   flowBody: "Instead of giving and receiving nothing back, supporters receive a UEN and, at minimum, a digital item. Exchange Hubs can add music, art, books, collectibles, campaign rewards, limited releases, and future perks.",
   flow1Title: "Supporters fund a cause or creator",
   flow1Body: "A Holder contributes to a fundraiser, campaign, creator, ministry, community, or pay-it-forward mission through the Exchange Hub's own commerce flow.",
-  flow1Image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop",
+  flow1Image: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=900&auto=format&fit=crop",
   flow1Badge: "Support",
   flow1Value: "$",
   flow2Title: "They receive more than a receipt",
@@ -230,7 +230,7 @@ const defaultHomeContent: HomeSiteContent = {
   flow4Value: "SALE",
   creatorEyebrow: "Own the supporter relationship",
   creatorTitle: "Fundraising should build your community, not just process a donation.",
-  creatorBody: "People have used donation platforms for years and often receive little more than a thank-you. UENite helps Exchange Hubs turn support into an owned relationship, a digital product moment, and a value system that can continue rewarding the Holder.",
+  creatorBody: "People have used donation platforms for years and often receive little more than a thank-you. UENITE helps Exchange Hubs turn support into an owned relationship, a digital product moment, and a value system that can continue rewarding the Holder.",
   creatorCard1Title: "Direct supporter data",
   creatorCard1Body: "Supporter names, emails, purchase history, and campaign activity can stay connected to your own commerce stack.",
   creatorCard2Title: "More value than a tip",
@@ -249,7 +249,7 @@ const defaultHomeContent: HomeSiteContent = {
   storyStep4: "Checkout creates sales",
   collectionEyebrow: "Supporter collection",
   collectionTitle: "Support should become something you can keep, show, and build on.",
-  collectionBody: "With UENite, Holders can collect Universal Exchange Notes, digital downloads, artwork, music, books, memorabilia, badges, and campaign rewards in one beautiful wallet. Every item can carry the story of what they supported, when they supported it, and what value it unlocked.",
+  collectionBody: "With UENITE, Holders can collect Universal Exchange Notes, digital downloads, artwork, music, books, memorabilia, badges, and campaign rewards in one beautiful wallet. Every item can carry the story of what they supported, when they supported it, and what value it unlocked.",
   collectionItem1Title: "Digital downloads and collectibles",
   collectionItem1Body: "Exchange Hubs can offer music, art, books, limited-time items, campaign files, memorabilia, and other digital goods alongside the UEN.",
   collectionItem2Title: "Achievement badges",
@@ -269,7 +269,7 @@ const defaultHomeContent: HomeSiteContent = {
   featured3Title: "Holder Collections",
   featured3Body: "A future-ready collection view for notes, downloads, badges, campaign memories, value, and redemption history.",
   finalTitle: "Ready to take support into the future?",
-  finalBody: "UENite turns giving, fundraising, selling, and loyalty into an ecosystem where supporters receive value and the network keeps growing.",
+  finalBody: "UENITE turns giving, fundraising, selling, and loyalty into an ecosystem where supporters receive value and the network keeps growing.",
   finalCtaText: "Join the Merchant Network",
   finalCtaHref: "/merchants/register",
   audienceBackground: "",
@@ -282,7 +282,7 @@ const defaultHomeContent: HomeSiteContent = {
 };
 
 function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined): HomeSiteContent {
-  return {
+  const merged = {
     ...defaultHomeContent,
     ...(value ?? {}),
     heroTitleSize: Number(value?.heroTitleSize ?? defaultHomeContent.heroTitleSize),
@@ -290,6 +290,16 @@ function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined
     textColors: value?.textColors && typeof value.textColors === "object" ? value.textColors : {},
     textLinks: value?.textLinks && typeof value.textLinks === "object" ? value.textLinks : {}
   };
+  if (merged.heroTitle === "When we UENite, the possibilities are endless." || merged.heroTitle === "A smarter way to fundraise, sell, support, and UENite.") {
+    merged.heroTitle = defaultHomeContent.heroTitle;
+  }
+  if (merged.heroBody === "Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.") {
+    merged.heroBody = defaultHomeContent.heroBody;
+  }
+  if (merged.flow1Image === "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop") {
+    merged.flow1Image = defaultHomeContent.flow1Image;
+  }
+  return merged;
 }
 
 function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
@@ -334,12 +344,21 @@ function PoweredByFooter() {
   return (
     <footer className="uenite-footer">
       <div>
-        <strong>UENite</strong>
+        <strong><span className="brand-uen">UEN</span><span className="brand-ite">ITE</span></strong>
         <span>A smarter way to fundraise, sell, and support.</span>
       </div>
       <p>Powered by Universal Exchange Notes.</p>
     </footer>
   );
+}
+
+function BrandWord() {
+  return <span className="brand-word"><span className="brand-uen">UEN</span><span className="brand-ite">ITE</span></span>;
+}
+
+function AnimatedMoney({ amount }: { amount: string }) {
+  const numeric = Number(amount.replace(/[^0-9.]/g, "")) || 0;
+  return <><AnimatedNumber value={numeric} prefix="$" suffix={amount.includes(".") ? ".00" : ""} /></>;
 }
 
 function Shell() {
@@ -446,7 +465,7 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
       <section className="public-hero">
         <div className="hero-grid">
           <div className="hero-copy">
-            <div className="brand public-brand"><Shield size={24} /><div><strong>UENite</strong><span>Merchant acceptance network</span></div></div>
+            <div className="brand public-brand"><Shield size={24} /><div><strong><BrandWord /></strong><span>Merchant acceptance network</span></div></div>
             <span className="eyebrow"><Ticket size={16} /> New customer channel for Shopify merchants</span>
             <h1>Turn creator support into sales for your store</h1>
             <p>Accept Universal Exchange Notes and reach motivated Holders from creators, influencers, organizations, ministries, and communities. You control the offer. We handle the note syncing. Your store gets access to warm traffic.</p>
@@ -586,7 +605,7 @@ function UeniteHome() {
         <nav className="uenite-nav">
           <a className="uenite-logo" href="/">
             <Shield size={24} />
-            <span>UENite</span>
+            <BrandWord />
           </a>
           <div>
             <a href="#audiences">Who it is for</a>
@@ -608,11 +627,6 @@ function UeniteHome() {
               <span><strong className="mini-money">$</strong> Sell notes through your own Shopify store</span>
               <span><Users size={15} /> Own the supporter relationship</span>
               <span><Zap size={15} /> Engage directly beyond social platforms</span>
-            </div>
-            <div className="hero-growth">
-              <div><strong><AnimatedNumber value={12840} /></strong><span>support actions</span></div>
-              <div><strong><AnimatedNumber value={4200} prefix="$" /></strong><span>sample collection value</span></div>
-              <div><strong><AnimatedNumber value={87} suffix="%" /></strong><span>reward utility</span></div>
             </div>
           </div>
           <div className="uenite-orbit" aria-hidden="true">
@@ -768,8 +782,9 @@ function UeniteHome() {
           </div>
           <div className="collection-value-card">
             <span {...editableText("collectionValueLabel")}>{content.collectionValueLabel}</span>
-            <strong {...editableText("collectionValueAmount")}>{content.collectionValueAmount}</strong>
+            <strong {...editableText("collectionValueAmount")}><AnimatedMoney amount={content.collectionValueAmount} /></strong>
             <small>Estimated holder value</small>
+            <div className="collection-value-orbits" aria-hidden="true"><span /><span /><span /></div>
           </div>
           {[
             ["collectionItem1Title", "collectionItem1Body", Ticket, "Digital item"],
