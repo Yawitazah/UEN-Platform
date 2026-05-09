@@ -55,6 +55,42 @@ function numericProductId(gidOrId: string) {
   return gidOrId.split("/").pop() ?? gidOrId;
 }
 
+function normalizedSearchText(value = "") {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+async function hubForShopDomain(shopDomain: string) {
+  const shopName = normalizedSearchText(shopDomain.replace(/\.myshopify\.com$/, ""));
+  const hubs = await prisma.exchangeHub.findMany({ where: { status: "ACTIVE" } });
+  return hubs.find((hub) => {
+    const name = normalizedSearchText(hub.name);
+    const displayName = normalizedSearchText(hub.displayName);
+    return (name.length >= 4 && shopName.includes(name)) || (displayName.length >= 4 && shopName.includes(displayName));
+  }) ?? null;
+}
+
+async function ensureShopMerchantAccess(shopDomain: string, merchantId: string) {
+  const hub = await hubForShopDomain(shopDomain);
+  if (!hub) return null;
+
+  await prisma.merchant.update({
+    where: { id: merchantId },
+    data: {
+      businessName: hub.displayName,
+      isExchangeHub: true,
+      linkedExchangeHubId: hub.id
+    }
+  });
+
+  await prisma.merchantAccessRule.upsert({
+    where: { merchantId_exchangeHubId: { merchantId, exchangeHubId: hub.id } },
+    update: { status: "ACTIVE" },
+    create: { merchantId, exchangeHubId: hub.id, status: "ACTIVE" }
+  });
+
+  return hub;
+}
+
 async function nextCodeForIssuance(exchangeHubId: string, issuanceProductId: string, prefix = "") {
   const inventoryCode =
     (await prisma.uenCodeInventory.findFirst({
@@ -223,7 +259,22 @@ router.get("/auth/callback", async (req, res) => {
     }
 
     const tokenPayload = (await tokenResponse.json()) as { access_token: string; scope?: string };
-    const merchant = await prisma.merchant.findFirst({ where: { businessName: "Merchant A" } });
+    const existingConnection = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
+    const matchedHub = await hubForShopDomain(shop);
+    const merchant =
+      (existingConnection ? await prisma.merchant.findUnique({ where: { id: existingConnection.merchantId } }) : null) ??
+      (matchedHub ? await prisma.merchant.findFirst({ where: { linkedExchangeHubId: matchedHub.id } }) : null) ??
+      (matchedHub
+        ? await prisma.merchant.create({
+            data: {
+              businessName: matchedHub.displayName,
+              platformType: "SHOPIFY",
+              status: "ACTIVE",
+              isExchangeHub: true,
+              linkedExchangeHubId: matchedHub.id
+            }
+          })
+        : await prisma.merchant.findFirst({ where: { businessName: "Merchant A" } }));
     if (!merchant) return res.status(404).send("Merchant A is not seeded");
 
     const connection = await prisma.shopifyConnection.upsert({
@@ -242,6 +293,8 @@ router.get("/auth/callback", async (req, res) => {
         status: "ACTIVE"
       }
     });
+
+    await ensureShopMerchantAccess(shop, merchant.id);
 
     await audit({
       action: AuditAction.SHOPIFY_CONNECTION_CHANGED,
@@ -399,6 +452,7 @@ router.post("/platform-connection", async (req, res) => {
 router.get("/dashboard", async (req, res) => {
   const connection = await connectionFromRequest(req, res);
   if (!connection) return;
+  await ensureShopMerchantAccess(connection.shopDomain, connection.merchantId);
   const [syncedCount, lastLog] = await Promise.all([
     prisma.shopifySyncedNote.count({ where: { merchantId: connection.merchantId, shopDomain: connection.shopDomain, syncStatus: "SYNCED" } }),
     prisma.syncLog.findFirst({ where: { merchantId: connection.merchantId, shopDomain: connection.shopDomain }, orderBy: { createdAt: "desc" } })
@@ -506,6 +560,7 @@ router.post("/sync", async (req, res) => {
   try {
     const connection = await connectionFromRequest(req, res);
     if (!connection) return;
+    await ensureShopMerchantAccess(connection.shopDomain, connection.merchantId);
     const log = await syncMerchantUensToShopify(connection.merchantId, connection.shopDomain, "MANUAL");
     res.json(log);
   } catch (error) {

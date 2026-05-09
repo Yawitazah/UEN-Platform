@@ -6,6 +6,7 @@ import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import { requireMerchantAccess, requireRole } from "../security";
 import { createShopifyDiscountCode } from "../services/shopifyGraphql";
+import { syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
   createAccessRuleSchema,
@@ -287,7 +288,8 @@ router.post("/exchange-hubs/:exchangeHubId/uens", requireRole(writeRoles), async
       entityId: note.id,
       message: `Generated ${note.code}`
     });
-    res.status(201).json(note);
+    const sync = await syncNewUensToEligibleShopifyStores(exchangeHubId, [note], "MANUAL");
+    res.status(201).json({ ...note, sync });
   } catch (error) {
     handleError(res, error);
   }
