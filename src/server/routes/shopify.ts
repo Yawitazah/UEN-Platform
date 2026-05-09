@@ -6,6 +6,7 @@ import { config } from "../config";
 import { AuditAction, MerchantStatus } from "../constants";
 import { prisma } from "../db";
 import { hashSecret } from "../security";
+import { createShopifyDiscountCode } from "../services/shopifyGraphql";
 import { syncMerchantUensToShopify } from "../services/sync";
 import { createOfferSchema, platformConnectionSchema } from "../validators";
 
@@ -124,6 +125,53 @@ async function subscribeOrdersPaidWebhook(shopDomain: string, accessToken: strin
   if (errors.length) {
     console.warn("Shopify webhook subscription warning", errors);
   }
+}
+
+async function createIssuanceDiscount(shopDomain: string, note: { id: string; code: string }, accessToken: string) {
+  const connection = await prisma.shopifyConnection.findUnique({
+    where: { shopDomain },
+    include: { merchant: { include: { offers: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 1 } } } }
+  });
+  const offer = connection?.merchant.offers[0];
+  if (!connection || !offer || (offer.discountType !== "PERCENTAGE" && offer.discountType !== "FIXED_AMOUNT")) {
+    return;
+  }
+
+  const result = await createShopifyDiscountCode({
+    shopDomain,
+    accessToken,
+    code: note.code,
+    title: `${note.code} Universal Exchange Note`,
+    discountType: offer.discountType,
+    discountValue: Number(offer.discountValue ?? 0),
+    usageLimitPerNote: offer.usageLimitPerNote,
+    minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
+    startsAt: offer.startsAt,
+    endsAt: offer.endsAt
+  });
+
+  await prisma.shopifySyncedNote.upsert({
+    where: { merchantId_universalExchangeNoteId: { merchantId: connection.merchantId, universalExchangeNoteId: note.id } },
+    update: {
+      shopDomain,
+      uenCode: note.code,
+      shopifyDiscountId: result.shopifyDiscountId,
+      shopifyDiscountCodeId: result.shopifyDiscountCodeId,
+      syncStatus: "SYNCED",
+      lastSyncedAt: new Date(),
+      errorMessage: null
+    },
+    create: {
+      merchantId: connection.merchantId,
+      shopDomain,
+      universalExchangeNoteId: note.id,
+      uenCode: note.code,
+      shopifyDiscountId: result.shopifyDiscountId,
+      shopifyDiscountCodeId: result.shopifyDiscountCodeId,
+      syncStatus: "SYNCED",
+      lastSyncedAt: new Date()
+    }
+  });
 }
 
 router.get("/auth", async (req, res) => {
@@ -279,6 +327,11 @@ router.post("/webhooks/orders-paid", async (req, res) => {
             universalExchangeNoteId: note.id
           }
         });
+      }
+
+      const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain } });
+      if (connection) {
+        await createIssuanceDiscount(shopDomain, note, connection.accessToken);
       }
 
       await prisma.uenIssuanceLog.create({

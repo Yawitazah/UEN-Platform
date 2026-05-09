@@ -349,11 +349,15 @@ function IssuanceProducts() {
     digitalAssetUrl: ""
   });
   const loadShopifyProducts = async () => {
-    const response = await fetch(`/shopify/api/products?shopDomain=${encodeURIComponent(form.shopDomain)}`);
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error ?? "Could not load products");
-    setShopifyProducts(payload);
-    setNotice(`Loaded ${payload.length} Shopify products`);
+    try {
+      const response = await fetch(`/shopify/api/products?shopDomain=${encodeURIComponent(form.shopDomain)}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Could not load products");
+      setShopifyProducts(payload);
+      setNotice(`Loaded ${payload.length} Shopify products`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not load Shopify products");
+    }
   };
   const create = async () => {
     await api("/api/issuance-products", { method: "POST", body: JSON.stringify(form) });
@@ -382,7 +386,7 @@ function IssuanceProducts() {
   return (
     <>
       <Header title="Product Issuance" subtitle="Map Shopify products to Exchange Hubs so paid orders issue UENs." />
-      {notice && <Notice>{notice}</Notice>}
+      {notice && <Notice tone={notice.toLowerCase().includes("could not") || notice.toLowerCase().includes("not connected") ? "bad" : "neutral"}>{notice}</Notice>}
       <FormGrid>
         <Select label="Exchange Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
         <Input label="Shop domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain })} />
