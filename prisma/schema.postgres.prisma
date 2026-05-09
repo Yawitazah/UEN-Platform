@@ -28,6 +28,7 @@ model ExchangeHub {
   codePrefix             String?
   customDomain           String?
   subdomain              String?                 @unique
+  uenValue               Decimal                 @default(1.00)
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   holders                Holder[]
@@ -46,10 +47,12 @@ model Holder {
   email                  String
   phone                  String?
   status                 String                  @default("ACTIVE")
+  portalToken            String?                 @unique
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   exchangeHub            ExchangeHub             @relation(fields: [exchangeHubId], references: [id])
   universalExchangeNotes UniversalExchangeNote[]
+  notifications          HolderNotification[]
 
   @@index([exchangeHubId])
   @@unique([exchangeHubId, email])
@@ -155,6 +158,9 @@ model ShopifySyncedNote {
   syncStatus              String                @default("PENDING")
   lastSyncedAt            DateTime?
   errorMessage            String?
+  redeemedAt              DateTime?
+  redeemedOrderId         String?
+  redeemedOrderAmount     Decimal?
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
   merchant                Merchant              @relation(fields: [merchantId], references: [id])
@@ -162,6 +168,7 @@ model ShopifySyncedNote {
 
   @@unique([merchantId, universalExchangeNoteId])
   @@index([shopDomain])
+  @@index([merchantId, redeemedAt])
 }
 
 model ShopifyIssuanceProduct {
@@ -319,4 +326,34 @@ model MerchantOnboarding {
 
   @@index([merchantId])
   @@index([shopDomain])
+}
+
+model PortalBanner {
+  id          String    @id @default(cuid())
+  title       String
+  body        String?
+  imageUrl    String?
+  linkUrl     String?
+  linkLabel   String?
+  bgColor     String    @default("#1f6f5b")
+  textColor   String    @default("#ffffff")
+  targetScope String    @default("ALL")
+  status      String    @default("ACTIVE")
+  priority    Int       @default(0)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model HolderNotification {
+  id        String    @id @default(cuid())
+  holderId  String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  holder    Holder    @relation(fields: [holderId], references: [id])
+
+  @@index([holderId])
 }

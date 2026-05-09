@@ -611,6 +611,240 @@ router.get("/audit-logs", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 }));
 });
 
+// ─── Portal token generation ───
+
+router.post("/holders/:holderId/portal-token", requireRole(writeRoles), async (req, res) => {
+  try {
+    const holderId = param(req, "holderId");
+    const holder = await prisma.holder.findUnique({ where: { id: holderId } });
+    if (!holder) return res.status(404).json({ error: "Holder not found" });
+    const token = holder.portalToken ?? crypto.randomBytes(24).toString("base64url");
+    const updated = await prisma.holder.update({
+      where: { id: holderId },
+      data: { portalToken: token }
+    });
+    res.json({ portalToken: updated.portalToken, portalUrl: `/holder/portal?token=${token}` });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// ─── Exchange Hub analytics ───
+
+function periodStart(period: string) {
+  const now = new Date();
+  if (period === "day") return new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (period === "month") return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+}
+
+router.get("/exchange-hubs/:exchangeHubId/analytics", requireRole(adminRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const period = String(req.query.period ?? "month");
+    const since = periodStart(period);
+
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+
+    const [totalUens, totalHolders, issuedInPeriod, holdersInPeriod, redemptions] = await Promise.all([
+      prisma.universalExchangeNote.count({ where: { exchangeHubId } }),
+      prisma.holder.count({ where: { exchangeHubId } }),
+      prisma.universalExchangeNote.count({ where: { exchangeHubId, issuedAt: { gte: since } } }),
+      prisma.holder.count({ where: { exchangeHubId, createdAt: { gte: since } } }),
+      prisma.shopifySyncedNote.findMany({
+        where: {
+          universalExchangeNote: { exchangeHubId },
+          redeemedAt: { gte: since }
+        },
+        select: { redeemedOrderAmount: true, redeemedAt: true }
+      })
+    ]);
+
+    const revenue = redemptions.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0);
+    const uenValue = Number(hub.uenValue);
+
+    res.json({
+      hub: { id: hub.id, displayName: hub.displayName, uenValue },
+      period,
+      totalUens,
+      totalHolders,
+      issuedInPeriod,
+      holdersInPeriod,
+      redemptionsInPeriod: redemptions.length,
+      revenueInPeriod: revenue,
+      estimatedValue: totalUens * uenValue
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.patch("/exchange-hubs/:exchangeHubId/uen-value", requireRole(writeRoles), async (req, res) => {
+  try {
+    const uenValue = Number(req.body.uenValue);
+    if (isNaN(uenValue) || uenValue < 0) return res.status(400).json({ error: "Invalid uenValue" });
+    const hub = await prisma.exchangeHub.update({
+      where: { id: param(req, "exchangeHubId") },
+      data: { uenValue }
+    });
+    res.json(hub);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// ─── Merchant analytics ───
+
+router.get("/merchants/:merchantId/analytics", requireRole(adminRoles), async (req, res) => {
+  try {
+    const merchantId = param(req, "merchantId");
+    const period = String(req.query.period ?? "month");
+    const since = periodStart(period);
+
+    const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
+    if (!merchant) return res.status(404).json({ error: "Merchant not found" });
+
+    const [totalSynced, redemptionsInPeriod, allTimeRedemptions] = await Promise.all([
+      prisma.shopifySyncedNote.count({ where: { merchantId, syncStatus: "SYNCED" } }),
+      prisma.shopifySyncedNote.findMany({
+        where: { merchantId, redeemedAt: { gte: since } },
+        select: { redeemedOrderAmount: true, redeemedAt: true }
+      }),
+      prisma.shopifySyncedNote.count({ where: { merchantId, redeemedAt: { not: null } } })
+    ]);
+
+    const revenueInPeriod = redemptionsInPeriod.reduce(
+      (sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0),
+      0
+    );
+
+    res.json({
+      merchant: { id: merchant.id, businessName: merchant.businessName },
+      period,
+      totalSyncedUens: totalSynced,
+      allTimeRedemptions,
+      redemptionsInPeriod: redemptionsInPeriod.length,
+      revenueInPeriod
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// ─── Portal banners ───
+
+router.get("/banners", requireRole(adminRoles), async (_req, res) => {
+  res.json(await prisma.portalBanner.findMany({ orderBy: [{ priority: "desc" }, { createdAt: "desc" }] }));
+});
+
+router.post("/banners", requireRole(writeRoles), async (req, res) => {
+  try {
+    const { title, body, imageUrl, linkUrl, linkLabel, bgColor, textColor, targetScope, priority, startsAt, endsAt } = req.body;
+    if (!title) return res.status(400).json({ error: "title is required" });
+    const banner = await prisma.portalBanner.create({
+      data: {
+        title,
+        body: body || undefined,
+        imageUrl: imageUrl || undefined,
+        linkUrl: linkUrl || undefined,
+        linkLabel: linkLabel || undefined,
+        bgColor: bgColor || "#1f6f5b",
+        textColor: textColor || "#ffffff",
+        targetScope: targetScope || "ALL",
+        priority: Number(priority ?? 0),
+        startsAt: startsAt ? new Date(startsAt) : undefined,
+        endsAt: endsAt ? new Date(endsAt) : undefined
+      }
+    });
+    res.status(201).json(banner);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.patch("/banners/:bannerId", requireRole(writeRoles), async (req, res) => {
+  try {
+    const { title, body, imageUrl, linkUrl, linkLabel, bgColor, textColor, targetScope, priority, status, startsAt, endsAt } = req.body;
+    const banner = await prisma.portalBanner.update({
+      where: { id: param(req, "bannerId") },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(body !== undefined && { body: body || undefined }),
+        ...(imageUrl !== undefined && { imageUrl: imageUrl || undefined }),
+        ...(linkUrl !== undefined && { linkUrl: linkUrl || undefined }),
+        ...(linkLabel !== undefined && { linkLabel: linkLabel || undefined }),
+        ...(bgColor !== undefined && { bgColor }),
+        ...(textColor !== undefined && { textColor }),
+        ...(targetScope !== undefined && { targetScope }),
+        ...(priority !== undefined && { priority: Number(priority) }),
+        ...(status !== undefined && { status }),
+        ...(startsAt !== undefined && { startsAt: startsAt ? new Date(startsAt) : null }),
+        ...(endsAt !== undefined && { endsAt: endsAt ? new Date(endsAt) : null })
+      }
+    });
+    res.json(banner);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.delete("/banners/:bannerId", requireRole(writeRoles), async (req, res) => {
+  try {
+    await prisma.portalBanner.delete({ where: { id: param(req, "bannerId") } });
+    res.json({ deleted: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// ─── Push notifications ───
+
+router.post("/notifications/send", requireRole(writeRoles), async (req, res) => {
+  try {
+    const { title, body, exchangeHubId, holderIds } = req.body;
+    if (!title || !body) return res.status(400).json({ error: "title and body are required" });
+
+    let targetHolders: { id: string }[] = [];
+
+    if (holderIds && Array.isArray(holderIds) && holderIds.length > 0) {
+      targetHolders = holderIds.map((id: string) => ({ id }));
+    } else if (exchangeHubId) {
+      targetHolders = await prisma.holder.findMany({
+        where: { exchangeHubId, status: "ACTIVE" },
+        select: { id: true }
+      });
+    } else {
+      targetHolders = await prisma.holder.findMany({
+        where: { status: "ACTIVE" },
+        select: { id: true }
+      });
+    }
+
+    const notifications = await Promise.all(
+      targetHolders.map((h) =>
+        prisma.holderNotification.create({
+          data: { holderId: h.id, title, body }
+        })
+      )
+    );
+
+    res.status(201).json({ sent: notifications.length });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get("/notifications", requireRole(adminRoles), async (_req, res) => {
+  res.json(
+    await prisma.holderNotification.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: { holder: { select: { firstName: true, lastName: true, email: true } } }
+    })
+  );
+});
+
 router.get("/merchants/:merchantId/valid-uens", requireMerchantAccess(), async (req, res) => {
   const { merchant, offer, uens } = await getValidUensForMerchant(param(req, "merchantId"));
   if (!merchant) return res.status(404).json({ error: "Merchant not found or inactive" });

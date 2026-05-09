@@ -8,6 +8,7 @@ import { config } from "./config";
 import { authenticate } from "./security";
 import authRoutes from "./routes/auth";
 import centralRoutes from "./routes/central";
+import holderRoutes from "./routes/holder";
 import shopifyRoutes from "./routes/shopify";
 
 const app = express();
@@ -39,6 +40,7 @@ app.use(authenticate);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
+app.use("/api", holderRoutes);
 app.use("/api", centralRoutes);
 app.use("/shopify/api", shopifyRoutes);
 app.use("/shopify", shopifyRoutes);

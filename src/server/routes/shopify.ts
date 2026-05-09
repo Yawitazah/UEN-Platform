@@ -150,7 +150,7 @@ async function subscribeOrdersPaidWebhook(shopDomain: string, accessToken: strin
         topic: "ORDERS_PAID",
         webhookSubscription: {
           uri,
-          includeFields: ["id", "email", "customer", "line_items"]
+          includeFields: ["id", "email", "customer", "line_items", "discount_codes", "total_price"]
         }
       }
     })
@@ -333,8 +333,10 @@ router.post("/webhooks/orders-paid", async (req, res) => {
     const order = req.body as {
       id?: number | string;
       email?: string;
+      total_price?: string;
       customer?: { email?: string; first_name?: string; last_name?: string };
       line_items?: Array<{ id?: number | string; product_id?: number | string; title?: string }>;
+      discount_codes?: Array<{ code?: string; amount?: string; type?: string }>;
     };
     const orderId = String(order.id ?? "");
     const customerEmail = order.email ?? order.customer?.email;
@@ -407,6 +409,32 @@ router.post("/webhooks/orders-paid", async (req, res) => {
           message: mappedProduct.digitalAssetUrl ? `Digital asset: ${mappedProduct.digitalAssetUrl}; UEN: ${note.code}` : `UEN: ${note.code}`
         }
       });
+    }
+
+    // ── Redemption tracking: mark UEN codes used via discount codes ──
+    const discountCodes = order.discount_codes ?? [];
+    if (discountCodes.length > 0 && shopDomain) {
+      const orderTotal = order.total_price ? Number(order.total_price) : null;
+      for (const dc of discountCodes) {
+        const code = String(dc.code ?? "").trim().toUpperCase();
+        if (!code) continue;
+        try {
+          await prisma.shopifySyncedNote.updateMany({
+            where: {
+              shopDomain,
+              uenCode: code,
+              redeemedAt: null
+            },
+            data: {
+              redeemedAt: new Date(),
+              redeemedOrderId: orderId,
+              redeemedOrderAmount: orderTotal
+            }
+          });
+        } catch (redeemError) {
+          console.warn("Could not mark UEN redemption for code", code, redeemError);
+        }
+      }
     }
 
     res.status(200).send("OK");

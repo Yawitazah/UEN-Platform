@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { Link2, Pause, Play, RefreshCw, Shield, Ticket, UploadCloud, SlidersHorizontal, Zap, ShoppingBag, TrendingUp, Download, Users, Star, CheckCircle } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Pause, Play, RefreshCw, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
 import "./styles.css";
 
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
@@ -35,6 +35,18 @@ async function shopifyApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json();
 }
 
+const portalToken = () => new URLSearchParams(window.location.search).get("token") ?? "";
+
+async function portalApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const sep = path.includes("?") ? "&" : "?";
+  const response = await fetch(`${path}${sep}token=${encodeURIComponent(portalToken())}`, {
+    ...init,
+    headers: { "content-type": "application/json", ...(init.headers ?? {}) }
+  });
+  if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
+  return response.json();
+}
+
 function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +71,7 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/");
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -88,6 +100,7 @@ function Shell() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
+          <Route path="/holder/portal" element={<HolderPortal />} />
         </Routes>
       ) : (
       <div className="app">
@@ -111,7 +124,9 @@ function Shell() {
               ["/access-rules", "Access Rules"],
               ["/connections", "Shopify Connections"],
               ["/sync-logs", "Sync Logs"],
-              ["/shopify", "Shopify App"]
+              ["/shopify", "Shopify App"],
+              ["/banners", "Portal Banners"],
+              ["/notifications", "Notifications"]
             ].map(([to, label]) => (
               <NavLink key={to} to={to} end={to === "/"}>
                 {label}
@@ -137,6 +152,8 @@ function Shell() {
               <Route path="/connections" element={<Connections user={user} />} />
               <Route path="/sync-logs" element={<SyncLogs user={user} />} />
               <Route path="/shopify" element={<ShopifyApp user={user} />} />
+              <Route path="/banners" element={<BannersAdmin user={user} />} />
+              <Route path="/notifications" element={<NotificationsAdmin user={user} />} />
             </Routes>
           )}
         </main>
@@ -798,11 +815,21 @@ function ExchangeHubs({ user }: { user: any }) {
           ["Display Name", (row) => row.displayName],
           ["Type", (row) => row.hubType],
           ["Code Prefix", (row) => row.codePrefix ?? "-"],
+          ["UEN Value", (row) => `$${Number(row.uenValue ?? 1).toFixed(2)}`],
           ["Status", (row) => <Status value={row.status} />],
           ["Billing", (row) => row.billingStatus],
           ["Action", (row) => <div className="actions"><button className="ghost" onClick={() => setEditing(row)}>Edit</button><button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button></div>]
         ]}
       />
+      {(data ?? []).map((hub: any) => (
+        <details key={hub.id} style={{ marginBottom: 12 }}>
+          <summary style={{ cursor: "pointer", padding: "8px 0", fontWeight: 600, color: "#17201b" }}>
+            <BarChart3 size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />
+            {hub.displayName} Analytics
+          </summary>
+          <HubAnalyticsPanel hubId={hub.id} />
+        </details>
+      ))}
     </>
   );
 }
@@ -811,10 +838,16 @@ function Holders({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const holders = useData<any[]>(() => api("/api/holders"));
   const [form, setForm] = useState({ exchangeHubId: "", firstName: "", lastName: "", email: "", phone: "" });
+  const [portalLinks, setPortalLinks] = useState<Record<string, string>>({});
   const create = async () => {
     await api(`/api/exchange-hubs/${form.exchangeHubId}/holders`, { method: "POST", body: JSON.stringify(form) });
     await holders.reload();
   };
+  const getPortalLink = async (holderId: string) => {
+    const result = await api<any>(`/api/holders/${holderId}/portal-token`, { method: "POST" });
+    setPortalLinks((prev) => ({ ...prev, [holderId]: result.portalUrl }));
+  };
+  const copyLink = (url: string) => navigator.clipboard.writeText(window.location.origin + url);
   return (
     <>
       <Header title="Holders" subtitle="Manage supporters and customers that own Universal Exchange Notes." user={user} />
@@ -825,7 +858,27 @@ function Holders({ user }: { user: any }) {
         <Input label="Email" value={form.email} onChange={(email) => setForm({ ...form, email })} />
         <button onClick={create}><UploadCloud size={16} /> Create Holder</button>
       </FormGrid>
-      <DataTable rows={holders.data ?? []} columns={[["Name", (r) => `${r.firstName} ${r.lastName}`], ["Email", (r) => r.email], ["Hub", (r) => r.exchangeHub.displayName], ["Status", (r) => <Status value={r.status} />]]} />
+      <DataTable
+        rows={holders.data ?? []}
+        columns={[
+          ["Name", (r) => `${r.firstName} ${r.lastName}`],
+          ["Email", (r) => r.email],
+          ["Hub", (r) => r.exchangeHub.displayName],
+          ["Status", (r) => <Status value={r.status} />],
+          ["Portal", (r) => (
+            <div className="actions">
+              {portalLinks[r.id] ? (
+                <>
+                  <span style={{ fontSize: 12, color: "#607069", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}>{portalLinks[r.id]}</span>
+                  <button className="ghost" onClick={() => copyLink(portalLinks[r.id])}><Copy size={14} /> Copy</button>
+                </>
+              ) : (
+                <button className="ghost" onClick={() => getPortalLink(r.id)}><Wallet size={14} /> Portal Link</button>
+              )}
+            </div>
+          )]
+        ]}
+      />
     </>
   );
 }
@@ -1165,6 +1218,7 @@ function ShopifyApp({ user }: { user: any }) {
       </section>
       <h2>Sync Logs</h2>
       <DataTable rows={logs.data ?? []} columns={[["Status", (r) => <Status value={r.status} />], ["Fetched", (r) => r.totalFetched], ["Created", (r) => r.totalCreated], ["Errors", (r) => r.totalErrors], ["Message", (r) => r.message]]} />
+      {dashboard.data?.merchantId && <MerchantAnalyticsPanel merchantId={dashboard.data.merchantId} />}
     </>
   );
 }
@@ -1207,6 +1261,507 @@ function FormGrid({ children }: { children: React.ReactNode }) {
 
 function Notice({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "bad" }) {
   return <div className={`notice notice-${tone}`}>{children}</div>;
+}
+
+// ─── HolderPortal ───
+
+function HolderPortal() {
+  const token = portalToken();
+  const wallet = useData<any>(() => portalApi("/api/holder/wallet"), [token]);
+  const merchants = useData<any[]>(() => portalApi("/api/holder/merchants"), [token]);
+  const banners = useData<any[]>(() => portalApi("/api/holder/banners"), [token]);
+  const [activeTab, setActiveTab] = useState<"wallet" | "merchants">("merchants");
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  if (!token) {
+    return (
+      <div className="portal-error">
+        <Shield size={48} />
+        <h1>No portal token</h1>
+        <p>This link is missing a valid portal token. Contact your Exchange Hub for your personal portal link.</p>
+      </div>
+    );
+  }
+
+  if (wallet.loading) {
+    return <div className="portal-loading"><div className="portal-spinner" /><p>Loading your wallet…</p></div>;
+  }
+
+  if (wallet.error || !wallet.data) {
+    return (
+      <div className="portal-error">
+        <Shield size={48} />
+        <h1>Could not load wallet</h1>
+        <p>{wallet.error ?? "Invalid or expired portal link."}</p>
+      </div>
+    );
+  }
+
+  const { holder, uens, notifications, unreadCount } = wallet.data;
+  const hub = holder.exchangeHub;
+  const totalActive = uens.filter((u: any) => u.status === "ACTIVE").length;
+  const totalRedeemed = uens.reduce((n: number, u: any) => n + u.redemptions.filter((r: any) => r.redeemed).length, 0);
+
+  const formatOffer = (offer: any) => {
+    if (!offer) return "No offer";
+    if (offer.discountType === "PERCENTAGE") return `${offer.discountValue}% off`;
+    if (offer.discountType === "FIXED_AMOUNT") return `$${offer.discountValue} off`;
+    return "Offer active";
+  };
+
+  return (
+    <div className="portal-root">
+      {/* Nav */}
+      <nav className="portal-nav">
+        <div className="portal-nav-brand">
+          <div className="portal-hub-dot" style={{ background: hub.brandColor ?? "#1f6f5b" }} />
+          <span>{hub.displayName}</span>
+        </div>
+        <div className="portal-nav-actions">
+          <button className="portal-notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
+            <Bell size={20} />
+            {unreadCount > 0 && <span className="portal-notif-badge">{unreadCount}</span>}
+          </button>
+        </div>
+      </nav>
+
+      {/* Notification drawer */}
+      {notifOpen && (
+        <div className="portal-notif-drawer">
+          <div className="portal-notif-header">
+            <h3>Notifications</h3>
+            <button className="portal-icon-btn" onClick={() => setNotifOpen(false)}><X size={18} /></button>
+          </div>
+          {notifications.length === 0 ? (
+            <p className="portal-notif-empty">No notifications yet.</p>
+          ) : (
+            notifications.map((n: any) => (
+              <div key={n.id} className={`portal-notif-item ${n.readAt ? "portal-notif-read" : ""}`}>
+                <strong>{n.title}</strong>
+                <p>{n.body}</p>
+                <span>{new Date(n.createdAt).toLocaleDateString()}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Hero / wallet overview */}
+      <section className="portal-hero">
+        <div className="portal-hero-inner">
+          <div className="portal-hero-copy">
+            <p className="portal-greeting">Welcome back,</p>
+            <h1 className="portal-name">{holder.firstName} {holder.lastName}</h1>
+            <div className="portal-stats-row">
+              <div className="portal-stat">
+                <Wallet size={18} />
+                <div>
+                  <strong>{totalActive}</strong>
+                  <span>Active UEN{totalActive !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+              <div className="portal-stat">
+                <CheckCircle size={18} />
+                <div>
+                  <strong>{totalRedeemed}</strong>
+                  <span>Times redeemed</span>
+                </div>
+              </div>
+              {hub.uenValue > 0 && (
+                <div className="portal-stat">
+                  <DollarSign size={18} />
+                  <div>
+                    <strong>${(totalActive * hub.uenValue).toFixed(2)}</strong>
+                    <span>Available value</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="portal-hero-uen-chip">
+            <div className="portal-uen-chip-inner">
+              <span>UENite Network</span>
+              <strong>{totalActive}</strong>
+              <span>Notes active</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Banners */}
+      {(banners.data ?? []).length > 0 && (
+        <div className="portal-banners">
+          {(banners.data ?? []).map((banner: any) => (
+            <div
+              key={banner.id}
+              className="portal-banner"
+              style={{ background: banner.bgColor, color: banner.textColor }}
+            >
+              {banner.imageUrl && <img src={banner.imageUrl} alt="" />}
+              <div className="portal-banner-copy">
+                <strong>{banner.title}</strong>
+                {banner.body && <p>{banner.body}</p>}
+                {banner.linkUrl && (
+                  <a href={banner.linkUrl} target="_blank" rel="noopener noreferrer">
+                    {banner.linkLabel ?? "Learn more"} <ExternalLink size={14} />
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <div className="portal-tabs">
+        <button className={`portal-tab ${activeTab === "merchants" ? "active" : ""}`} onClick={() => setActiveTab("merchants")}>
+          <Globe size={16} /> Where to Redeem
+        </button>
+        <button className={`portal-tab ${activeTab === "wallet" ? "active" : ""}`} onClick={() => setActiveTab("wallet")}>
+          <Wallet size={16} /> My Codes
+        </button>
+      </div>
+
+      {/* Merchant directory */}
+      {activeTab === "merchants" && (
+        <section className="portal-section">
+          <div className="portal-section-inner">
+            {merchants.loading && <p className="portal-loading-text">Loading merchants…</p>}
+            {(merchants.data ?? []).length === 0 && !merchants.loading && (
+              <div className="portal-empty">
+                <ShoppingBag size={40} />
+                <p>No merchants available yet. Check back soon.</p>
+              </div>
+            )}
+            <div className="portal-merchant-grid">
+              {(merchants.data ?? []).map((m: any) => (
+                <article key={m.id} className="portal-merchant-card">
+                  <div className="portal-merchant-offer">
+                    <Tag size={16} />
+                    <span>{formatOffer(m.offer)}</span>
+                  </div>
+                  <h3 className="portal-merchant-name">{m.businessName}</h3>
+                  {m.offer?.minimumOrderAmount && (
+                    <p className="portal-merchant-min">Min. order ${m.offer.minimumOrderAmount}</p>
+                  )}
+                  <div className="portal-merchant-meta">
+                    <span className={m.availableUens > 0 ? "portal-avail-yes" : "portal-avail-no"}>
+                      <CheckCircle size={13} /> {m.availableUens} available
+                    </span>
+                    {m.redeemedUens > 0 && (
+                      <span className="portal-redeemed-count">
+                        <RefreshCw size={13} /> {m.redeemedUens} used
+                      </span>
+                    )}
+                  </div>
+                  {m.shopUrl && (
+                    <a className="portal-shop-btn" href={m.shopUrl} target="_blank" rel="noopener noreferrer">
+                      Shop Now <ExternalLink size={14} />
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Wallet / code list */}
+      {activeTab === "wallet" && (
+        <section className="portal-section">
+          <div className="portal-section-inner">
+            {uens.length === 0 && (
+              <div className="portal-empty">
+                <Ticket size={40} />
+                <p>No active UEN codes yet.</p>
+              </div>
+            )}
+            <div className="portal-code-grid">
+              {uens.map((uen: any) => {
+                const usedAt = uen.redemptions.filter((r: any) => r.redeemed);
+                const availableAt = uen.redemptions.filter((r: any) => !r.redeemed && r.syncStatus === "SYNCED");
+                return (
+                  <article key={uen.id} className="portal-code-card">
+                    <div className="portal-code-top">
+                      <span className="portal-code-label">UEN Code</span>
+                      <button className="portal-copy-btn" onClick={() => navigator.clipboard.writeText(uen.code)} title="Copy code">
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                    <div className="portal-code-value">{uen.code}</div>
+                    <div className="portal-code-footer">
+                      <span className={`portal-code-status ${uen.status === "ACTIVE" ? "active" : "inactive"}`}>
+                        {uen.status}
+                      </span>
+                      {availableAt.length > 0 && (
+                        <span className="portal-code-meta">
+                          <CheckCircle size={12} /> Available at {availableAt.length} merchant{availableAt.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {usedAt.length > 0 && (
+                        <span className="portal-code-meta used">
+                          <RefreshCw size={12} /> Used at {usedAt.length} merchant{usedAt.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    {usedAt.length > 0 && (
+                      <div className="portal-code-used-list">
+                        {usedAt.map((r: any) => (
+                          <span key={r.merchantId} className="portal-used-chip">
+                            {r.merchantName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <footer className="portal-footer">
+        <Shield size={16} />
+        <span>Powered by UENite Exchange Network</span>
+      </footer>
+    </div>
+  );
+}
+
+// ─── BannersAdmin ───
+
+function BannersAdmin({ user }: { user: any }) {
+  const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
+  const banners = useData<any[]>(() => api("/api/banners"));
+  const [form, setForm] = useState({
+    title: "", body: "", imageUrl: "", linkUrl: "", linkLabel: "",
+    bgColor: "#1f6f5b", textColor: "#ffffff", targetScope: "ALL", priority: "0"
+  });
+  const [msg, setMsg] = useState("");
+
+  const create = async () => {
+    await api("/api/banners", { method: "POST", body: JSON.stringify(form) });
+    setMsg("Banner created");
+    setForm({ title: "", body: "", imageUrl: "", linkUrl: "", linkLabel: "", bgColor: "#1f6f5b", textColor: "#ffffff", targetScope: "ALL", priority: "0" });
+    await banners.reload();
+  };
+
+  const archive = async (id: string) => {
+    await api(`/api/banners/${id}`, { method: "PATCH", body: JSON.stringify({ status: "ARCHIVED" }) });
+    await banners.reload();
+  };
+
+  const del = async (id: string) => {
+    await api(`/api/banners/${id}`, { method: "DELETE" });
+    await banners.reload();
+  };
+
+  return (
+    <>
+      <Header title="Portal Banners" subtitle="Create promotional banners displayed in the Holder portal." user={user} />
+      {msg && <Notice>{msg}</Notice>}
+      <section className="panel">
+        <h2>New Banner</h2>
+        <div className="banner-preview" style={{ background: form.bgColor, color: form.textColor }}>
+          <strong>{form.title || "Banner title preview"}</strong>
+          {form.body && <p>{form.body}</p>}
+          {form.linkLabel && <span>{form.linkLabel} →</span>}
+        </div>
+        <FormGrid>
+          <Input label="Title *" value={form.title} onChange={(title) => setForm({ ...form, title })} />
+          <Input label="Body text" value={form.body} onChange={(body) => setForm({ ...form, body })} />
+          <Input label="Image URL" value={form.imageUrl} onChange={(imageUrl) => setForm({ ...form, imageUrl })} />
+          <Input label="Link URL" value={form.linkUrl} onChange={(linkUrl) => setForm({ ...form, linkUrl })} />
+          <Input label="Link label" value={form.linkLabel} onChange={(linkLabel) => setForm({ ...form, linkLabel })} />
+          <label>
+            Background color
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="color" value={form.bgColor} onChange={(e) => setForm({ ...form, bgColor: e.target.value })} style={{ width: 48, minHeight: 38, padding: 2 }} />
+              <input value={form.bgColor} onChange={(e) => setForm({ ...form, bgColor: e.target.value })} style={{ flex: 1 }} />
+            </div>
+          </label>
+          <label>
+            Text color
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="color" value={form.textColor} onChange={(e) => setForm({ ...form, textColor: e.target.value })} style={{ width: 48, minHeight: 38, padding: 2 }} />
+              <input value={form.textColor} onChange={(e) => setForm({ ...form, textColor: e.target.value })} style={{ flex: 1 }} />
+            </div>
+          </label>
+          <label>
+            Target audience
+            <select value={form.targetScope} onChange={(e) => setForm({ ...form, targetScope: e.target.value })}>
+              <option value="ALL">All Holders</option>
+              {(hubs.data ?? []).map((h: any) => <option key={h.id} value={h.id}>{h.displayName} only</option>)}
+            </select>
+          </label>
+          <Input label="Priority (higher = first)" value={form.priority} onChange={(priority) => setForm({ ...form, priority })} />
+          <button onClick={create}><UploadCloud size={16} /> Create Banner</button>
+        </FormGrid>
+      </section>
+      <DataTable
+        rows={banners.data ?? []}
+        columns={[
+          ["Preview", (r) => <div style={{ background: r.bgColor, color: r.textColor, padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, minWidth: 100 }}>{r.title}</div>],
+          ["Body", (r) => r.body ?? "—"],
+          ["Target", (r) => r.targetScope === "ALL" ? "All Holders" : r.targetScope],
+          ["Priority", (r) => r.priority],
+          ["Status", (r) => <Status value={r.status} />],
+          ["Actions", (r) => (
+            <div className="actions">
+              {r.status === "ACTIVE" && <button className="ghost" onClick={() => archive(r.id)}>Archive</button>}
+              <button className="ghost danger" onClick={() => del(r.id)}><X size={14} /> Delete</button>
+            </div>
+          )]
+        ]}
+      />
+    </>
+  );
+}
+
+// ─── NotificationsAdmin ───
+
+function NotificationsAdmin({ user }: { user: any }) {
+  const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
+  const logs = useData<any[]>(() => api("/api/notifications"));
+  const [form, setForm] = useState({ title: "", body: "", targetType: "all", exchangeHubId: "" });
+  const [msg, setMsg] = useState("");
+
+  const send = async () => {
+    if (!form.title || !form.body) { setMsg("Title and body are required"); return; }
+    setMsg("");
+    const payload: any = { title: form.title, body: form.body };
+    if (form.targetType === "hub" && form.exchangeHubId) payload.exchangeHubId = form.exchangeHubId;
+    const result = await api<any>("/api/notifications/send", { method: "POST", body: JSON.stringify(payload) });
+    setMsg(`Sent to ${result.sent} holder${result.sent !== 1 ? "s" : ""}`);
+    setForm({ ...form, title: "", body: "" });
+    await logs.reload();
+  };
+
+  return (
+    <>
+      <Header title="Push Notifications" subtitle="Send promo and announcement notifications to Holders." user={user} />
+      {msg && <Notice>{msg}</Notice>}
+      <section className="panel">
+        <h2>Send Notification</h2>
+        <FormGrid>
+          <Input label="Title *" value={form.title} onChange={(title) => setForm({ ...form, title })} />
+          <label className="wide">
+            Message *
+            <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Write your notification message here…" />
+          </label>
+          <label>
+            Send to
+            <select value={form.targetType} onChange={(e) => setForm({ ...form, targetType: e.target.value })}>
+              <option value="all">All Holders</option>
+              <option value="hub">Specific Exchange Hub</option>
+            </select>
+          </label>
+          {form.targetType === "hub" && (
+            <Select label="Exchange Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
+          )}
+          <button onClick={send}><Bell size={16} /> Send Notification</button>
+        </FormGrid>
+      </section>
+      <h2>Recent Notifications</h2>
+      <DataTable
+        rows={logs.data ?? []}
+        columns={[
+          ["Holder", (r) => `${r.holder.firstName} ${r.holder.lastName} (${r.holder.email})`],
+          ["Title", (r) => r.title],
+          ["Body", (r) => r.body],
+          ["Read", (r) => r.readAt ? new Date(r.readAt).toLocaleString() : "Unread"],
+          ["Sent", (r) => new Date(r.createdAt).toLocaleString()]
+        ]}
+      />
+    </>
+  );
+}
+
+// ─── Hub Analytics Panel (used inside ExchangeHubs) ───
+
+function HubAnalyticsPanel({ hubId }: { hubId: string }) {
+  const [period, setPeriod] = useState("month");
+  const { data, loading, reload } = useData<any>(() => api(`/api/exchange-hubs/${hubId}/analytics?period=${period}`), [hubId, period]);
+  const [uenValue, setUenValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  const saveValue = async () => {
+    setSaving(true);
+    await api(`/api/exchange-hubs/${hubId}/uen-value`, { method: "PATCH", body: JSON.stringify({ uenValue: parseFloat(uenValue) }) });
+    setSaving(false);
+    setSavedMsg("UEN value saved");
+    await reload();
+  };
+
+  return (
+    <div className="analytics-panel">
+      <div className="analytics-header">
+        <h3><BarChart3 size={16} /> Analytics</h3>
+        <div className="analytics-period-tabs">
+          {["day", "month", "year"].map((p) => (
+            <button key={p} className={`ghost analytics-period-btn ${period === p ? "active" : ""}`} onClick={() => setPeriod(p)}>{p}</button>
+          ))}
+        </div>
+      </div>
+      {loading && <p style={{ color: "#607069", fontSize: 13 }}>Loading…</p>}
+      {data && (
+        <>
+          <div className="analytics-stats">
+            <div className="analytics-stat"><strong>{data.totalUens}</strong><span>Total UENs</span></div>
+            <div className="analytics-stat"><strong>{data.totalHolders}</strong><span>Total Holders</span></div>
+            <div className="analytics-stat"><strong>{data.issuedInPeriod}</strong><span>Issued ({period})</span></div>
+            <div className="analytics-stat"><strong>{data.holdersInPeriod}</strong><span>New holders ({period})</span></div>
+            <div className="analytics-stat"><strong>{data.redemptionsInPeriod}</strong><span>Redemptions ({period})</span></div>
+            <div className="analytics-stat highlight"><strong>${data.revenueInPeriod.toFixed(2)}</strong><span>Revenue ({period})</span></div>
+          </div>
+          <div className="analytics-value-row">
+            <span>UEN value: <strong>${data.hub.uenValue}</strong></span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                style={{ width: 100, minHeight: 32, padding: "4px 8px", fontSize: 13 }}
+                value={uenValue}
+                placeholder="New value"
+                onChange={(e) => setUenValue(e.target.value)}
+              />
+              <button style={{ minHeight: 32, padding: "4px 10px", fontSize: 13 }} onClick={saveValue} disabled={saving}><DollarSign size={13} /> Set</button>
+            </div>
+            {savedMsg && <span style={{ color: "#1f6f5b", fontSize: 12 }}>{savedMsg}</span>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Merchant Analytics Panel ───
+
+function MerchantAnalyticsPanel({ merchantId }: { merchantId: string }) {
+  const [period, setPeriod] = useState("month");
+  const { data, loading } = useData<any>(() => api(`/api/merchants/${merchantId}/analytics?period=${period}`), [merchantId, period]);
+
+  return (
+    <div className="analytics-panel">
+      <div className="analytics-header">
+        <h3><BarChart3 size={16} /> UEN Analytics</h3>
+        <div className="analytics-period-tabs">
+          {["day", "month", "year"].map((p) => (
+            <button key={p} className={`ghost analytics-period-btn ${period === p ? "active" : ""}`} onClick={() => setPeriod(p)}>{p}</button>
+          ))}
+        </div>
+      </div>
+      {loading && <p style={{ color: "#607069", fontSize: 13 }}>Loading…</p>}
+      {data && (
+        <div className="analytics-stats">
+          <div className="analytics-stat"><strong>{data.totalSyncedUens}</strong><span>Synced UENs</span></div>
+          <div className="analytics-stat"><strong>{data.allTimeRedemptions}</strong><span>All-time redemptions</span></div>
+          <div className="analytics-stat"><strong>{data.redemptionsInPeriod}</strong><span>Redemptions ({period})</span></div>
+          <div className="analytics-stat highlight"><strong>${data.revenueInPeriod.toFixed(2)}</strong><span>UEN Revenue ({period})</span></div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(<Shell />);
