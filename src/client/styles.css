@@ -1229,6 +1229,22 @@ th {
   width: 28px;
 }
 
+/* ─── Signup form overrides ─── */
+
+/* Clean up the form grid inside the signup card */
+.signup-left .form-grid {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Make the submit button span all columns so it never clips */
+.signup-left .form-grid button {
+  grid-column: 1 / -1;
+  justify-content: center;
+  width: 100%;
+}
+
 /* ─── Responsive ─── */
 
 @media (max-width: 900px) {
