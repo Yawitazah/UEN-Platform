@@ -19,7 +19,8 @@ export const createHolderSchema = z.object({
 
 export const createUenSchema = z.object({
   holderId: z.string().min(1),
-  code: z.string().min(3).optional(),
+  code: z.string().min(4).max(64).regex(/^[A-Z0-9]+UEN$/i).optional(),
+  codePrefix: z.string().max(24).regex(/^[A-Z0-9]*$/i).optional(),
   campaignId: z.string().optional(),
   expiresAt: z.string().datetime().optional()
 });

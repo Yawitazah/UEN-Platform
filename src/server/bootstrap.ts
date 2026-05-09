@@ -45,7 +45,7 @@ export async function ensureFirstBuildTarget() {
     data: {
       exchangeHubId: exchangeHub.id,
       holderId: holder.id,
-      code: "UEN-TEST-001",
+      code: "1234567UEN",
       status: UenStatus.ACTIVE
     }
   });
@@ -85,5 +85,5 @@ export async function ensureFirstBuildTarget() {
     }
   });
 
-  console.log("Bootstrapped first-build target for UEN-TEST-001");
+  console.log("Bootstrapped first-build target for 1234567UEN");
 }

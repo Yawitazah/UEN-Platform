@@ -240,26 +240,38 @@ function Uens() {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const holders = useData<any[]>(() => api("/api/holders"));
   const uens = useData<any[]>(() => api("/api/uens"));
-  const [form, setForm] = useState({ exchangeHubId: "", holderId: "", code: "" });
+  const [form, setForm] = useState({ exchangeHubId: "", holderId: "", codePrefix: "", code: "" });
   const hubHolders = useMemo(() => (holders.data ?? []).filter((h) => h.exchangeHubId === form.exchangeHubId), [holders.data, form.exchangeHubId]);
   const create = async () => {
-    await api(`/api/exchange-hubs/${form.exchangeHubId}/uens`, { method: "POST", body: JSON.stringify({ holderId: form.holderId, code: form.code || undefined }) });
+    await api(`/api/exchange-hubs/${form.exchangeHubId}/uens`, {
+      method: "POST",
+      body: JSON.stringify({
+        holderId: form.holderId,
+        codePrefix: form.codePrefix || undefined,
+        code: form.code || undefined
+      })
+    });
     await uens.reload();
   };
   const disable = async (id: string) => {
     await api(`/api/uens/${id}/disable`, { method: "POST" });
     await uens.reload();
   };
+  const removeFromCirculation = async (id: string) => {
+    await api(`/api/uens/${id}/remove-from-circulation`, { method: "POST" });
+    await uens.reload();
+  };
   return (
     <>
-      <Header title="Universal Exchange Notes" subtitle="Generate and disable platform value/access units." />
+      <Header title="Universal Exchange Notes" subtitle="Generate, disable, or remove platform value/access units from circulation." />
       <FormGrid>
         <Select label="Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId, holderId: "" })} />
         <Select label="Holder" value={form.holderId} options={hubHolders} labelKey="email" onChange={(holderId) => setForm({ ...form, holderId })} />
-        <Input label="Code" value={form.code} onChange={(code) => setForm({ ...form, code })} />
+        <Input label="Hub code prefix" value={form.codePrefix} onChange={(codePrefix) => setForm({ ...form, codePrefix })} />
+        <Input label="Manual code override" value={form.code} onChange={(code) => setForm({ ...form, code })} />
         <button onClick={create}><Ticket size={16} /> Generate UEN</button>
       </FormGrid>
-      <DataTable rows={uens.data ?? []} columns={[["Code", (r) => r.code], ["Hub", (r) => r.exchangeHub.displayName], ["Holder", (r) => r.holder.email], ["Status", (r) => <Status value={r.status} />], ["Action", (r) => <button className="ghost" onClick={() => disable(r.id)}>Disable</button>]]} />
+      <DataTable rows={uens.data ?? []} columns={[["Code", (r) => r.code], ["Hub", (r) => r.exchangeHub.displayName], ["Holder", (r) => r.holder.email], ["Status", (r) => <Status value={r.status} />], ["Actions", (r) => <div className="actions"><button className="ghost" onClick={() => disable(r.id)}>Disable</button><button className="ghost danger" onClick={() => removeFromCirculation(r.id)}>Remove from Circulation</button></div>]]} />
     </>
   );
 }

@@ -48,7 +48,7 @@ Production-minded MVP for a Universal Exchange Note platform with a Shopify merc
 
 - Exchange Hub: `Exchange Hub A`
 - Holder: `Holder A`
-- UEN: `UEN-TEST-001`
+- UEN: `1234567UEN`
 - Merchant: `Merchant A`
 - Shopify store placeholder: `merchant-a.myshopify.com`
 - Merchant offer: `15% off`
@@ -56,7 +56,7 @@ Production-minded MVP for a Universal Exchange Note platform with a Shopify merc
 - Shopify merchant connection token: `uen_dev_merchant_token`
 - Admin bearer token: `dev-admin-token`
 
-Local Shopify sync runs in mock mode by default using `SHOPIFY_SYNC_MODE=mock`, so syncing `UEN-TEST-001` creates mock Shopify discount IDs without calling Shopify. Set `SHOPIFY_SYNC_MODE=live`, store a real offline Shopify access token in `ShopifyConnection.accessToken`, and keep scopes as `read_discounts,write_discounts` to call the Shopify Admin GraphQL API.
+Local Shopify sync runs in mock mode by default using `SHOPIFY_SYNC_MODE=mock`, so syncing `1234567UEN` creates mock Shopify discount IDs without calling Shopify. Set `SHOPIFY_SYNC_MODE=live`, store a real offline Shopify access token in `ShopifyConnection.accessToken`, and keep scopes as `read_discounts,write_discounts` to call the Shopify Admin GraphQL API.
 
 ## Connect a real Shopify store for testing
 
@@ -101,7 +101,7 @@ Then set `.env` to:
 SHOPIFY_SYNC_MODE="live"
 ```
 
-Restart the server and use `/shopify` to sync `UEN-TEST-001`.
+Restart the server and use `/shopify` to sync `1234567UEN`.
 
 ## Key API endpoints
 
@@ -120,8 +120,11 @@ Restart the server and use `/shopify` to sync `UEN-TEST-001`.
 
 - The central platform is the source of truth for UEN validity, Exchange Hub status, merchant access, and offers.
 - Shopify is only the redemption layer. The Shopify app cannot create or delete UENs.
+- Exchange Hubs sell access through their own systems. For a Shopify-based Exchange Hub, the sale can be a normal Shopify product, and a post-purchase integration can call the central platform to create the Holder and generate the UEN.
+- Generated UENs use `1234567UEN` by default, with an optional Exchange Hub prefix such as `NUBREED1234567UEN`. The numeric portion is 1 to 7 digits.
 - One UEN can sync to many merchants, with merchant-specific offer values.
 - Suspended Exchange Hubs cannot generate new UENs. Suspending a hub marks active UENs as suspended so they stop syncing.
+- Admins can disable a UEN or remove it from circulation, which marks synced Shopify records inactive.
 - UENs in `GRACE_PERIOD` may continue syncing even when a hub is suspended.
 - Future non-Shopify merchants can validate UENs through `POST /api/uens/validate`.
 

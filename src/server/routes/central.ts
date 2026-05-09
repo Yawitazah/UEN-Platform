@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import type { Router } from "express";
 import express from "express";
 import { ZodError } from "zod";
@@ -34,8 +33,22 @@ function handleError(res: express.Response, error: unknown) {
   return res.status(500).json({ error: "Unexpected server error" });
 }
 
-function generatedCode() {
-  return `UEN-${randomBytes(4).toString("hex").toUpperCase()}`;
+async function generatedCode(prefix = "") {
+  const normalizedPrefix = prefix.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  const max = 9_999_999;
+  const existingCount = await prisma.universalExchangeNote.count();
+  if (existingCount >= max) {
+    throw new Error("All 7-digit UEN combinations have been issued");
+  }
+
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const number = Math.floor(Math.random() * max) + 1;
+    const code = `${normalizedPrefix}${number}UEN`;
+    const existing = await prisma.universalExchangeNote.findUnique({ where: { code } });
+    if (!existing) return code;
+  }
+
+  throw new Error("Could not generate a unique UEN code");
 }
 
 function publicConnection(connection: { accessToken: string; [key: string]: unknown }) {
@@ -136,7 +149,7 @@ router.post("/exchange-hubs/:exchangeHubId/uens", requireRole(writeRoles), async
       data: {
         exchangeHubId,
         holderId: data.holderId,
-        code: data.code ?? generatedCode(),
+        code: data.code?.toUpperCase() ?? (await generatedCode(data.codePrefix)),
         campaignId: data.campaignId,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined
       }
@@ -172,6 +185,30 @@ router.post("/uens/:uenId/disable", requireRole(writeRoles), async (req, res) =>
       entityType: "UniversalExchangeNote",
       entityId: note.id,
       message: `Disabled ${note.code}`
+    });
+    res.json(note);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post("/uens/:uenId/remove-from-circulation", requireRole(writeRoles), async (req, res) => {
+  try {
+    const note = await prisma.universalExchangeNote.update({
+      where: { id: param(req, "uenId") },
+      data: { status: UenStatus.REMOVED_FROM_CIRCULATION, disabledAt: new Date() }
+    });
+    await prisma.shopifySyncedNote.updateMany({
+      where: { universalExchangeNoteId: note.id },
+      data: { syncStatus: "INACTIVE", errorMessage: "UEN removed from circulation by platform admin" }
+    });
+    await audit({
+      action: AuditAction.UEN_REMOVED_FROM_CIRCULATION,
+      actorId: req.auth?.actorId,
+      actorType: req.auth?.actorType,
+      entityType: "UniversalExchangeNote",
+      entityId: note.id,
+      message: `Removed ${note.code} from circulation`
     });
     res.json(note);
   } catch (error) {
