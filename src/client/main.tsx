@@ -5,7 +5,10 @@ import { Link2, Pause, Play, RefreshCw, Shield, Ticket, UploadCloud } from "luci
 import "./styles.css";
 
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
-const shopDomain = () => new URLSearchParams(window.location.search).get("shopDomain") ?? localStorage.getItem("uen_shop_domain") ?? "merchant-a.myshopify.com";
+const shopDomain = () => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("shopDomain") ?? params.get("shop") ?? localStorage.getItem("uen_shop_domain") ?? "nubreed-love.myshopify.com";
+};
 let authRefresh: (() => void) | null = null;
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -591,30 +594,20 @@ function ShopifyApp({ user }: { user: any }) {
   const [shop, setShop] = useState(shopDomain());
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [token, setToken] = useState("uen_dev_merchant_token");
   const dashboard = useData<any>(() => shopifyApi("/dashboard"), [shop]);
   const logs = useData<any[]>(() => shopifyApi("/sync-logs"), [shop]);
   const [offer, setOffer] = useState({ discountType: "PERCENTAGE", discountValue: "15", minimumOrderAmount: "", usageLimitPerNote: "1" });
-  const saveShop = () => {
+  useEffect(() => {
     localStorage.setItem("uen_shop_domain", shop);
-    void dashboard.reload();
-    void logs.reload();
-  };
-  const connect = async () => {
+  }, [shop]);
+  const installOrReconnect = () => {
     setActionError(null);
     setActionMessage(null);
-    const response = await fetch("/shopify/api/platform-connection", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ shopDomain: shop, connectionToken: token })
-    });
-    if (!response.ok) {
-      const payload = await response.json();
-      setActionError(payload.error ?? "Could not link store");
+    if (!shop.endsWith(".myshopify.com")) {
+      setActionError("Enter the store domain ending in .myshopify.com");
       return;
     }
-    setActionMessage("Store linked");
-    saveShop();
+    window.location.href = `/shopify/auth?shop=${encodeURIComponent(shop)}`;
   };
   const sync = async () => {
     setActionError(null);
@@ -641,25 +634,33 @@ function ShopifyApp({ user }: { user: any }) {
       <Header title="Shopify Merchant App" subtitle="Connect a store, configure merchant offer rules, and sync allowed UENs." user={user} />
         <section className="split">
         <div className="panel">
-          <h2>Platform Connection</h2>
-          <Input label="Shop domain" value={shop} onChange={setShop} />
-          <Input label="Connection token" value={token} onChange={setToken} />
-          <button onClick={connect}><Link2 size={16} /> Link Store</button>
+          <h2>Store Connection</h2>
+          {dashboard.data ? (
+            <div className="facts">
+              <span>Store {dashboard.data.shopDomain}</span>
+              <span>Connection <Status value={dashboard.data.platformConnectionStatus} /></span>
+              <span>Merchant <Status value={dashboard.data.merchantStatus} /></span>
+            </div>
+          ) : (
+            <>
+              <Notice>{dashboard.error ?? "Install the app to connect this Shopify store automatically."}</Notice>
+              <Input label="Shop domain" value={shop} onChange={setShop} />
+              <button onClick={installOrReconnect}><Link2 size={16} /> Install or Reconnect</button>
+            </>
+          )}
         </div>
         <div className="panel">
           <h2>Dashboard</h2>
           {dashboard.data ? (
             <div className="facts">
-              <span>Connection <Status value={dashboard.data.platformConnectionStatus} /></span>
-              <span>Merchant <Status value={dashboard.data.merchantStatus} /></span>
               <span>Offer {dashboard.data.activeOffer ? `${dashboard.data.activeOffer.discountValue}%` : "None"}</span>
               <span>Synced UENs {dashboard.data.totalSyncedUens}</span>
               <span>Last sync {dashboard.data.lastSyncTime ? new Date(dashboard.data.lastSyncTime).toLocaleString() : "Never"}</span>
             </div>
           ) : <Notice>{dashboard.error ?? "Connect the store to load dashboard data."}</Notice>}
           <div className="actions">
-            <button onClick={sync}><RefreshCw size={16} /> Sync UENs Now</button>
-            <button className="ghost" onClick={pause}><Pause size={16} /> Pause</button>
+            <button onClick={sync} disabled={!dashboard.data}><RefreshCw size={16} /> Sync UENs Now</button>
+            <button className="ghost" onClick={pause} disabled={!dashboard.data}><Pause size={16} /> Pause</button>
           </div>
         </div>
         </section>
