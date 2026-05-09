@@ -474,15 +474,16 @@ function UeniteHome() {
       className: "path-holder"
     }
   ];
+  const editMode = Boolean(publicAdmin && editorOpen);
   const selectField = (field: keyof HomeSiteContent | "heroBackground" | "share") => (event: React.MouseEvent) => {
-    if (!publicAdmin) return;
+    if (!publicAdmin || !editMode) return;
     event.preventDefault();
     event.stopPropagation();
     setSelectedField(field);
     setEditorOpen(true);
   };
   const editableClass = (field: keyof HomeSiteContent | "heroBackground" | "share") =>
-    publicAdmin ? `editable-surface ${selectedField === field ? "selected" : ""}` : "";
+    editMode ? `editable-surface ${selectedField === field ? "selected" : ""}` : "";
   const editableText = (field: keyof HomeSiteContent, className = "") => ({
     className: `${className} ${editableClass(field)}`,
     onClick: selectField(field),
@@ -710,7 +711,7 @@ function UeniteHome() {
         </div>
         <a {...editableAnchor("finalCtaText", content.finalCtaHref, "button-link button-link-large")}>{content.finalCtaText}</a>
       </section>
-      {publicAdmin && <SiteEditor initialContent={content} onPreview={setPreviewContent} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={setEditorOpen} onSelect={setSelectedField} />}
+      {publicAdmin && <SiteEditor initialContent={content} onPreview={setPreviewContent} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={(nextOpen) => { setEditorOpen(nextOpen); if (!nextOpen) setSelectedField(null); }} onSelect={setSelectedField} />}
     </main>
   );
 }
@@ -775,6 +776,8 @@ function SiteEditor({
       await api("/api/site-content/home", { method: "PATCH", body: JSON.stringify({ value: draft }) });
       await onSaved();
       setStatus("Saved live");
+      onSelect(null);
+      onOpenChange(false);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Save failed");
     }
