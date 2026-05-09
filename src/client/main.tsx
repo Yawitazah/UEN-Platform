@@ -157,6 +157,7 @@ type HomeSiteContent = {
   flowBackground: string;
   creatorBackground: string;
   storyBackground: string;
+  collectionBackground: string;
   featuredBackground: string;
   finalBackground: string;
 };
@@ -164,8 +165,8 @@ type HomeSiteContent = {
 const defaultHomeContent: HomeSiteContent = {
   pageBackground: "",
   heroEyebrow: "A smarter way to fundraise, sell, and support",
-  heroTitle: "When we UENite, support becomes something people can keep.",
-  heroBody: "Fundraisers, creators, ministries, causes, brands, and communities can receive support through their own store while giving supporters real value in return: Universal Exchange Notes, digital downloads, collectibles, badges, and offers from participating merchants.",
+  heroTitle: "A smarter way to fundraise, sell, support, and UENite.",
+  heroBody: "Turn every contribution into a memorable exchange. Exchange Hubs can sell through their own Shopify store, issue Universal Exchange Notes, deliver digital rewards, keep direct supporter relationships, and send Holders into a merchant network where their support unlocks real value.",
   primaryCtaText: "Join the Merchant Network",
   primaryCtaHref: "/merchants/register",
   secondaryCtaText: "Choose your path",
@@ -275,6 +276,7 @@ const defaultHomeContent: HomeSiteContent = {
   flowBackground: "",
   creatorBackground: "",
   storyBackground: "",
+  collectionBackground: "",
   featuredBackground: "",
   finalBackground: ""
 };
@@ -309,6 +311,35 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
     void reload();
   }, deps);
   return { data, error, loading, reload };
+}
+
+function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
+  const [current, setCurrent] = useState(0);
+  useEffect(() => {
+    const duration = 1100;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      setCurrent(Math.round(value * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <>{prefix}{current.toLocaleString()}{suffix}</>;
+}
+
+function PoweredByFooter() {
+  return (
+    <footer className="uenite-footer">
+      <div>
+        <strong>UENite</strong>
+        <span>A smarter way to fundraise, sell, and support.</span>
+      </div>
+      <p>Powered by Universal Exchange Notes.</p>
+    </footer>
+  );
 }
 
 function Shell() {
@@ -443,6 +474,7 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
         </div>
       </section>
       {children}
+      <PoweredByFooter />
     </main>
   );
 }
@@ -577,11 +609,21 @@ function UeniteHome() {
               <span><Users size={15} /> Own the supporter relationship</span>
               <span><Zap size={15} /> Engage directly beyond social platforms</span>
             </div>
+            <div className="hero-growth">
+              <div><strong><AnimatedNumber value={12840} /></strong><span>support actions</span></div>
+              <div><strong><AnimatedNumber value={4200} prefix="$" /></strong><span>sample collection value</span></div>
+              <div><strong><AnimatedNumber value={87} suffix="%" /></strong><span>reward utility</span></div>
+            </div>
           </div>
           <div className="uenite-orbit" aria-hidden="true">
             <div className="money-symbol money-one">$</div>
             <div className="money-symbol money-two">¢</div>
             <div className="money-symbol money-three">$</div>
+            <div className="orbit-collection-card">
+              <span>Holder collection</span>
+              <strong>5 items</strong>
+              <small>2 badges / 3 downloads</small>
+            </div>
             <div className={`orbit-core ${editableClass("orbitCoreTitle")}`} onClick={selectField("orbitCoreTitle")}><strong>{content.orbitCoreTitle}</strong><span>{content.orbitCoreSubtitle}</span></div>
             <div className={`orbit-node node-hub ${editableClass("orbitHubLabel")}`} onClick={selectField("orbitHubLabel")}><Users size={18} /><span>{content.orbitHubLabel}</span></div>
             <div className={`orbit-node node-holder ${editableClass("orbitHolderLabel")}`} onClick={selectField("orbitHolderLabel")}><Ticket size={18} /><span>{content.orbitHolderLabel}</span></div>
@@ -706,7 +748,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="collection-section">
+      <section className={`collection-section ${editableClass("collectionBackground")}`} style={backgroundStyle("collectionBackground")} onClick={selectField("collectionBackground")}>
         <div className="collection-copy">
           <span {...editableText("collectionEyebrow", "eyebrow")}><Wallet size={16} /> {content.collectionEyebrow}</span>
           <h2 {...editableText("collectionTitle")}>{content.collectionTitle}</h2>
@@ -716,6 +758,14 @@ function UeniteHome() {
           </div>
         </div>
         <div className="collection-showcase">
+          <div className="collection-toolbar">
+            <span>Collection Vault</span>
+            <div>
+              <button type="button">Newest</button>
+              <button type="button">Value</button>
+              <button type="button">Cause</button>
+            </div>
+          </div>
           <div className="collection-value-card">
             <span {...editableText("collectionValueLabel")}>{content.collectionValueLabel}</span>
             <strong {...editableText("collectionValueAmount")}>{content.collectionValueAmount}</strong>
@@ -768,6 +818,7 @@ function UeniteHome() {
         <a {...editableAnchor("finalCtaText", content.finalCtaHref, "button-link button-link-large")}>{content.finalCtaText}</a>
       </section>
       {publicAdmin && <SiteEditor initialContent={content} onPreview={setPreviewContent} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={(nextOpen) => { setEditorOpen(nextOpen); if (!nextOpen) setSelectedField(null); }} onSelect={setSelectedField} />}
+      <PoweredByFooter />
     </main>
   );
 }
@@ -806,7 +857,7 @@ function SiteEditor({
     share: "Share and site settings"
   };
   const imageFields = new Set<keyof HomeSiteContent>(["heroBgImage", "flow1Image", "flow2Image", "flow3Image", "flow4Image", "storyImage"]);
-  const backgroundFields = new Set<string>(["heroBackground", "pageBackground", "audienceBackground", "flowBackground", "creatorBackground", "storyBackground", "featuredBackground", "finalBackground"]);
+  const backgroundFields = new Set<string>(["heroBackground", "pageBackground", "audienceBackground", "flowBackground", "creatorBackground", "storyBackground", "collectionBackground", "featuredBackground", "finalBackground"]);
   const linkFields: Partial<Record<keyof HomeSiteContent, keyof HomeSiteContent>> = {
     primaryCtaText: "primaryCtaHref",
     secondaryCtaText: "secondaryCtaHref",
@@ -1291,6 +1342,7 @@ function Dashboard({ user }: { user: any }) {
     <>
       <Header title="Admin Dashboard" subtitle="Operate Exchange Hubs, UEN validity, merchant access, and Shopify syncs." user={user} />
       <SharePanel />
+      <PublicPreviews />
       {error && <Notice tone="bad">{error}</Notice>}
       {loading && <Notice>Loading dashboard...</Notice>}
       {data && (
@@ -1341,6 +1393,41 @@ function SharePanel() {
           <button className="ghost" key={label} onClick={() => copyLink(label, url)}>
             <Copy size={15} /> {copied === label ? "Copied" : label}
           </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PublicPreviews() {
+  const pages = [
+    ["Homepage", "/"],
+    ["Login", "/login"],
+    ["Signup Gateway", "/signup"],
+    ["Merchant Signup", "/merchants/register"],
+    ["Exchange Hub Signup", "/exchange-hub/register"],
+    ["Holder Signup", "/holder/register"]
+  ];
+  return (
+    <section className="preview-panel">
+      <div className="preview-panel-head">
+        <div>
+          <span>Public page previews</span>
+          <strong>Quickly verify the pages people see before you share them.</strong>
+        </div>
+        <a className="text-link dark" href="/" target="_blank" rel="noreferrer">
+          Open site <ExternalLink size={14} />
+        </a>
+      </div>
+      <div className="preview-grid">
+        {pages.map(([label, path]) => (
+          <article className="preview-card" key={path}>
+            <div className="preview-card-head">
+              <strong>{label}</strong>
+              <a href={path} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a>
+            </div>
+            <iframe title={`${label} preview`} src={path} loading="lazy" />
+          </article>
         ))}
       </div>
     </section>
