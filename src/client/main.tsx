@@ -1893,7 +1893,7 @@ function HolderPortal() {
 
       <footer className="portal-footer">
         <Shield size={16} />
-        <span>Powered by UENite Exchange Network</span>
+        <span>Powered by UENite (Universal Exchange Note)</span>
       </footer>
     </div>
   );
