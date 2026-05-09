@@ -75,6 +75,52 @@ async function ensureDiscountGroup(connection: GroupedDiscountConnection, offer:
   });
 }
 
+function isDuplicateShopifyCodeError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  return message.includes("code must be unique") || message.includes("already been taken") || message.includes("already exists");
+}
+
+async function recordGroupedCodeSync(input: {
+  connection: GroupedDiscountConnection;
+  code: { id: string; code: string; kind: "note" | "inventory" };
+  syncStatus: string;
+  shopifyDiscountId?: string | null;
+  errorMessage?: string | null;
+}) {
+  const data = {
+    shopDomain: input.connection.shopDomain,
+    uenCode: input.code.code,
+    shopifyDiscountId: input.shopifyDiscountId ?? null,
+    shopifyDiscountCodeId: input.shopifyDiscountId ?? null,
+    syncStatus: input.syncStatus,
+    lastSyncedAt: new Date(),
+    errorMessage: input.errorMessage ?? null
+  };
+
+  if (input.code.kind === "note") {
+    await prisma.shopifySyncedNote.upsert({
+      where: { merchantId_universalExchangeNoteId: { merchantId: input.connection.merchantId, universalExchangeNoteId: input.code.id } },
+      update: data,
+      create: {
+        merchantId: input.connection.merchantId,
+        universalExchangeNoteId: input.code.id,
+        ...data
+      }
+    });
+    return;
+  }
+
+  await prisma.shopifyInventorySyncedCode.upsert({
+    where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: input.code.id } },
+    update: data,
+    create: {
+      inventoryCodeId: input.code.id,
+      merchantId: input.connection.merchantId,
+      ...data
+    }
+  });
+}
+
 export async function syncCodesToGroupedShopifyDiscount(input: {
   connection: GroupedDiscountConnection;
   offer: GroupedDiscountOffer;
@@ -88,7 +134,39 @@ export async function syncCodesToGroupedShopifyDiscount(input: {
   let created = 0;
   let skipped = 0;
   let errors = 0;
-  const group = await ensureDiscountGroup(input.connection, input.offer, input.codes[0].code);
+  let seededCodeId: string | null = null;
+  let group = await prisma.shopifyDiscountGroup.findUnique({
+    where: {
+      merchantId_shopDomain_discountKey: {
+        merchantId: input.connection.merchantId,
+        shopDomain: input.connection.shopDomain,
+        discountKey: discountKey(input.offer)
+      }
+    }
+  });
+
+  if (!group || group.status !== "ACTIVE") {
+    for (const code of input.codes) {
+      try {
+        group = await ensureDiscountGroup(input.connection, input.offer, code.code);
+        seededCodeId = code.id;
+        break;
+      } catch (error) {
+        if (!isDuplicateShopifyCodeError(error)) throw error;
+        skipped += 1;
+        await recordGroupedCodeSync({
+          connection: input.connection,
+          code,
+          syncStatus: "EXTERNAL_CONFLICT",
+          errorMessage: "This code already exists elsewhere in Shopify. Delete the old standalone discount in Shopify, or leave it skipped and use newly generated codes for the consolidated group."
+        });
+      }
+    }
+  }
+
+  if (!group || group.status !== "ACTIVE") {
+    return { created, skipped, errors: errors + 1 };
+  }
 
   for (const code of input.codes) {
     const existing =
@@ -105,7 +183,7 @@ export async function syncCodesToGroupedShopifyDiscount(input: {
     }
 
     try {
-      if (!(created === 0 && code.code === input.codes[0].code && group.createdAt.getTime() > Date.now() - 30_000)) {
+      if (code.id !== seededCodeId) {
         await addShopifyDiscountCodes({
           shopDomain: input.connection.shopDomain,
           accessToken: input.connection.accessToken,
@@ -114,86 +192,23 @@ export async function syncCodesToGroupedShopifyDiscount(input: {
         });
       }
 
-      if (code.kind === "note") {
-        await prisma.shopifySyncedNote.upsert({
-          where: { merchantId_universalExchangeNoteId: { merchantId: input.connection.merchantId, universalExchangeNoteId: code.id } },
-          update: {
-            shopDomain: input.connection.shopDomain,
-            uenCode: code.code,
-            shopifyDiscountId: group.shopifyDiscountId,
-            shopifyDiscountCodeId: group.shopifyDiscountId,
-            syncStatus: "SYNCED",
-            lastSyncedAt: new Date(),
-            errorMessage: null
-          },
-          create: {
-            merchantId: input.connection.merchantId,
-            shopDomain: input.connection.shopDomain,
-            universalExchangeNoteId: code.id,
-            uenCode: code.code,
-            shopifyDiscountId: group.shopifyDiscountId,
-            shopifyDiscountCodeId: group.shopifyDiscountId,
-            syncStatus: "SYNCED",
-            lastSyncedAt: new Date()
-          }
-        });
-      } else {
-        await prisma.shopifyInventorySyncedCode.upsert({
-          where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: code.id } },
-          update: {
-            shopDomain: input.connection.shopDomain,
-            uenCode: code.code,
-            shopifyDiscountId: group.shopifyDiscountId,
-            shopifyDiscountCodeId: group.shopifyDiscountId,
-            syncStatus: "SYNCED",
-            lastSyncedAt: new Date(),
-            errorMessage: null
-          },
-          create: {
-            inventoryCodeId: code.id,
-            merchantId: input.connection.merchantId,
-            shopDomain: input.connection.shopDomain,
-            uenCode: code.code,
-            shopifyDiscountId: group.shopifyDiscountId,
-            shopifyDiscountCodeId: group.shopifyDiscountId,
-            syncStatus: "SYNCED",
-            lastSyncedAt: new Date()
-          }
-        });
-      }
+      await recordGroupedCodeSync({ connection: input.connection, code, syncStatus: "SYNCED", shopifyDiscountId: group.shopifyDiscountId });
       created += 1;
     } catch (error) {
+      if (isDuplicateShopifyCodeError(error)) {
+        skipped += 1;
+        await recordGroupedCodeSync({
+          connection: input.connection,
+          code,
+          syncStatus: "EXTERNAL_CONFLICT",
+          shopifyDiscountId: group.shopifyDiscountId,
+          errorMessage: "This code already exists elsewhere in Shopify. Delete the old standalone discount in Shopify, or leave it skipped and use newly generated codes for the consolidated group."
+        });
+        continue;
+      }
       errors += 1;
       const errorMessage = error instanceof Error ? error.message : "Unknown sync error";
-      if (code.kind === "note") {
-        await prisma.shopifySyncedNote.upsert({
-          where: { merchantId_universalExchangeNoteId: { merchantId: input.connection.merchantId, universalExchangeNoteId: code.id } },
-          update: { shopDomain: input.connection.shopDomain, uenCode: code.code, syncStatus: "ERROR", lastSyncedAt: new Date(), errorMessage },
-          create: {
-            merchantId: input.connection.merchantId,
-            shopDomain: input.connection.shopDomain,
-            universalExchangeNoteId: code.id,
-            uenCode: code.code,
-            syncStatus: "ERROR",
-            lastSyncedAt: new Date(),
-            errorMessage
-          }
-        });
-      } else {
-        await prisma.shopifyInventorySyncedCode.upsert({
-          where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: code.id } },
-          update: { shopDomain: input.connection.shopDomain, uenCode: code.code, syncStatus: "ERROR", lastSyncedAt: new Date(), errorMessage },
-          create: {
-            inventoryCodeId: code.id,
-            merchantId: input.connection.merchantId,
-            shopDomain: input.connection.shopDomain,
-            uenCode: code.code,
-            syncStatus: "ERROR",
-            lastSyncedAt: new Date(),
-            errorMessage
-          }
-        });
-      }
+      await recordGroupedCodeSync({ connection: input.connection, code, syncStatus: "ERROR", shopifyDiscountId: group.shopifyDiscountId, errorMessage });
     }
   }
 
