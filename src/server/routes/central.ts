@@ -1,4 +1,5 @@
 import type { Router } from "express";
+import crypto from "node:crypto";
 import express from "express";
 import { ZodError } from "zod";
 import { audit } from "../audit";
@@ -16,6 +17,7 @@ import {
   createIssuanceProductSchema,
   createMerchantSchema,
   createOfferSchema,
+  merchantOnboardingSchema,
   createUenSchema,
   updateHubSchema,
   validateUenSchema
@@ -123,6 +125,92 @@ router.get("/admin/dashboard", requireRole(adminRoles), async (_req, res) => {
 
 router.get("/exchange-hubs", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.exchangeHub.findMany({ orderBy: { createdAt: "desc" } }));
+});
+
+router.get("/public/exchange-hubs", async (_req, res) => {
+  const hubs = await prisma.exchangeHub.findMany({
+    where: { status: "ACTIVE" },
+    orderBy: { displayName: "asc" },
+    select: { id: true, displayName: true, hubType: true, logoUrl: true, brandColor: true }
+  });
+  res.json(hubs);
+});
+
+router.post("/merchant-onboarding/register", async (req, res) => {
+  try {
+    const data = merchantOnboardingSchema.parse(req.body);
+    const token = crypto.randomBytes(24).toString("base64url");
+    const merchant = await prisma.merchant.create({
+      data: {
+        businessName: data.businessName,
+        platformType: "SHOPIFY",
+        status: "PAUSED"
+      }
+    });
+
+    if (data.requestedExchangeHubId) {
+      await prisma.merchantAccessRule.upsert({
+        where: { merchantId_exchangeHubId: { merchantId: merchant.id, exchangeHubId: data.requestedExchangeHubId } },
+        update: { status: "ACTIVE" },
+        create: { merchantId: merchant.id, exchangeHubId: data.requestedExchangeHubId, status: "ACTIVE" }
+      });
+    }
+
+    await prisma.merchantOffer.create({
+      data: {
+        merchantId: merchant.id,
+        discountType: "PERCENTAGE",
+        discountValue: 15,
+        usageLimitPerNote: 1,
+        status: "ACTIVE"
+      }
+    });
+
+    const onboarding = await prisma.merchantOnboarding.create({
+      data: {
+        merchantId: merchant.id,
+        token,
+        businessName: data.businessName,
+        contactName: data.contactName || undefined,
+        contactEmail: data.contactEmail.toLowerCase(),
+        shopDomain: data.shopDomain.toLowerCase(),
+        requestedExchangeHubId: data.requestedExchangeHubId || undefined
+      }
+    });
+
+    res.status(201).json({
+      token,
+      installUrl: `/merchant/install/${token}`,
+      onboarding: {
+        id: onboarding.id,
+        businessName: onboarding.businessName,
+        shopDomain: onboarding.shopDomain,
+        status: onboarding.status
+      }
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.get("/merchant-onboarding/:token", async (req, res) => {
+  const onboarding = await prisma.merchantOnboarding.findUnique({
+    where: { token: param(req, "token") },
+    include: { merchant: { include: { offers: { orderBy: { createdAt: "desc" }, take: 1 }, accessRules: { include: { exchangeHub: true } } } } }
+  });
+  if (!onboarding) return res.status(404).json({ error: "Merchant onboarding link not found" });
+  res.json({
+    token: onboarding.token,
+    businessName: onboarding.businessName,
+    contactEmail: onboarding.contactEmail,
+    shopDomain: onboarding.shopDomain,
+    status: onboarding.status,
+    installedAt: onboarding.installedAt,
+    merchantStatus: onboarding.merchant.status,
+    offer: onboarding.merchant.offers[0] ?? null,
+    exchangeHubs: onboarding.merchant.accessRules.map((rule) => rule.exchangeHub.displayName),
+    installUrl: `/shopify/auth?shop=${encodeURIComponent(onboarding.shopDomain)}&onboardingToken=${encodeURIComponent(onboarding.token)}`
+  });
 });
 
 router.post("/exchange-hubs", requireRole(writeRoles), async (req, res) => {

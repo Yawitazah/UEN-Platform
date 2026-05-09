@@ -185,8 +185,12 @@ async function createIssuanceDiscount(shopDomain: string, note: { id: string; co
 }
 
 router.get("/auth", async (req, res) => {
-  const shop = normalizeShop(req.query.shop);
+  const onboardingToken = typeof req.query.onboardingToken === "string" ? req.query.onboardingToken : "";
+  const onboarding = onboardingToken ? await prisma.merchantOnboarding.findUnique({ where: { token: onboardingToken } }) : null;
+  const shop = normalizeShop(req.query.shop ?? onboarding?.shopDomain);
   if (!shop) return res.status(400).send("Missing or invalid shop parameter");
+  if (onboardingToken && !onboarding) return res.status(404).send("Merchant onboarding link not found");
+  if (onboarding && onboarding.shopDomain !== shop) return res.status(400).send("Onboarding link does not match this Shopify store");
   if (!config.shopifyApiKey || !config.shopifyApiSecret) {
     return res.status(500).send("SHOPIFY_API_KEY and SHOPIFY_API_SECRET must be configured");
   }
@@ -206,6 +210,14 @@ router.get("/auth", async (req, res) => {
     secure: config.shopifyAppUrl.startsWith("https://"),
     maxAge: 10 * 60 * 1000
   });
+  if (onboarding) {
+    res.cookie("shopify_onboarding_token", onboarding.token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: config.shopifyAppUrl.startsWith("https://"),
+      maxAge: 10 * 60 * 1000
+    });
+  }
   res.redirect(`https://${shop}/admin/oauth/authorize?${params.toString()}`);
 });
 
@@ -233,9 +245,15 @@ router.get("/auth/callback", async (req, res) => {
     }
 
     const tokenPayload = (await tokenResponse.json()) as { access_token: string; scope?: string };
+    const onboardingToken = String(req.cookies?.shopify_onboarding_token ?? "");
+    const onboarding = onboardingToken
+      ? await prisma.merchantOnboarding.findUnique({ where: { token: onboardingToken }, include: { merchant: true } })
+      : null;
+    if (onboarding && onboarding.shopDomain !== shop) return res.status(400).send("Onboarding link does not match this Shopify store");
     const existingConnection = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
     const matchedHub = await hubForShopDomain(shop);
     const merchant =
+      onboarding?.merchant ??
       (existingConnection ? await prisma.merchant.findUnique({ where: { id: existingConnection.merchantId } }) : null) ??
       (matchedHub ? await prisma.merchant.findFirst({ where: { linkedExchangeHubId: matchedHub.id } }) : null) ??
       (matchedHub
@@ -268,7 +286,22 @@ router.get("/auth/callback", async (req, res) => {
       }
     });
 
-    await ensureShopMerchantAccess(shop, merchant.id);
+    if (onboarding) {
+      await prisma.merchant.update({ where: { id: merchant.id }, data: { status: MerchantStatus.ACTIVE } });
+      if (onboarding.requestedExchangeHubId) {
+        await prisma.merchantAccessRule.upsert({
+          where: { merchantId_exchangeHubId: { merchantId: merchant.id, exchangeHubId: onboarding.requestedExchangeHubId } },
+          update: { status: "ACTIVE" },
+          create: { merchantId: merchant.id, exchangeHubId: onboarding.requestedExchangeHubId, status: "ACTIVE" }
+        });
+      }
+      await prisma.merchantOnboarding.update({
+        where: { id: onboarding.id },
+        data: { status: "INSTALLED", installedAt: new Date(), shopDomain: shop }
+      });
+    } else {
+      await ensureShopMerchantAccess(shop, merchant.id);
+    }
 
     await audit({
       action: AuditAction.SHOPIFY_CONNECTION_CHANGED,
@@ -281,7 +314,8 @@ router.get("/auth/callback", async (req, res) => {
     await subscribeOrdersPaidWebhook(shop, tokenPayload.access_token);
 
     res.clearCookie("shopify_oauth_state");
-    res.redirect(`/shopify?shopDomain=${encodeURIComponent(shop)}`);
+    res.clearCookie("shopify_onboarding_token");
+    res.redirect(onboarding ? `/merchant/install/${encodeURIComponent(onboarding.token)}?installed=1` : `/shopify?shopDomain=${encodeURIComponent(shop)}`);
   } catch (error) {
     handleError(res, error);
   }

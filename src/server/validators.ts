@@ -80,3 +80,11 @@ export const bulkImportCodesSchema = z.object({
   codes: z.array(z.string().min(4).max(64).regex(/^[A-Z0-9]+UEN$/i)).min(1).max(500),
   issuanceProductId: z.string().optional()
 });
+
+export const merchantOnboardingSchema = z.object({
+  businessName: z.string().min(2).max(120),
+  contactName: z.string().max(120).optional(),
+  contactEmail: z.string().email(),
+  shopDomain: z.string().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
+  requestedExchangeHubId: z.string().optional()
+});

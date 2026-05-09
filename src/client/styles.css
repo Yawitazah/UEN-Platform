@@ -33,6 +33,21 @@ button {
   white-space: nowrap;
 }
 
+a.button-link {
+  align-items: center;
+  background: #1f6f5b;
+  border: 1px solid #1f6f5b;
+  border-radius: 6px;
+  color: white;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-decoration: none;
+  width: fit-content;
+}
+
 button.ghost {
   background: white;
   color: #1f4f46;
@@ -355,6 +370,75 @@ th {
   align-items: center;
   display: flex;
   gap: 10px;
+}
+
+.public-main {
+  background: #f6f7f4;
+  height: auto;
+  min-height: 100vh;
+  overflow: auto;
+  padding: 0;
+}
+
+.public-hero {
+  background: #17201b;
+  color: white;
+  padding: 40px 28px;
+}
+
+.public-hero > div,
+.public-card {
+  margin: 0 auto;
+  max-width: 960px;
+}
+
+.public-brand {
+  margin-bottom: 28px;
+}
+
+.public-hero h1 {
+  max-width: 720px;
+}
+
+.public-hero p {
+  color: #c6d2cc;
+  margin-top: 12px;
+  max-width: 680px;
+}
+
+.public-card {
+  background: white;
+  border: 1px solid #d9e2dd;
+  border-radius: 8px;
+  margin-top: 24px;
+  padding: 22px;
+}
+
+.install-steps {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.install-steps div {
+  align-items: center;
+  background: #e9efec;
+  border: 1px solid #d5dfda;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+}
+
+.install-steps strong {
+  align-items: center;
+  background: #1f6f5b;
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
 }
 
 @media (max-width: 900px) {

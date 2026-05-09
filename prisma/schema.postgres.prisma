@@ -94,6 +94,7 @@ model Merchant {
   apiKeys             MerchantApiKey[]
   inventorySyncs      ShopifyInventorySyncedCode[]
   discountGroups      ShopifyDiscountGroup[]
+  onboardingRequests  MerchantOnboarding[]
 }
 
 model MerchantOffer {
@@ -299,4 +300,23 @@ model MerchantApiKey {
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
   merchant   Merchant  @relation(fields: [merchantId], references: [id])
+}
+
+model MerchantOnboarding {
+  id                     String    @id @default(cuid())
+  merchantId             String
+  token                  String    @unique
+  businessName           String
+  contactName            String?
+  contactEmail           String
+  shopDomain             String
+  requestedExchangeHubId String?
+  status                 String    @default("REGISTERED")
+  installedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  merchant               Merchant  @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+  @@index([shopDomain])
 }

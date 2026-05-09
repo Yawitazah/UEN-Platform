@@ -59,6 +59,7 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const isPublicRoute = window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/");
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -81,6 +82,12 @@ function Shell() {
 
   return (
     <Router>
+      {isPublicRoute ? (
+        <Routes>
+          <Route path="/merchants/register" element={<MerchantRegister />} />
+          <Route path="/merchant/install/:token" element={<MerchantInstall />} />
+        </Routes>
+      ) : (
       <div className="app">
         <aside className="sidebar">
           <div className="brand">
@@ -132,7 +139,99 @@ function Shell() {
           )}
         </main>
       </div>
+      )}
     </Router>
+  );
+}
+
+function PublicShell({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="public-main">
+      <section className="public-hero">
+        <div>
+          <div className="brand public-brand"><Shield size={24} /><div><strong>UEN Platform</strong><span>Merchant acceptance network</span></div></div>
+          <h1>Accept Universal Exchange Notes in your Shopify store</h1>
+          <p>Install the merchant app, choose your offer, and let approved holders redeem UEN codes through Shopify checkout.</p>
+        </div>
+      </section>
+      {children}
+    </main>
+  );
+}
+
+function MerchantRegister() {
+  const hubs = useData<any[]>(() => api("/api/public/exchange-hubs"));
+  const [form, setForm] = useState({ businessName: "", contactName: "", contactEmail: "", shopDomain: "", requestedExchangeHubId: "" });
+  const [result, setResult] = useState<any | null>(null);
+  const [error, setError] = useState("");
+  const submit = async () => {
+    setError("");
+    try {
+      const payload = await api<any>("/api/merchant-onboarding/register", {
+        method: "POST",
+        body: JSON.stringify({ ...form, requestedExchangeHubId: form.requestedExchangeHubId || undefined })
+      });
+      setResult(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not register merchant");
+    }
+  };
+  return (
+    <PublicShell>
+      <section className="public-card">
+        <h2>Merchant Registration</h2>
+        {error && <Notice tone="bad">{error}</Notice>}
+        {result ? (
+          <div className="facts">
+            <Notice>Registration created. Share or open this install page to finish connecting Shopify.</Notice>
+            <span>Store {result.onboarding.shopDomain}</span>
+            <a className="button-link" href={result.installUrl}>Open Install Instructions</a>
+          </div>
+        ) : (
+          <FormGrid>
+            <Input label="Business name" value={form.businessName} onChange={(businessName) => setForm({ ...form, businessName })} />
+            <Input label="Contact name" value={form.contactName} onChange={(contactName) => setForm({ ...form, contactName })} />
+            <Input label="Contact email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
+            <Input label="Shopify store domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain: shopDomain.toLowerCase().trim() })} />
+            <Select label="UEN hub to accept" value={form.requestedExchangeHubId} options={hubs.data ?? []} onChange={(requestedExchangeHubId) => setForm({ ...form, requestedExchangeHubId })} />
+            <button onClick={submit}><Link2 size={16} /> Create Install Link</button>
+          </FormGrid>
+        )}
+      </section>
+    </PublicShell>
+  );
+}
+
+function MerchantInstall() {
+  const token = window.location.pathname.split("/").pop() ?? "";
+  const installed = new URLSearchParams(window.location.search).get("installed") === "1";
+  const onboarding = useData<any>(() => api(`/api/merchant-onboarding/${token}`), [token]);
+  return (
+    <PublicShell>
+      <section className="public-card">
+        <h2>Shopify Installation</h2>
+        {onboarding.error && <Notice tone="bad">{onboarding.error}</Notice>}
+        {onboarding.loading && <Notice>Loading install details...</Notice>}
+        {onboarding.data && (
+          <>
+            {installed && <Notice>Shopify is connected. You can now configure the merchant offer in the embedded app.</Notice>}
+            <div className="facts">
+              <span>Merchant {onboarding.data.businessName}</span>
+              <span>Store {onboarding.data.shopDomain}</span>
+              <span>Status <Status value={onboarding.data.status} /></span>
+              <span>Offer {onboarding.data.offer ? `${onboarding.data.offer.discountValue}%` : "Default offer pending"}</span>
+              <span>Accepted hubs {onboarding.data.exchangeHubs.length ? onboarding.data.exchangeHubs.join(", ") : "Pending admin access"}</span>
+            </div>
+            <div className="install-steps">
+              <div><strong>1</strong><span>Confirm this is your Shopify store.</span></div>
+              <div><strong>2</strong><span>Approve the UEN Platform app permissions in Shopify.</span></div>
+              <div><strong>3</strong><span>Return here, set your offer, then sync UEN codes.</span></div>
+            </div>
+            <a className="button-link" href={onboarding.data.installUrl}><Link2 size={16} /> Install Shopify App</a>
+          </>
+        )}
+      </section>
+    </PublicShell>
   );
 }
 
