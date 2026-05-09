@@ -368,7 +368,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -399,6 +399,7 @@ function Shell() {
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
           <Route path="/holder/portal" element={<HolderPortal />} />
+          <Route path="/holder/collection" element={<HolderCollectionDemo />} />
           <Route path="/holder/register" element={<HolderRegister />} />
           <Route path="/signup" element={<SignupGateway />} />
           <Route path="/exchange-hub/register" element={<ExchangeHubRegister />} />
@@ -878,6 +879,125 @@ function AboutPage() {
         <p>People should be able to support what they believe in and hold something that reflects that goodwill. UENITE gives every campaign a collection, every Holder a reason to return, and every Merchant a new way to connect with motivated customers.</p>
         <a className="button-link button-link-large" href="/signup">Start with UENITE</a>
       </section>
+      <PoweredByFooter />
+    </main>
+  );
+}
+
+const demoCollectionItems = [
+  {
+    id: "demo-note",
+    type: "Universal Exchange Note",
+    title: "Founding Support Note",
+    source: "Nubreed Global Truth",
+    rarity: "Founding",
+    value: "$45.00",
+    date: "May 9, 2026",
+    status: "Redeemable",
+    description: "A Note received for supporting a launch campaign. It can unlock merchant value and remains part of the Holder's proof-of-support history."
+  },
+  {
+    id: "demo-art",
+    type: "Digital Download",
+    title: "Infinite Love Artwork",
+    source: "Digital Love Note",
+    rarity: "Limited",
+    value: "$25.00",
+    date: "May 9, 2026",
+    status: "Owned",
+    description: "A digital keepsake attached to the campaign, housed with the Holder's Notes, badges, and unlock history."
+  },
+  {
+    id: "demo-badge",
+    type: "Achievement Badge",
+    title: "Pay It Forward Supporter",
+    source: "Community Campaign",
+    rarity: "Earned",
+    value: "$0.00",
+    date: "May 9, 2026",
+    status: "Visible",
+    description: "A badge that proves the Holder supported a pay-it-forward campaign and can be shown as part of their goodwill profile."
+  },
+  {
+    id: "demo-future",
+    type: "Future Asset",
+    title: "Trade Ready Collectible",
+    source: "Future Vault Layer",
+    rarity: "Potential",
+    value: "$178.00",
+    date: "Future",
+    status: "Preview",
+    description: "A preview of how select collection items could later support transfer, gifting, trading, or resale when enabled."
+  }
+];
+
+function HolderCollectionExperience({ holderName = "Holder", items = demoCollectionItems }: { holderName?: string; items?: typeof demoCollectionItems }) {
+  const [filter, setFilter] = useState("All");
+  const [selected, setSelected] = useState(items[0]);
+  const filtered = filter === "All" ? items : items.filter((item) => item.type.includes(filter) || item.rarity === filter);
+  const totalValue = items.reduce((sum, item) => sum + (Number(item.value.replace(/[^0-9.]/g, "")) || 0), 0);
+  return (
+    <section className="collection-experience">
+      <div className="collection-experience-head">
+        <div>
+          <span className="eyebrow dark"><Wallet size={16} /> Holder Collection</span>
+          <h1>{holderName}'s Support Vault</h1>
+          <p>Notes, downloads, badges, rewards, and future assets live together as proof of what a Holder supported and what value they unlocked.</p>
+        </div>
+        <div className="collection-total">
+          <span>Total collection value</span>
+          <strong><AnimatedNumber value={totalValue} prefix="$" suffix=".00" /></strong>
+          <small>{items.length} collection items</small>
+        </div>
+      </div>
+      <div className="collection-console">
+        <div className="collection-console-toolbar">
+          {["All", "Note", "Download", "Badge", "Future"].map((option) => (
+            <button key={option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option}</button>
+          ))}
+        </div>
+        <div className="collection-inventory">
+          {filtered.map((item) => (
+            <button key={item.id} className={`collection-tile ${selected.id === item.id ? "active" : ""}`} onClick={() => setSelected(item)}>
+              <span>{item.type}</span>
+              <strong>{item.title}</strong>
+              <small>{item.rarity} / {item.value}</small>
+            </button>
+          ))}
+        </div>
+        <aside className="collection-detail">
+          <span>{selected.type}</span>
+          <h2>{selected.title}</h2>
+          <p>{selected.description}</p>
+          <dl>
+            <div><dt>Exchange Hub</dt><dd>{selected.source}</dd></div>
+            <div><dt>Received</dt><dd>{selected.date}</dd></div>
+            <div><dt>Rarity</dt><dd>{selected.rarity}</dd></div>
+            <div><dt>Status</dt><dd>{selected.status}</dd></div>
+            <div><dt>Value</dt><dd>{selected.value}</dd></div>
+          </dl>
+          <div className="collection-actions">
+            <button>Open Item</button>
+            <button className="ghost">Gift / Trade Preview</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function HolderCollectionDemo() {
+  return (
+    <main className="collection-demo-page">
+      <nav className="uenite-nav about-nav">
+        <a className="uenite-logo" href="/"><Shield size={24} /><BrandWord /></a>
+        <div>
+          <a href="/">Home</a>
+          <a href="/about">About</a>
+          <a href="/signup" className="uenite-nav-cta">Get Started</a>
+        </div>
+      </nav>
+      <HolderCollectionExperience holderName="Raquel" />
       <PoweredByFooter />
     </main>
   );
@@ -1460,37 +1580,54 @@ function SharePanel() {
 }
 
 function PublicPreviews() {
-  const pages = [
-    ["Homepage", "/"],
-    ["About", "/about"],
-    ["Login", "/login"],
-    ["Signup Gateway", "/signup"],
-    ["Merchant Signup", "/merchants/register"],
-    ["Exchange Hub Signup", "/exchange-hub/register"],
-    ["Holder Signup", "/holder/register"]
-  ];
+  const groups = {
+    Public: [
+      ["Homepage", "/"],
+      ["About", "/about"],
+      ["Login", "/login"],
+      ["Signup Gateway", "/signup"]
+    ],
+    Holder: [
+      ["Holder Collection Demo", "/holder/collection"],
+      ["Holder Signup", "/holder/register"],
+      ["Holder Portal", "/holder/portal"]
+    ],
+    Merchant: [
+      ["Merchant Signup", "/merchants/register"],
+      ["Merchant App", "/shopify"],
+      ["Merchant Offers", "/offers"]
+    ],
+    Hub: [
+      ["Exchange Hub Signup", "/exchange-hub/register"],
+      ["Exchange Hubs Admin", "/exchange-hubs"],
+      ["Universal Exchange Notes", "/uens"]
+    ]
+  };
+  const [activeGroup, setActiveGroup] = useState<keyof typeof groups>("Public");
+  const pages = groups[activeGroup];
   return (
     <section className="preview-panel">
       <div className="preview-panel-head">
         <div>
-          <span>Public page previews</span>
-          <strong>Quickly verify the pages people see before you share them.</strong>
+          <span>Page previews</span>
+          <strong>Switch views and open the pages you need to test.</strong>
         </div>
-        <a className="text-link dark" href="/" target="_blank" rel="noreferrer">
-          Open site <ExternalLink size={14} />
-        </a>
+        <div className="preview-switcher">
+          {(Object.keys(groups) as Array<keyof typeof groups>).map((group) => (
+            <button key={group} className={activeGroup === group ? "active" : ""} onClick={() => setActiveGroup(group)}>{group}</button>
+          ))}
+        </div>
       </div>
-      <div className="preview-grid">
+      <div className="preview-list">
         {pages.map(([label, path]) => (
-          <article className="preview-card" key={path}>
-            <div className="preview-card-head">
-              <strong>{label}</strong>
-              <a href={path} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a>
-            </div>
-            <iframe title={`${label} preview`} src={path} loading="lazy" />
-          </article>
+          <a className="preview-row" href={path} target="_blank" rel="noreferrer" key={path}>
+            <strong>{label}</strong>
+            <span>{path}</span>
+            <ExternalLink size={14} />
+          </a>
         ))}
       </div>
+      <iframe className="preview-focus" title={`${activeGroup} preview`} src={pages[0][1]} loading="lazy" />
     </section>
   );
 }
@@ -2165,7 +2302,7 @@ function HolderPortal() {
   const wallet = useData<any>(() => portalApi("/api/holder/wallet"), [token]);
   const merchants = useData<any[]>(() => portalApi("/api/holder/merchants"), [token]);
   const banners = useData<any[]>(() => portalApi("/api/holder/banners"), [token]);
-  const [activeTab, setActiveTab] = useState<"wallet" | "merchants">("merchants");
+  const [activeTab, setActiveTab] = useState<"collection" | "wallet" | "merchants">("collection");
   const [notifOpen, setNotifOpen] = useState(false);
 
   if (!token) {
@@ -2196,6 +2333,17 @@ function HolderPortal() {
   const hub = holder.exchangeHub;
   const totalActive = uens.filter((u: any) => u.status === "ACTIVE").length;
   const totalRedeemed = uens.reduce((n: number, u: any) => n + u.redemptions.filter((r: any) => r.redeemed).length, 0);
+  const holderCollectionItems = uens.length > 0 ? uens.map((uen: any, index: number) => ({
+    id: uen.id,
+    type: "Universal Exchange Note",
+    title: uen.code,
+    source: hub.displayName,
+    rarity: index === 0 ? "Founding" : "Earned",
+    value: hub.uenValue > 0 ? `$${hub.uenValue.toFixed(2)}` : "$0.00",
+    date: new Date(uen.issuedAt ?? uen.createdAt).toLocaleDateString(),
+    status: uen.status,
+    description: `A Universal Exchange Note issued by ${hub.displayName}. This item stays in your collection as proof of support and can unlock value with participating merchants.`
+  })) : demoCollectionItems;
 
   const formatOffer = (offer: any) => {
     if (!offer) return "No offer";
@@ -2309,6 +2457,9 @@ function HolderPortal() {
 
       {/* Tab bar */}
       <div className="portal-tabs">
+        <button className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}>
+          <Star size={16} /> Collection
+        </button>
         <button className={`portal-tab ${activeTab === "merchants" ? "active" : ""}`} onClick={() => setActiveTab("merchants")}>
           <Globe size={16} /> Where to Redeem
         </button>
@@ -2316,6 +2467,10 @@ function HolderPortal() {
           <Wallet size={16} /> My Codes
         </button>
       </div>
+
+      {activeTab === "collection" && (
+        <HolderCollectionExperience holderName={holder.firstName} items={holderCollectionItems} />
+      )}
 
       {/* Merchant directory */}
       {activeTab === "merchants" && (
