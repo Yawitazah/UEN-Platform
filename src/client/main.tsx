@@ -137,20 +137,33 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("admin@uen.local");
   const [password, setPassword] = useState("change-me");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const login = async () => {
     setError("");
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-    if (!response.ok) {
-      const payload = await response.json();
-      setError(payload.error ?? "Could not sign in");
-      return;
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (!response.ok) {
+        const payload = await response.json();
+        setError(payload.error ?? "Could not sign in");
+        return;
+      }
+      const sessionCheck = await fetch("/api/auth/me", { credentials: "include" });
+      if (!sessionCheck.ok) {
+        setError("Sign-in was accepted, but the browser did not keep the session. In Shopify, confirm the app URL uses HTTPS and redeploy the latest Railway build.");
+        return;
+      }
+      onLogin();
+    } catch (_error) {
+      setError("Could not reach the app server. Refresh the page and try again.");
+    } finally {
+      setLoading(false);
     }
-    onLogin();
   };
   return (
     <section className="login-panel">
@@ -159,7 +172,7 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       {error && <Notice tone="bad">{error}</Notice>}
       <Input label="Email" value={email} onChange={setEmail} />
       <Input label="Password" value={password} onChange={setPassword} type="password" />
-      <button onClick={login}>Sign In</button>
+      <button onClick={login} disabled={loading}>{loading ? "Signing In..." : "Sign In"}</button>
     </section>
   );
 }

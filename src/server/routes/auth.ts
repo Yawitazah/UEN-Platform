@@ -15,7 +15,7 @@ function cookieOptions(req: express.Request) {
   const secure = req.secure || req.header("x-forwarded-proto") === "https";
   return {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: (secure ? "none" : "lax") as "none" | "lax",
     secure,
     maxAge: 1000 * 60 * 60 * 24 * 7
   };
