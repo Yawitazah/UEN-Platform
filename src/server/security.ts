@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHmac, createHash, timingSafeEqual } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { config } from "./config";
 import { AdminRole, type AdminRoleValue } from "./constants";
@@ -34,8 +34,46 @@ function bearer(req: Request) {
   return header.toLowerCase().startsWith("bearer ") ? header.slice(7) : undefined;
 }
 
+function sessionCookie(req: Request) {
+  return req.cookies?.uen_session;
+}
+
+export function createAdminSession(input: { id: string; email: string; role: string }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      id: input.id,
+      email: input.email,
+      role: input.role,
+      exp: Date.now() + 1000 * 60 * 60 * 24 * 7
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyAdminSession(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { id: string; email: string; role: AdminRoleValue; exp: number };
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
   const token = bearer(req);
+  const session = verifyAdminSession(sessionCookie(req));
+  if (session) {
+    req.auth = { actorId: session.id, actorType: "admin", role: session.role };
+    return next();
+  }
+
   if (!token) return next();
 
   if (safeEqual(token, config.adminToken)) {

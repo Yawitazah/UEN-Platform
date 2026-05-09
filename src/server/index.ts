@@ -6,6 +6,7 @@ import morgan from "morgan";
 import { ensureFirstBuildTarget } from "./bootstrap";
 import { config } from "./config";
 import { authenticate } from "./security";
+import authRoutes from "./routes/auth";
 import centralRoutes from "./routes/central";
 import shopifyRoutes from "./routes/shopify";
 
@@ -37,6 +38,7 @@ app.use(morgan("dev"));
 app.use(authenticate);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+app.use("/api/auth", authRoutes);
 app.use("/api", centralRoutes);
 app.use("/shopify/api", shopifyRoutes);
 app.use("/shopify", shopifyRoutes);

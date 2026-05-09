@@ -159,6 +159,32 @@ main {
   max-width: 260px;
 }
 
+.user-chip {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.user-chip span {
+  color: #607069;
+  font-size: 13px;
+}
+
+.login-panel {
+  background: white;
+  border: 1px solid #d9e2dd;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  margin: 8vh auto 0;
+  max-width: 420px;
+  padding: 22px;
+}
+
+.login-panel p {
+  color: #607069;
+}
+
 .metrics {
   display: grid;
   gap: 12px;

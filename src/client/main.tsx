@@ -6,13 +6,15 @@ import "./styles.css";
 
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
 const shopDomain = () => new URLSearchParams(window.location.search).get("shopDomain") ?? localStorage.getItem("uen_shop_domain") ?? "merchant-a.myshopify.com";
+let authRefresh: (() => void) | null = null;
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
+    credentials: "include",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${adminToken()}`,
+      ...(localStorage.getItem("uen_admin_token") ? { authorization: `Bearer ${adminToken()}` } : {}),
       ...(init.headers ?? {})
     }
   });
@@ -52,6 +54,28 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
 }
 
 function Shell() {
+  const [user, setUser] = useState<any | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const refreshAuth = async () => {
+    try {
+      const response = await fetch("/api/auth/me", { credentials: "include" });
+      if (!response.ok) throw new Error("Not signed in");
+      const payload = await response.json();
+      setUser(payload.user);
+    } catch (_error) {
+      setUser(null);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+  useEffect(() => {
+    authRefresh = refreshAuth;
+    void refreshAuth();
+    return () => {
+      authRefresh = null;
+    };
+  }, []);
+
   return (
     <Router>
       <div className="app">
@@ -84,39 +108,75 @@ function Shell() {
           </nav>
         </aside>
         <main>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/exchange-hubs" element={<ExchangeHubs />} />
-            <Route path="/holders" element={<Holders />} />
-            <Route path="/uens" element={<Uens />} />
-            <Route path="/merchants" element={<Merchants />} />
-            <Route path="/issuance-products" element={<IssuanceProducts />} />
-            <Route path="/offers" element={<Offers />} />
-            <Route path="/access-rules" element={<AccessRules />} />
-            <Route path="/connections" element={<Connections />} />
-            <Route path="/sync-logs" element={<SyncLogs />} />
-            <Route path="/shopify" element={<ShopifyApp />} />
-          </Routes>
+          {authLoading ? (
+            <Notice>Checking session...</Notice>
+          ) : !user ? (
+            <LoginPanel onLogin={refreshAuth} />
+          ) : (
+            <Routes>
+              <Route path="/" element={<Dashboard user={user} />} />
+              <Route path="/exchange-hubs" element={<ExchangeHubs user={user} />} />
+              <Route path="/holders" element={<Holders user={user} />} />
+              <Route path="/uens" element={<Uens user={user} />} />
+              <Route path="/merchants" element={<Merchants user={user} />} />
+              <Route path="/issuance-products" element={<IssuanceProducts user={user} />} />
+              <Route path="/offers" element={<Offers user={user} />} />
+              <Route path="/access-rules" element={<AccessRules user={user} />} />
+              <Route path="/connections" element={<Connections user={user} />} />
+              <Route path="/sync-logs" element={<SyncLogs user={user} />} />
+              <Route path="/shopify" element={<ShopifyApp user={user} />} />
+            </Routes>
+          )}
         </main>
       </div>
     </Router>
   );
 }
 
-function Header({ title, subtitle }: { title: string; subtitle: string }) {
+function LoginPanel({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail] = useState("admin@uen.local");
+  const [password, setPassword] = useState("change-me");
+  const [error, setError] = useState("");
+  const login = async () => {
+    setError("");
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    if (!response.ok) {
+      const payload = await response.json();
+      setError(payload.error ?? "Could not sign in");
+      return;
+    }
+    onLogin();
+  };
+  return (
+    <section className="login-panel">
+      <h1>Admin Login</h1>
+      <p>Sign in to manage Exchange Hubs, UENs, merchants, product issuance, and Shopify sync.</p>
+      {error && <Notice tone="bad">{error}</Notice>}
+      <Input label="Email" value={email} onChange={setEmail} />
+      <Input label="Password" value={password} onChange={setPassword} type="password" />
+      <button onClick={login}>Sign In</button>
+    </section>
+  );
+}
+
+function Header({ title, subtitle, user }: { title: string; subtitle: string; user?: any }) {
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    localStorage.removeItem("uen_admin_token");
+    authRefresh?.();
+  };
   return (
     <header className="page-header">
       <div>
         <h1>{title}</h1>
         <p>{subtitle}</p>
       </div>
-      <label className="token-input">
-        Admin token
-        <input
-          defaultValue={adminToken()}
-          onBlur={(event) => localStorage.setItem("uen_admin_token", event.target.value)}
-        />
-      </label>
+      {user && <div className="user-chip"><span>{user.email ?? user.role}</span><button className="ghost" onClick={logout}>Logout</button></div>}
     </header>
   );
 }
@@ -146,11 +206,11 @@ function DataTable({ rows, columns }: { rows: any[]; columns: [string, (row: any
   );
 }
 
-function Dashboard() {
+function Dashboard({ user }: { user: any }) {
   const { data, error, loading } = useData<any>(() => api("/api/admin/dashboard"));
   return (
     <>
-      <Header title="Admin Dashboard" subtitle="Operate Exchange Hubs, UEN validity, merchant access, and Shopify syncs." />
+      <Header title="Admin Dashboard" subtitle="Operate Exchange Hubs, UEN validity, merchant access, and Shopify syncs." user={user} />
       {error && <Notice tone="bad">{error}</Notice>}
       {loading && <Notice>Loading dashboard...</Notice>}
       {data && (
@@ -179,7 +239,7 @@ function Dashboard() {
   );
 }
 
-function ExchangeHubs() {
+function ExchangeHubs({ user }: { user: any }) {
   const { data, reload } = useData<any[]>(() => api("/api/exchange-hubs"));
   const [form, setForm] = useState({ name: "", displayName: "", hubType: "creator", codePrefix: "", subdomain: "" });
   const [editing, setEditing] = useState<any | null>(null);
@@ -209,7 +269,7 @@ function ExchangeHubs() {
   };
   return (
     <>
-      <Header title="Exchange Hubs" subtitle="Create and suspend audience-holders that issue UENs." />
+      <Header title="Exchange Hubs" subtitle="Create and suspend audience-holders that issue UENs." user={user} />
       {editing && (
         <FormGrid>
           <Input label="Name" value={editing.name} onChange={(name) => setEditing({ ...editing, name })} />
@@ -244,7 +304,7 @@ function ExchangeHubs() {
   );
 }
 
-function Holders() {
+function Holders({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const holders = useData<any[]>(() => api("/api/holders"));
   const [form, setForm] = useState({ exchangeHubId: "", firstName: "", lastName: "", email: "", phone: "" });
@@ -254,7 +314,7 @@ function Holders() {
   };
   return (
     <>
-      <Header title="Holders" subtitle="Manage supporters and customers that own Universal Exchange Notes." />
+      <Header title="Holders" subtitle="Manage supporters and customers that own Universal Exchange Notes." user={user} />
       <FormGrid>
         <Select label="Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
         <Input label="First" value={form.firstName} onChange={(firstName) => setForm({ ...form, firstName })} />
@@ -267,7 +327,7 @@ function Holders() {
   );
 }
 
-function Uens() {
+function Uens({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const holders = useData<any[]>(() => api("/api/holders"));
   const uens = useData<any[]>(() => api("/api/uens"));
@@ -298,7 +358,7 @@ function Uens() {
   };
   return (
     <>
-      <Header title="Universal Exchange Notes" subtitle="Generate, disable, or remove platform value/access units from circulation." />
+      <Header title="Universal Exchange Notes" subtitle="Generate, disable, or remove platform value/access units from circulation." user={user} />
       <FormGrid>
         <Select label="Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId, holderId: "" })} />
         <Select label="Holder" value={form.holderId} options={hubHolders} labelKey="email" onChange={(holderId) => setForm({ ...form, holderId })} />
@@ -311,7 +371,7 @@ function Uens() {
   );
 }
 
-function Merchants() {
+function Merchants({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const merchants = useData<any[]>(() => api("/api/merchants"));
   const [form, setForm] = useState({ businessName: "", platformType: "SHOPIFY", isExchangeHub: false, linkedExchangeHubId: "" });
@@ -321,7 +381,7 @@ function Merchants() {
   };
   return (
     <>
-      <Header title="Merchants" subtitle="Create redemption partners and optionally link them to Exchange Hubs." />
+      <Header title="Merchants" subtitle="Create redemption partners and optionally link them to Exchange Hubs." user={user} />
       <FormGrid>
         <Input label="Business name" value={form.businessName} onChange={(businessName) => setForm({ ...form, businessName })} />
         <Select label="Linked hub" value={form.linkedExchangeHubId} options={hubs.data ?? []} onChange={(linkedExchangeHubId) => setForm({ ...form, linkedExchangeHubId, isExchangeHub: Boolean(linkedExchangeHubId) })} />
@@ -332,7 +392,7 @@ function Merchants() {
   );
 }
 
-function IssuanceProducts() {
+function IssuanceProducts({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const products = useData<any[]>(() => api("/api/issuance-products"));
   const logs = useData<any[]>(() => api("/api/issuance-logs"));
@@ -394,7 +454,7 @@ function IssuanceProducts() {
   };
   return (
     <>
-      <Header title="Product Issuance" subtitle="Map Shopify products to Exchange Hubs so paid orders issue UENs." />
+      <Header title="Product Issuance" subtitle="Map Shopify products to Exchange Hubs so paid orders issue UENs." user={user} />
       {notice && <Notice tone={notice.toLowerCase().includes("could not") || notice.toLowerCase().includes("not connected") ? "bad" : "neutral"}>{notice}</Notice>}
       <FormGrid>
         <Select label="Exchange Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
@@ -445,7 +505,7 @@ function IssuanceProducts() {
   );
 }
 
-function Offers() {
+function Offers({ user }: { user: any }) {
   const merchants = useData<any[]>(() => api("/api/merchants"));
   const offers = useData<any[]>(() => api("/api/merchant-offers"));
   const [form, setForm] = useState({ merchantId: "", discountType: "PERCENTAGE", discountValue: "15", minimumOrderAmount: "", usageLimitPerNote: "1" });
@@ -455,7 +515,7 @@ function Offers() {
   };
   return (
     <>
-      <Header title="Merchant Offers" subtitle="Set merchant-specific value for the same UEN codes." />
+      <Header title="Merchant Offers" subtitle="Set merchant-specific value for the same UEN codes." user={user} />
       <FormGrid>
         <Select label="Merchant" value={form.merchantId} options={merchants.data ?? []} labelKey="businessName" onChange={(merchantId) => setForm({ ...form, merchantId })} />
         <SelectText label="Type" value={form.discountType} options={["PERCENTAGE", "FIXED_AMOUNT"]} onChange={(discountType) => setForm({ ...form, discountType })} />
@@ -468,7 +528,7 @@ function Offers() {
   );
 }
 
-function AccessRules() {
+function AccessRules({ user }: { user: any }) {
   const merchants = useData<any[]>(() => api("/api/merchants"));
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const rules = useData<any[]>(() => api("/api/merchant-access-rules"));
@@ -479,7 +539,7 @@ function AccessRules() {
   };
   return (
     <>
-      <Header title="Merchant Access Rules" subtitle="Decide which Exchange Hub UENs each merchant accepts." />
+      <Header title="Merchant Access Rules" subtitle="Decide which Exchange Hub UENs each merchant accepts." user={user} />
       <FormGrid>
         <Select label="Merchant" value={form.merchantId} options={merchants.data ?? []} labelKey="businessName" onChange={(merchantId) => setForm({ ...form, merchantId })} />
         <Select label="Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
@@ -491,12 +551,12 @@ function AccessRules() {
   );
 }
 
-function Connections() {
+function Connections({ user }: { user: any }) {
   const { data } = useData<any[]>(() => api("/api/shopify-connections"));
   const synced = useData<any[]>(() => api("/api/shopify-synced-notes"));
   return (
     <>
-      <Header title="Shopify Connections" subtitle="Review server-side store connections and synced UEN codes." />
+      <Header title="Shopify Connections" subtitle="Review server-side store connections and synced UEN codes." user={user} />
       <DataTable rows={data ?? []} columns={[["Shop", (r) => r.shopDomain], ["Merchant", (r) => r.merchant.businessName], ["Status", (r) => <Status value={r.status} />], ["Last Sync", (r) => r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : "Never"]]} />
       <h2>Synced Notes</h2>
       <DataTable rows={synced.data ?? []} columns={[["Code", (r) => r.uenCode], ["Merchant", (r) => r.merchant.businessName], ["Status", (r) => <Status value={r.syncStatus} />], ["Discount ID", (r) => r.shopifyDiscountId ?? "-"]]} />
@@ -504,17 +564,17 @@ function Connections() {
   );
 }
 
-function SyncLogs() {
+function SyncLogs({ user }: { user: any }) {
   const { data } = useData<any[]>(() => api("/api/sync-logs"));
   return (
     <>
-      <Header title="Sync Logs" subtitle="Audit Shopify sync outcomes and partial failures." />
+      <Header title="Sync Logs" subtitle="Audit Shopify sync outcomes and partial failures." user={user} />
       <DataTable rows={data ?? []} columns={[["Merchant", (r) => r.merchant.businessName], ["Shop", (r) => r.shopDomain], ["Status", (r) => <Status value={r.status} />], ["Fetched", (r) => r.totalFetched], ["Errors", (r) => r.totalErrors], ["Message", (r) => r.message]]} />
     </>
   );
 }
 
-function ShopifyApp() {
+function ShopifyApp({ user }: { user: any }) {
   const [shop, setShop] = useState(shopDomain());
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -565,7 +625,7 @@ function ShopifyApp() {
   };
   return (
     <>
-      <Header title="Shopify Merchant App" subtitle="Connect a store, configure merchant offer rules, and sync allowed UENs." />
+      <Header title="Shopify Merchant App" subtitle="Connect a store, configure merchant offer rules, and sync allowed UENs." user={user} />
         <section className="split">
         <div className="panel">
           <h2>Platform Connection</h2>
@@ -608,11 +668,11 @@ function ShopifyApp() {
   );
 }
 
-function Input({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Input({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return (
     <label>
       {label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} />
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

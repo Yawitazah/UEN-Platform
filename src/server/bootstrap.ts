@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { AdminRole, HubStatus, MerchantStatus, UenStatus } from "./constants";
+import { config } from "./config";
 import { prisma } from "./db";
 import { hashSecret } from "./security";
 
@@ -10,11 +11,11 @@ export async function ensureFirstBuildTarget() {
   if (existingHub) return;
 
   await prisma.adminUser.upsert({
-    where: { email: "admin@uen.local" },
+    where: { email: config.adminEmail.toLowerCase() },
     update: {},
     create: {
-      email: "admin@uen.local",
-      passwordHash: await bcrypt.hash("change-me", 12),
+      email: config.adminEmail.toLowerCase(),
+      passwordHash: await bcrypt.hash(config.adminPassword, 12),
       role: AdminRole.SUPER_ADMIN
     }
   });

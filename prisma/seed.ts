@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../src/server/db";
 import { AdminRole, HubStatus, MerchantStatus, UenStatus } from "../src/server/constants";
 import { hashSecret } from "../src/server/security";
+import { config } from "../src/server/config";
 
 async function main() {
   await prisma.auditLog.deleteMany();
@@ -19,8 +20,8 @@ async function main() {
 
   await prisma.adminUser.create({
     data: {
-      email: "admin@uen.local",
-      passwordHash: await bcrypt.hash("change-me", 12),
+      email: config.adminEmail.toLowerCase(),
+      passwordHash: await bcrypt.hash(config.adminPassword, 12),
       role: AdminRole.SUPER_ADMIN
     }
   });
