@@ -9,4 +9,12 @@ declare module "lucide-react" {
   export const Shield: LucideIcon;
   export const Ticket: LucideIcon;
   export const UploadCloud: LucideIcon;
+  export const SlidersHorizontal: LucideIcon;
+  export const Zap: LucideIcon;
+  export const ShoppingBag: LucideIcon;
+  export const TrendingUp: LucideIcon;
+  export const Download: LucideIcon;
+  export const Users: LucideIcon;
+  export const Star: LucideIcon;
+  export const CheckCircle: LucideIcon;
 }
