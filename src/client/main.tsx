@@ -144,14 +144,37 @@ function Shell() {
   );
 }
 
-function PublicShell({ children }: { children: React.ReactNode }) {
+function PublicShell({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
-    <main className="public-main">
+    <main className={`public-main ${compact ? "public-main-compact" : ""}`}>
       <section className="public-hero">
-        <div>
-          <div className="brand public-brand"><Shield size={24} /><div><strong>UEN Platform</strong><span>Merchant acceptance network</span></div></div>
-          <h1>Accept Universal Exchange Notes in your Shopify store</h1>
-          <p>Install the merchant app, choose your offer, and let approved holders redeem UEN codes through Shopify checkout.</p>
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <div className="brand public-brand"><Shield size={24} /><div><strong>UEN Platform</strong><span>Merchant acceptance network</span></div></div>
+            <span className="eyebrow"><Ticket size={16} /> New customer channel for Shopify merchants</span>
+            <h1>Turn creator support into sales for your store</h1>
+            <p>Accept Universal Exchange Notes and reach motivated Holders from creators, influencers, organizations, ministries, and communities. You control the offer. We handle the note syncing. Your store gets access to warm traffic.</p>
+            <div className="hero-actions">
+              <a className="button-link button-link-large" href="#merchant-signup">Join the Merchant Network</a>
+              <a className="text-link" href="#how-it-works">See how it works</a>
+            </div>
+            <div className="hero-proof">
+              <span>No manual code uploads</span>
+              <span>No second website</span>
+              <span>No checkout rebuild</span>
+            </div>
+          </div>
+          <div className="hero-visual" aria-hidden="true">
+            <div className="note-card note-card-a"><span>Holder traffic</span><strong>NUBREED74201UEN</strong></div>
+            <div className="flow-line" />
+            <div className="merchant-terminal">
+              <div><Shield size={18} /><span>Shopify store</span><strong>Connected</strong></div>
+              <div><Ticket size={18} /><span>Approved notes</span><strong>Auto synced</strong></div>
+              <div><Play size={18} /><span>Merchant offer</span><strong>15% active</strong></div>
+            </div>
+            <div className="orb orb-one" />
+            <div className="orb orb-two" />
+          </div>
         </div>
       </section>
       {children}
@@ -178,14 +201,62 @@ function MerchantRegister() {
   };
   return (
     <PublicShell>
-      <section className="public-card">
-        <h2>Merchant Registration</h2>
+      <section className="public-band value-band">
+        <div className="section-heading">
+          <span className="eyebrow dark"><Shield size={16} /> Why merchants join</span>
+          <h2>Access warm traffic from trusted communities</h2>
+          <p>Holders are not random visitors. They received value through an Exchange Hub they support, and now they are looking for participating merchants where that value works.</p>
+        </div>
+        <div className="value-grid">
+          {[
+            ["You control the offer", "Set percentage, fixed amount, minimum order, usage limits, and when to pause participation."],
+            ["We sync the notes", "Approved Universal Exchange Notes are pushed into Shopify without manual CSV uploads or code management."],
+            ["Your checkout stays yours", "Holders redeem through your existing Shopify checkout using the value you define."],
+            ["Traffic with a reason", "Supporter energy becomes a simple reason to discover your store and make a purchase."]
+          ].map(([title, body]) => (
+            <article className="value-card" key={title}>
+              <Ticket size={20} />
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="public-band how-band" id="how-it-works">
+        <div className="section-heading">
+          <span className="eyebrow dark"><RefreshCw size={16} /> How it works</span>
+          <h2>Connect once. Start accepting notes.</h2>
+        </div>
+        <div className="steps-grid">
+          {[
+            ["Install the merchant app", "Connect your Shopify store in minutes without rebuilding your site."],
+            ["Set your offer", "Choose what UEN Holders receive when they shop with you."],
+            ["Notes sync automatically", "The platform keeps approved notes available in your store."],
+            ["Holders shop with you", "Customers enter their note at checkout and receive your offer."],
+            ["You gain new customers", "Join a network where more Exchange Hubs can send motivated traffic."]
+          ].map(([title, body], index) => (
+            <article className="step-card" key={title}>
+              <strong>{index + 1}</strong>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="public-card signup-card" id="merchant-signup">
+        <div className="signup-heading">
+          <span className="eyebrow dark"><Shield size={16} /> Merchant signup</span>
+          <h2>Join the Merchant Network</h2>
+          <p>Connect your Shopify store and turn Holder traffic into real customer opportunities.</p>
+        </div>
         {error && <Notice tone="bad">{error}</Notice>}
         {result ? (
-          <div className="facts">
-            <Notice>Registration created. Share or open this install page to finish connecting Shopify.</Notice>
+          <div className="success-panel">
+            <Ticket size={32} />
+            <h3>Registration created</h3>
+            <p>Your install page is ready. Open it to connect Shopify and activate the merchant app.</p>
             <span>Store {result.onboarding.shopDomain}</span>
-            <a className="button-link" href={result.installUrl}>Open Install Instructions</a>
+            <a className="button-link button-link-large" href={result.installUrl}>Open Install Instructions</a>
           </div>
         ) : (
           <FormGrid>
@@ -194,9 +265,14 @@ function MerchantRegister() {
             <Input label="Contact email" value={form.contactEmail} onChange={(contactEmail) => setForm({ ...form, contactEmail })} />
             <Input label="Shopify store domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain: shopDomain.toLowerCase().trim() })} />
             <Select label="UEN hub to accept" value={form.requestedExchangeHubId} options={hubs.data ?? []} onChange={(requestedExchangeHubId) => setForm({ ...form, requestedExchangeHubId })} />
-            <button onClick={submit}><Link2 size={16} /> Create Install Link</button>
+            <button onClick={submit}><Link2 size={16} /> Join the Merchant Network</button>
           </FormGrid>
         )}
+      </section>
+      <section className="public-band benefit-strip">
+        {["Shopify app connection", "Automatic note syncing", "Access to Holder traffic", "Controlled discounts", "No manual code uploads", "Your store stays in control"].map((item) => (
+          <span key={item}><Ticket size={16} /> {item}</span>
+        ))}
       </section>
     </PublicShell>
   );
@@ -207,7 +283,7 @@ function MerchantInstall() {
   const installed = new URLSearchParams(window.location.search).get("installed") === "1";
   const onboarding = useData<any>(() => api(`/api/merchant-onboarding/${token}`), [token]);
   return (
-    <PublicShell>
+    <PublicShell compact>
       <section className="public-card">
         <h2>Shopify Installation</h2>
         {onboarding.error && <Notice tone="bad">{onboarding.error}</Notice>}
