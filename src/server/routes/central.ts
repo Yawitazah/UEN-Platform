@@ -5,6 +5,7 @@ import { audit } from "../audit";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import { requireMerchantAccess, requireRole } from "../security";
+import { createShopifyDiscountCode } from "../services/shopifyGraphql";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
   createAccessRuleSchema,
@@ -61,6 +62,106 @@ async function generatedCode(prefix = "") {
 function publicConnection(connection: { accessToken: string; [key: string]: unknown }) {
   const { accessToken: _accessToken, ...safe } = connection;
   return safe;
+}
+
+async function syncInventoryCodesToMerchantStores(exchangeHubId: string, inventoryCodes: Array<{ id: string; code: string }>) {
+  const merchants = await prisma.merchant.findMany({
+    where: {
+      status: "ACTIVE",
+      accessRules: { some: { exchangeHubId, status: "ACTIVE" } },
+      shopifyConnections: { some: { status: "ACTIVE" } }
+    },
+    include: {
+      offers: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 1 },
+      shopifyConnections: { where: { status: "ACTIVE" } }
+    }
+  });
+
+  let synced = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const merchant of merchants) {
+    const offer = merchant.offers[0];
+    if (!offer || (offer.discountType !== "PERCENTAGE" && offer.discountType !== "FIXED_AMOUNT")) {
+      skipped += inventoryCodes.length;
+      continue;
+    }
+
+    for (const connection of merchant.shopifyConnections) {
+      for (const inventoryCode of inventoryCodes) {
+        const existing = await prisma.shopifyInventorySyncedCode.findUnique({
+          where: { merchantId_inventoryCodeId: { merchantId: merchant.id, inventoryCodeId: inventoryCode.id } }
+        });
+        if (existing?.syncStatus === "SYNCED") {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          const result = await createShopifyDiscountCode({
+            shopDomain: connection.shopDomain,
+            accessToken: connection.accessToken,
+            code: inventoryCode.code,
+            title: `${inventoryCode.code} Universal Exchange Note`,
+            discountType: offer.discountType,
+            discountValue: Number(offer.discountValue ?? 0),
+            usageLimitPerNote: offer.usageLimitPerNote,
+            minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
+            startsAt: offer.startsAt,
+            endsAt: offer.endsAt
+          });
+
+          await prisma.shopifyInventorySyncedCode.upsert({
+            where: { merchantId_inventoryCodeId: { merchantId: merchant.id, inventoryCodeId: inventoryCode.id } },
+            update: {
+              shopDomain: connection.shopDomain,
+              uenCode: inventoryCode.code,
+              shopifyDiscountId: result.shopifyDiscountId,
+              shopifyDiscountCodeId: result.shopifyDiscountCodeId,
+              syncStatus: "SYNCED",
+              lastSyncedAt: new Date(),
+              errorMessage: null
+            },
+            create: {
+              inventoryCodeId: inventoryCode.id,
+              merchantId: merchant.id,
+              shopDomain: connection.shopDomain,
+              uenCode: inventoryCode.code,
+              shopifyDiscountId: result.shopifyDiscountId,
+              shopifyDiscountCodeId: result.shopifyDiscountCodeId,
+              syncStatus: "SYNCED",
+              lastSyncedAt: new Date()
+            }
+          });
+          synced += 1;
+        } catch (error) {
+          errors += 1;
+          await prisma.shopifyInventorySyncedCode.upsert({
+            where: { merchantId_inventoryCodeId: { merchantId: merchant.id, inventoryCodeId: inventoryCode.id } },
+            update: {
+              shopDomain: connection.shopDomain,
+              uenCode: inventoryCode.code,
+              syncStatus: "ERROR",
+              lastSyncedAt: new Date(),
+              errorMessage: error instanceof Error ? error.message : "Unknown sync error"
+            },
+            create: {
+              inventoryCodeId: inventoryCode.id,
+              merchantId: merchant.id,
+              shopDomain: connection.shopDomain,
+              uenCode: inventoryCode.code,
+              syncStatus: "ERROR",
+              lastSyncedAt: new Date(),
+              errorMessage: error instanceof Error ? error.message : "Unknown sync error"
+            }
+          });
+        }
+      }
+    }
+  }
+
+  return { synced, skipped, errors, merchantStores: merchants.flatMap((merchant) => merchant.shopifyConnections).length };
 }
 
 router.get("/admin/dashboard", requireRole(adminRoles), async (_req, res) => {
@@ -418,7 +519,8 @@ router.post("/exchange-hubs/:exchangeHubId/code-inventory/generate", requireRole
         })
       );
     }
-    res.status(201).json({ created: created.length });
+    const sync = await syncInventoryCodesToMerchantStores(exchangeHubId, created);
+    res.status(201).json({ created: created.length, sync });
   } catch (error) {
     handleError(res, error);
   }
@@ -428,16 +530,45 @@ router.post("/exchange-hubs/:exchangeHubId/code-inventory/import", requireRole(w
   try {
     const exchangeHubId = param(req, "exchangeHubId");
     const data = bulkImportCodesSchema.parse(req.body);
-    const result = await prisma.uenCodeInventory.createMany({
-      data: data.codes.map((code) => ({
+    const created = [];
+    for (const code of data.codes) {
+      try {
+        created.push(
+          await prisma.uenCodeInventory.create({
+            data: {
+              exchangeHubId,
+              issuanceProductId: data.issuanceProductId,
+              code: code.toUpperCase(),
+              source: "IMPORTED"
+            }
+          })
+        );
+      } catch (_error) {
+        // Duplicate imported codes are skipped so CSV-style bulk imports can be retried.
+      }
+    }
+    const sync = await syncInventoryCodesToMerchantStores(exchangeHubId, created);
+    res.status(201).json({ created: created.length, sync });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post("/exchange-hubs/:exchangeHubId/code-inventory/sync", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const issuanceProductId = typeof req.body.issuanceProductId === "string" ? req.body.issuanceProductId : undefined;
+    const codes = await prisma.uenCodeInventory.findMany({
+      where: {
         exchangeHubId,
-        issuanceProductId: data.issuanceProductId,
-        code: code.toUpperCase(),
-        source: "IMPORTED"
-      })),
-      skipDuplicates: true
+        status: "AVAILABLE",
+        ...(issuanceProductId ? { issuanceProductId } : {})
+      },
+      take: 500,
+      orderBy: { createdAt: "asc" }
     });
-    res.status(201).json({ created: result.count });
+    const sync = await syncInventoryCodesToMerchantStores(exchangeHubId, codes);
+    res.json({ selected: codes.length, sync });
   } catch (error) {
     handleError(res, error);
   }

@@ -92,6 +92,7 @@ model Merchant {
   syncedNotes         ShopifySyncedNote[]
   syncLogs            SyncLog[]
   apiKeys             MerchantApiKey[]
+  inventorySyncs      ShopifyInventorySyncedCode[]
 }
 
 model MerchantOffer {
@@ -195,9 +196,30 @@ model UenCodeInventory {
   exchangeHub             ExchangeHub            @relation(fields: [exchangeHubId], references: [id])
   issuanceProduct         ShopifyIssuanceProduct? @relation(fields: [issuanceProductId], references: [id])
   universalExchangeNote   UniversalExchangeNote? @relation(fields: [universalExchangeNoteId], references: [id])
+  shopifySyncs            ShopifyInventorySyncedCode[]
 
   @@index([exchangeHubId, status])
   @@index([issuanceProductId, status])
+}
+
+model ShopifyInventorySyncedCode {
+  id                    String           @id @default(cuid())
+  inventoryCodeId        String
+  merchantId             String
+  shopDomain             String
+  uenCode                String
+  shopifyDiscountId      String?
+  shopifyDiscountCodeId  String?
+  syncStatus             String           @default("PENDING")
+  lastSyncedAt           DateTime?
+  errorMessage           String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  inventoryCode          UenCodeInventory @relation(fields: [inventoryCodeId], references: [id])
+  merchant               Merchant         @relation(fields: [merchantId], references: [id])
+
+  @@unique([merchantId, inventoryCodeId])
+  @@index([shopDomain])
 }
 
 model UenIssuanceLog {

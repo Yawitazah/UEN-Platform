@@ -367,21 +367,29 @@ function IssuanceProducts() {
   };
   const selectedHubId = products.data?.find((product) => product.id === selectedIssuanceProductId)?.exchangeHubId ?? form.exchangeHubId;
   const generateCodes = async () => {
-    await api(`/api/exchange-hubs/${selectedHubId}/code-inventory/generate`, {
+    const result = await api<any>(`/api/exchange-hubs/${selectedHubId}/code-inventory/generate`, {
       method: "POST",
       body: JSON.stringify({ count: bulkCount, issuanceProductId: selectedIssuanceProductId || undefined })
     });
-    setNotice(`Generated ${bulkCount} available codes`);
+    setNotice(`Generated ${result.created} codes. Synced ${result.sync?.synced ?? 0} Shopify discount codes across ${result.sync?.merchantStores ?? 0} store connections.`);
     await products.reload();
   };
   const importCodes = async () => {
     const codes = bulkCodes.split(/\r?\n|,/).map((code) => code.trim()).filter(Boolean);
-    await api(`/api/exchange-hubs/${selectedHubId}/code-inventory/import`, {
+    const result = await api<any>(`/api/exchange-hubs/${selectedHubId}/code-inventory/import`, {
       method: "POST",
       body: JSON.stringify({ codes, issuanceProductId: selectedIssuanceProductId || undefined })
     });
     setBulkCodes("");
-    setNotice(`Imported ${codes.length} available codes`);
+    setNotice(`Imported ${result.created} codes. Synced ${result.sync?.synced ?? 0} Shopify discount codes across ${result.sync?.merchantStores ?? 0} store connections.`);
+    await products.reload();
+  };
+  const syncAvailableCodes = async () => {
+    const result = await api<any>(`/api/exchange-hubs/${selectedHubId}/code-inventory/sync`, {
+      method: "POST",
+      body: JSON.stringify({ issuanceProductId: selectedIssuanceProductId || undefined })
+    });
+    setNotice(`Selected ${result.selected} available codes. Synced ${result.sync?.synced ?? 0}, skipped ${result.sync?.skipped ?? 0}, errors ${result.sync?.errors ?? 0}.`);
     await products.reload();
   };
   return (
@@ -421,6 +429,7 @@ function IssuanceProducts() {
           <SelectText label="Mapped product ID" value={selectedIssuanceProductId} options={(products.data ?? []).map((product) => product.id)} onChange={setSelectedIssuanceProductId} />
           <Input label="Generate count" value={bulkCount} onChange={setBulkCount} />
           <button onClick={generateCodes}><UploadCloud size={16} /> Generate Codes</button>
+          <button className="ghost" onClick={syncAvailableCodes}><RefreshCw size={16} /> Sync Available Codes</button>
         </FormGrid>
         <FormGrid>
           <label className="wide">

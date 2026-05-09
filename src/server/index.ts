@@ -11,7 +11,7 @@ import shopifyRoutes from "./routes/shopify";
 
 const app = express();
 
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: false, xFrameOptions: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({
   limit: "1mb",
