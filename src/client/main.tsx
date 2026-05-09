@@ -230,15 +230,23 @@ function UeniteHome() {
         </nav>
         <div className="uenite-hero-grid">
           <div className="uenite-copy">
-            <span className="eyebrow"><Star size={16} /> Your potential is unlimited when we UENite</span>
-            <h1>One exchange network for creators, merchants, and Holders.</h1>
-            <p>Universal Exchange Notes connect audience support to real-world purchasing power. Exchange Hubs issue value, Holders carry it, and merchants turn it into sales.</p>
+            <span className="eyebrow"><Star size={16} /> The possibilities are endless when we UENite</span>
+            <h1>When we UENite, the possibilities are endless.</h1>
+            <p>Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.</p>
             <div className="hero-actions">
               <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
               <a className="text-link" href="#audiences">Choose your path</a>
             </div>
+            <div className="creator-proof">
+              <span><strong className="mini-money">$</strong> Sell notes through your own Shopify store</span>
+              <span><Users size={15} /> Own the supporter relationship</span>
+              <span><Zap size={15} /> Engage directly beyond social platforms</span>
+            </div>
           </div>
           <div className="uenite-orbit" aria-hidden="true">
+            <div className="money-symbol money-one">$</div>
+            <div className="money-symbol money-two">¢</div>
+            <div className="money-symbol money-three">$</div>
             <div className="orbit-core"><strong>UEN</strong><span>Universal Exchange Note</span></div>
             <div className="orbit-node node-hub"><Users size={18} /><span>Exchange Hub</span></div>
             <div className="orbit-node node-holder"><Ticket size={18} /><span>Holder</span></div>
@@ -267,6 +275,28 @@ function UeniteHome() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="creator-economy-section">
+        <div className="creator-economy-copy">
+          <span className="eyebrow dark"><strong className="mini-money">$</strong> Creator owned support</span>
+          <h2>Audience support should build your own customer list, not someone else’s platform.</h2>
+          <p>Exchange Hubs can sell notes through their own Shopify store, collect supporter data directly, and stay connected after the sale. Instead of audience value being trapped inside social platforms, UENite helps turn support into owned relationships and merchant-ready value.</p>
+        </div>
+        <div className="creator-economy-cards">
+          {[
+            ["Direct data", "Supporter names, emails, and purchase history flow through your own commerce stack."],
+            ["Lower-friction support", "A note purchase can compete with tip-style support while creating value the Holder can use."],
+            ["Ongoing engagement", "Holders can be contacted, rewarded, and directed to participating merchants."],
+            ["Shopify ecosystem", "Creators with stores can pair note sales, digital products, merch, and merchant redemption."]
+          ].map(([title, body]) => (
+            <article key={title}>
+              <strong className="card-money">$</strong>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </article>
+          ))}
         </div>
       </section>
 
