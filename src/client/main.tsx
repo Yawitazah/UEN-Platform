@@ -48,6 +48,7 @@ async function portalApi<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 type HomeSiteContent = {
+  pageBackground: string;
   heroEyebrow: string;
   heroTitle: string;
   heroBody: string;
@@ -138,9 +139,16 @@ type HomeSiteContent = {
   finalBody: string;
   finalCtaText: string;
   finalCtaHref: string;
+  audienceBackground: string;
+  flowBackground: string;
+  creatorBackground: string;
+  storyBackground: string;
+  featuredBackground: string;
+  finalBackground: string;
 };
 
 const defaultHomeContent: HomeSiteContent = {
+  pageBackground: "",
   heroEyebrow: "The possibilities are endless when we UENite",
   heroTitle: "When we UENite, the possibilities are endless.",
   heroBody: "Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.",
@@ -234,7 +242,13 @@ const defaultHomeContent: HomeSiteContent = {
   finalTitle: "Ready to UENite your audience, customers, and community?",
   finalBody: "Start with a merchant connection today, then grow into the full exchange network.",
   finalCtaText: "Join the Merchant Network",
-  finalCtaHref: "/merchants/register"
+  finalCtaHref: "/merchants/register",
+  audienceBackground: "",
+  flowBackground: "",
+  creatorBackground: "",
+  storyBackground: "",
+  featuredBackground: "",
+  finalBackground: ""
 };
 
 function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined): HomeSiteContent {
@@ -414,6 +428,9 @@ function UeniteHome() {
     color: content.heroTextColor,
     ...(content.heroBgImage ? { backgroundImage: `linear-gradient(135deg, rgba(7, 18, 14, 0.82), rgba(18, 51, 38, 0.74)), url("${content.heroBgImage}")` } : {})
   } as React.CSSProperties;
+  const backgroundStyle = (field: keyof HomeSiteContent) => ({
+    ...(String(content[field] ?? "").trim() ? { background: String(content[field]), backgroundPosition: "center", backgroundSize: "cover" } : {})
+  } as React.CSSProperties);
   const particles = Array.from({ length: 24 }, (_, index) => ({
     left: `${(index * 37) % 96}%`,
     top: `${8 + ((index * 23) % 78)}%`,
@@ -479,7 +496,7 @@ function UeniteHome() {
     link.href = content.faviconUrl;
   }, [content.faviconUrl]);
   return (
-    <main className="uenite-main">
+    <main className={`uenite-main ${editableClass("pageBackground")}`} style={backgroundStyle("pageBackground")} onClick={selectField("pageBackground")}>
       <section className={`uenite-hero uenite-hero-${content.heroPreset} ${editableClass("heroBackground")}`} style={heroStyle} onClick={selectField("heroBackground")}>
         {content.heroVideoUrl && (
           <video className="hero-video-bg" autoPlay muted loop playsInline>
@@ -532,7 +549,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="audience-section" id="audiences">
+      <section className={`audience-section ${editableClass("audienceBackground")}`} id="audiences" style={backgroundStyle("audienceBackground")} onClick={selectField("audienceBackground")}>
         <div className="section-inner">
           <div className="section-heading colorful-heading">
             <span {...editableText("audienceEyebrow", "eyebrow dark")}><Zap size={16} /> {content.audienceEyebrow}</span>
@@ -553,7 +570,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="exchange-flow-section">
+      <section className={`exchange-flow-section ${editableClass("flowBackground")}`} style={backgroundStyle("flowBackground")} onClick={selectField("flowBackground")}>
         <div className="section-inner">
           <div className="section-heading flow-heading">
             <span {...editableText("flowEyebrow", "eyebrow")}><RefreshCw size={16} /> {content.flowEyebrow}</span>
@@ -608,7 +625,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="creator-economy-section">
+      <section className={`creator-economy-section ${editableClass("creatorBackground")}`} style={backgroundStyle("creatorBackground")} onClick={selectField("creatorBackground")}>
         <div className="creator-economy-copy">
           <span {...editableText("creatorEyebrow", "eyebrow dark")}><strong className="mini-money">$</strong> {content.creatorEyebrow}</span>
           <h2 {...editableText("creatorTitle")}>{content.creatorTitle}</h2>
@@ -630,7 +647,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="story-section">
+      <section className={`story-section ${editableClass("storyBackground")}`} style={backgroundStyle("storyBackground")} onClick={selectField("storyBackground")}>
         <div className={`story-image ${editableClass("storyImage")}`} onClick={selectField("storyImage")}>
           <img src={content.storyImage} alt="Merchant helping a customer" />
         </div>
@@ -646,7 +663,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="featured-section" id="featured-network">
+      <section className={`featured-section ${editableClass("featuredBackground")}`} id="featured-network" style={backgroundStyle("featuredBackground")} onClick={selectField("featuredBackground")}>
         <div className="section-inner">
           <div className="section-heading colorful-heading">
             <span {...editableText("featuredEyebrow", "eyebrow dark")}><Star size={16} /> {content.featuredEyebrow}</span>
@@ -668,7 +685,7 @@ function UeniteHome() {
         </div>
       </section>
 
-      <section className="uenite-final">
+      <section className={`uenite-final ${editableClass("finalBackground")}`} style={backgroundStyle("finalBackground")} onClick={selectField("finalBackground")}>
         <div>
           <h2 {...editableText("finalTitle")}>{content.finalTitle}</h2>
           <p {...editableText("finalBody")}>{content.finalBody}</p>
@@ -712,6 +729,7 @@ function SiteEditor({
     share: "Share and site settings"
   };
   const imageFields = new Set<keyof HomeSiteContent>(["heroBgImage", "flow1Image", "flow2Image", "flow3Image", "flow4Image", "storyImage"]);
+  const backgroundFields = new Set<string>(["heroBackground", "pageBackground", "audienceBackground", "flowBackground", "creatorBackground", "storyBackground", "featuredBackground", "finalBackground"]);
   const linkFields: Partial<Record<keyof HomeSiteContent, keyof HomeSiteContent>> = {
     primaryCtaText: "primaryCtaHref",
     secondaryCtaText: "secondaryCtaHref",
@@ -755,7 +773,8 @@ function SiteEditor({
   };
   const selectedKey = selectedField as keyof HomeSiteContent;
   const selectedIsImage = selectedField && imageFields.has(selectedKey);
-  const selectedIsText = selectedField && selectedField !== "heroBackground" && selectedField !== "share" && !selectedIsImage && selectedField !== "heroVideoUrl" && selectedField !== "faviconUrl" && selectedField !== "mediaLibrary";
+  const selectedIsBackground = Boolean(selectedField && backgroundFields.has(String(selectedField)));
+  const selectedIsText = selectedField && !selectedIsBackground && selectedField !== "share" && !selectedIsImage && selectedField !== "heroVideoUrl" && selectedField !== "faviconUrl" && selectedField !== "mediaLibrary";
   return (
     <>
       <button className={`site-edit-toggle ${open ? "active" : ""}`} onClick={() => { onOpenChange(!open); if (!open && !selectedField) onSelect("share"); }} title="Edit public page">
@@ -804,25 +823,27 @@ function SiteEditor({
                 </div>
               </>
             )}
-            {selectedField === "heroBackground" && (
+            {selectedIsBackground && (
               <>
                 <div className="preset-grid">
                   {[
-                    ["emerald", "Emerald network"],
-                    ["gold", "Gold exchange"],
-                    ["violet", "Violet creator"],
-                    ["midnight", "Midnight market"]
-                  ].map(([preset, label]) => (
-                    <button className={`preset-tile preset-${preset} ${draft.heroPreset === preset ? "active" : ""}`} key={preset} type="button" onClick={() => update({ heroPreset: preset })}>
+                    ["linear-gradient(135deg, #07120e 0%, #123326 48%, #0b1512 100%)", "Emerald network", "emerald"],
+                    ["linear-gradient(135deg, #150f05 0%, #604315 54%, #10130c 100%)", "Gold exchange", "gold"],
+                    ["linear-gradient(135deg, #0a1024 0%, #39215f 56%, #07120e 100%)", "Violet creator", "violet"],
+                    ["linear-gradient(135deg, #020617 0%, #0f2f2e 52%, #070b12 100%)", "Midnight market", "midnight"],
+                    ["#f8faf6", "Soft light", "light"],
+                    ["#0c1a12", "Deep green", "deep"]
+                  ].map(([preset, label, id]) => (
+                    <button className={`preset-tile preset-${id} ${selectedField === "heroBackground" ? draft.heroPreset === id : String(draft[selectedKey] ?? "") === preset ? "active" : ""}`} key={id} type="button" onClick={() => selectedField === "heroBackground" ? update({ heroPreset: id, heroBgImage: "" } as Partial<HomeSiteContent>) : update({ [selectedKey]: preset } as Partial<HomeSiteContent>)}>
                       <span>{label}</span>
                     </button>
                   ))}
                 </div>
-                <label>Background image URL<input value={draft.heroBgImage} onChange={(event) => update({ heroBgImage: event.target.value })} placeholder="https://..." /></label>
-                <label>Video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>
+                <label>Background CSS / color / image<input value={selectedField === "heroBackground" ? draft.heroBgImage : String(draft[selectedKey] ?? "")} onChange={(event) => selectedField === "heroBackground" ? update({ heroBgImage: event.target.value }) : update({ [selectedKey]: event.target.value } as Partial<HomeSiteContent>)} placeholder="#07120e or linear-gradient(...) or url(...)" /></label>
+                {selectedField === "heroBackground" && <label>Video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>}
                 <div className="editor-grid">
-                  <label className="upload-drop">Upload image<input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "image", "heroBgImage")} /></label>
-                  <label className="upload-drop">Upload video<input type="file" accept="video/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "video", "heroVideoUrl")} /></label>
+                  <label className="upload-drop">Upload image<input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "image", selectedField === "heroBackground" ? "heroBgImage" : selectedKey)} /></label>
+                  {selectedField === "heroBackground" && <label className="upload-drop">Upload video<input type="file" accept="video/*" onChange={(event) => event.target.files?.[0] && uploadMedia(event.target.files[0], "video", "heroVideoUrl")} /></label>}
                 </div>
                 <div className="editor-grid">
                   <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
@@ -830,7 +851,7 @@ function SiteEditor({
                 </div>
                 <div className="media-library-list">
                   {draft.mediaLibrary.map((url) => (
-                    <button key={url} type="button" onClick={() => update({ heroBgImage: url })}>
+                    <button key={url} type="button" onClick={() => selectedField === "heroBackground" ? update({ heroBgImage: url }) : update({ [selectedKey]: `url("${url}")` } as Partial<HomeSiteContent>)}>
                       <img src={url} alt="" />
                       <span>Use</span>
                     </button>

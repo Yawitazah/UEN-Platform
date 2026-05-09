@@ -927,6 +927,15 @@ th {
   background: radial-gradient(circle at 20% 20%, #38bdf8, transparent 28%), linear-gradient(135deg, #020617, #0f2f2e);
 }
 
+.preset-light {
+  background: linear-gradient(135deg, #ffffff, #e8f5ed);
+  color: #17201b;
+}
+
+.preset-deep {
+  background: linear-gradient(135deg, #07120e, #0c1a12);
+}
+
 .upload-drop {
   background: #eef5f1;
   border: 1px dashed #9ab2a7;
