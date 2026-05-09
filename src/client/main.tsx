@@ -422,7 +422,9 @@ function UeniteHome() {
   const [publicAdmin, setPublicAdmin] = useState<any | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedField, setSelectedField] = useState<keyof HomeSiteContent | "heroBackground" | "share" | null>(null);
-  const content = normalizeHomeContent(siteContent.data?.home);
+  const savedContent = normalizeHomeContent(siteContent.data?.home);
+  const [previewContent, setPreviewContent] = useState<HomeSiteContent>(savedContent);
+  const content = previewContent;
   const heroStyle = {
     "--uenite-accent": content.heroAccentColor,
     color: content.heroTextColor,
@@ -495,6 +497,9 @@ function UeniteHome() {
     }
     link.href = content.faviconUrl;
   }, [content.faviconUrl]);
+  useEffect(() => {
+    setPreviewContent(savedContent);
+  }, [siteContent.data]);
   return (
     <main className={`uenite-main ${editableClass("pageBackground")}`} style={backgroundStyle("pageBackground")} onClick={selectField("pageBackground")}>
       <section className={`uenite-hero uenite-hero-${content.heroPreset} ${editableClass("heroBackground")}`} style={heroStyle} onClick={selectField("heroBackground")}>
@@ -692,13 +697,14 @@ function UeniteHome() {
         </div>
         <a className={`button-link button-link-large ${editableClass("finalCtaText")}`} onClick={selectField("finalCtaText")} href={content.finalCtaHref}>{content.finalCtaText}</a>
       </section>
-      {publicAdmin && <SiteEditor initialContent={content} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={setEditorOpen} onSelect={setSelectedField} />}
+      {publicAdmin && <SiteEditor initialContent={content} onPreview={setPreviewContent} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={setEditorOpen} onSelect={setSelectedField} />}
     </main>
   );
 }
 
 function SiteEditor({
   initialContent,
+  onPreview,
   onSaved,
   open,
   selectedField,
@@ -706,6 +712,7 @@ function SiteEditor({
   onSelect
 }: {
   initialContent: HomeSiteContent;
+  onPreview: (content: HomeSiteContent) => void;
   onSaved: () => Promise<void>;
   open: boolean;
   selectedField: keyof HomeSiteContent | "heroBackground" | "share" | null;
@@ -742,34 +749,49 @@ function SiteEditor({
     ["Login", `${window.location.origin}/login`]
   ];
   useEffect(() => setDraft(initialContent), [initialContent]);
-  const update = (patch: Partial<HomeSiteContent>) => setDraft((current) => ({ ...current, ...patch }));
+  const update = (patch: Partial<HomeSiteContent>) => {
+    setDraft((current) => {
+      const next = { ...current, ...patch };
+      onPreview(next);
+      return next;
+    });
+  };
   const save = async () => {
-    setStatus("Saving...");
-    await api("/api/site-content/home", { method: "PATCH", body: JSON.stringify({ value: draft }) });
-    await onSaved();
-    setStatus("Live");
+    try {
+      setStatus("Saving...");
+      await api("/api/site-content/home", { method: "PATCH", body: JSON.stringify({ value: draft }) });
+      await onSaved();
+      setStatus("Saved live");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Save failed");
+    }
   };
   const copy = async (url: string) => {
     await navigator.clipboard.writeText(url);
     setStatus("Copied link");
   };
   const uploadMedia = async (file: File, mediaType: "image" | "video", targetField?: keyof HomeSiteContent) => {
-    setUploading(true);
-    setStatus("Uploading...");
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const saved = await api<{ url: string }>("/api/site-media", {
-      method: "POST",
-      body: JSON.stringify({ filename: file.name, dataUrl, mediaType })
-    });
-    const nextLibrary = Array.from(new Set([saved.url, ...draft.mediaLibrary]));
-    update({ mediaLibrary: nextLibrary, ...(targetField ? { [targetField]: saved.url } : {}) } as Partial<HomeSiteContent>);
-    setStatus("Uploaded");
-    setUploading(false);
+    try {
+      setUploading(true);
+      setStatus("Uploading...");
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const saved = await api<{ url: string }>("/api/site-media", {
+        method: "POST",
+        body: JSON.stringify({ filename: file.name, dataUrl, mediaType })
+      });
+      const nextLibrary = Array.from(new Set([saved.url, ...draft.mediaLibrary]));
+      update({ mediaLibrary: nextLibrary, ...(targetField ? { [targetField]: saved.url } : {}) } as Partial<HomeSiteContent>);
+      setStatus("Uploaded");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
   const selectedKey = selectedField as keyof HomeSiteContent;
   const selectedIsImage = selectedField && imageFields.has(selectedKey);
