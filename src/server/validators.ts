@@ -66,6 +66,7 @@ export const createIssuanceProductSchema = z.object({
   shopDomain: z.string().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
   shopifyProductId: z.string().min(1),
   productTitle: z.string().optional(),
+  productImageUrl: z.string().url().optional().or(z.literal("")),
   digitalAssetUrl: z.string().url().optional().or(z.literal("")),
   status: z.enum(["ACTIVE", "PAUSED", "DISABLED"]).default("ACTIVE")
 });

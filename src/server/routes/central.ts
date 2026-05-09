@@ -374,11 +374,13 @@ router.post("/issuance-products", requireRole(writeRoles), async (req, res) => {
       update: {
         exchangeHubId: data.exchangeHubId,
         productTitle: data.productTitle,
+        productImageUrl: data.productImageUrl || undefined,
         digitalAssetUrl: data.digitalAssetUrl || undefined,
         status: data.status
       },
       create: {
         ...data,
+        productImageUrl: data.productImageUrl || undefined,
         digitalAssetUrl: data.digitalAssetUrl || undefined
       }
     });

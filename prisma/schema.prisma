@@ -167,6 +167,7 @@ model ShopifyIssuanceProduct {
   shopDomain       String
   shopifyProductId String
   productTitle     String?
+  productImageUrl  String?
   digitalAssetUrl  String?
   status           String      @default("ACTIVE")
   createdAt        DateTime    @default(now())

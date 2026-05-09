@@ -284,6 +284,48 @@ th {
   margin-top: 16px;
 }
 
+.product-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  margin: 0 0 18px;
+}
+
+.product-option {
+  align-items: center;
+  background: white;
+  border-color: #d9e2dd;
+  color: #17201b;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  justify-items: start;
+  min-height: 64px;
+  text-align: left;
+  white-space: normal;
+}
+
+.product-option.selected {
+  border-color: #1f6f5b;
+  box-shadow: inset 0 0 0 1px #1f6f5b;
+}
+
+.product-option img,
+.product-cell img,
+.product-placeholder {
+  background: #e9efec;
+  border-radius: 6px;
+  display: block;
+  height: 42px;
+  object-fit: cover;
+  width: 42px;
+}
+
+.product-cell {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
 @media (max-width: 900px) {
   .app,
   .split {

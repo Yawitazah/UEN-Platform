@@ -346,6 +346,7 @@ function IssuanceProducts() {
     shopDomain: "nubreed-love.myshopify.com",
     shopifyProductId: "",
     productTitle: "",
+    productImageUrl: "",
     digitalAssetUrl: ""
   });
   const loadShopifyProducts = async () => {
@@ -392,23 +393,28 @@ function IssuanceProducts() {
         <Input label="Shop domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain })} />
         <button className="ghost" onClick={loadShopifyProducts}><RefreshCw size={16} /> Load Shopify Products</button>
         <label>
-          Product
-          <select
-            value={form.shopifyProductId}
-            onChange={(event) => {
-              const product = shopifyProducts.find((item) => item.id === event.target.value);
-              setForm({ ...form, shopifyProductId: event.target.value, productTitle: product?.title ?? form.productTitle });
-            }}
-          >
-            <option value="">Select product...</option>
-            {shopifyProducts.map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}
-          </select>
+          Selected product
+          <input value={form.productTitle || "No product selected"} readOnly />
         </label>
         <Input label="Product title" value={form.productTitle} onChange={(productTitle) => setForm({ ...form, productTitle })} />
         <Input label="Digital asset URL" value={form.digitalAssetUrl} onChange={(digitalAssetUrl) => setForm({ ...form, digitalAssetUrl })} />
         <button onClick={create}><Link2 size={16} /> Map Product</button>
       </FormGrid>
-      <DataTable rows={products.data ?? []} columns={[["Shop", (r) => r.shopDomain], ["Title", (r) => r.productTitle ?? "-"], ["Hub", (r) => r.exchangeHub.displayName], ["Available", (r) => r.availableKeys], ["Issued", (r) => r.issuedKeys], ["Status", (r) => <Status value={r.status} />], ["Action", (r) => <button className="ghost" onClick={() => setSelectedIssuanceProductId(r.id)}>Manage Keys</button>]]} />
+      {shopifyProducts.length > 0 && (
+        <section className="product-grid">
+          {shopifyProducts.map((product) => (
+            <button
+              className={`product-option ${form.shopifyProductId === product.id ? "selected" : ""}`}
+              key={product.id}
+              onClick={() => setForm({ ...form, shopifyProductId: product.id, productTitle: product.title, productImageUrl: product.imageUrl ?? "" })}
+            >
+              {product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span className="product-placeholder" />}
+              <span>{product.title}</span>
+            </button>
+          ))}
+        </section>
+      )}
+      <DataTable rows={products.data ?? []} columns={[["Product", (r) => <div className="product-cell">{r.productImageUrl ? <img src={r.productImageUrl} alt="" /> : <span className="product-placeholder" />}<span>{r.productTitle ?? "-"}</span></div>], ["Shop", (r) => r.shopDomain], ["Hub", (r) => r.exchangeHub.displayName], ["Available", (r) => r.availableKeys], ["Issued", (r) => r.issuedKeys], ["Status", (r) => <Status value={r.status} />], ["Action", (r) => <button className="ghost" onClick={() => setSelectedIssuanceProductId(r.id)}>Manage Keys</button>]]} />
       <section className="panel">
         <h2>Code Inventory</h2>
         <FormGrid>
