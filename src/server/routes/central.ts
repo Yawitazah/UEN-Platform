@@ -5,8 +5,7 @@ import { audit } from "../audit";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import { requireMerchantAccess, requireRole } from "../security";
-import { createShopifyDiscountCode } from "../services/shopifyGraphql";
-import { syncNewUensToEligibleShopifyStores } from "../services/sync";
+import { syncCodesToGroupedShopifyDiscount, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
   createAccessRuleSchema,
@@ -90,75 +89,19 @@ async function syncInventoryCodesToMerchantStores(exchangeHubId: string, invento
     }
 
     for (const connection of merchant.shopifyConnections) {
-      for (const inventoryCode of inventoryCodes) {
-        const existing = await prisma.shopifyInventorySyncedCode.findUnique({
-          where: { merchantId_inventoryCodeId: { merchantId: merchant.id, inventoryCodeId: inventoryCode.id } }
-        });
-        if (existing?.syncStatus === "SYNCED") {
-          skipped += 1;
-          continue;
-        }
-
-        try {
-          const result = await createShopifyDiscountCode({
-            shopDomain: connection.shopDomain,
-            accessToken: connection.accessToken,
-            code: inventoryCode.code,
-            title: `${inventoryCode.code} Universal Exchange Note`,
-            discountType: offer.discountType,
-            discountValue: Number(offer.discountValue ?? 0),
-            usageLimitPerNote: offer.usageLimitPerNote,
-            minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
-            startsAt: offer.startsAt,
-            endsAt: offer.endsAt
-          });
-
-          await prisma.shopifyInventorySyncedCode.upsert({
-            where: { merchantId_inventoryCodeId: { merchantId: merchant.id, inventoryCodeId: inventoryCode.id } },
-            update: {
-              shopDomain: connection.shopDomain,
-              uenCode: inventoryCode.code,
-              shopifyDiscountId: result.shopifyDiscountId,
-              shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-              syncStatus: "SYNCED",
-              lastSyncedAt: new Date(),
-              errorMessage: null
-            },
-            create: {
-              inventoryCodeId: inventoryCode.id,
-              merchantId: merchant.id,
-              shopDomain: connection.shopDomain,
-              uenCode: inventoryCode.code,
-              shopifyDiscountId: result.shopifyDiscountId,
-              shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-              syncStatus: "SYNCED",
-              lastSyncedAt: new Date()
-            }
-          });
-          synced += 1;
-        } catch (error) {
-          errors += 1;
-          await prisma.shopifyInventorySyncedCode.upsert({
-            where: { merchantId_inventoryCodeId: { merchantId: merchant.id, inventoryCodeId: inventoryCode.id } },
-            update: {
-              shopDomain: connection.shopDomain,
-              uenCode: inventoryCode.code,
-              syncStatus: "ERROR",
-              lastSyncedAt: new Date(),
-              errorMessage: error instanceof Error ? error.message : "Unknown sync error"
-            },
-            create: {
-              inventoryCodeId: inventoryCode.id,
-              merchantId: merchant.id,
-              shopDomain: connection.shopDomain,
-              uenCode: inventoryCode.code,
-              syncStatus: "ERROR",
-              lastSyncedAt: new Date(),
-              errorMessage: error instanceof Error ? error.message : "Unknown sync error"
-            }
-          });
-        }
-      }
+      const groupedSync = await syncCodesToGroupedShopifyDiscount({
+        connection: {
+          merchantId: merchant.id,
+          shopDomain: connection.shopDomain,
+          accessToken: connection.accessToken,
+          merchantName: merchant.businessName
+        },
+        offer,
+        codes: inventoryCodes.map((inventoryCode) => ({ id: inventoryCode.id, code: inventoryCode.code, kind: "inventory" as const }))
+      });
+      synced += groupedSync.created;
+      skipped += groupedSync.skipped;
+      errors += groupedSync.errors;
     }
   }
 

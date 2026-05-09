@@ -93,6 +93,7 @@ model Merchant {
   syncLogs            SyncLog[]
   apiKeys             MerchantApiKey[]
   inventorySyncs      ShopifyInventorySyncedCode[]
+  discountGroups      ShopifyDiscountGroup[]
 }
 
 model MerchantOffer {
@@ -219,6 +220,26 @@ model ShopifyInventorySyncedCode {
   merchant              Merchant         @relation(fields: [merchantId], references: [id])
 
   @@unique([merchantId, inventoryCodeId])
+  @@index([shopDomain])
+}
+
+model ShopifyDiscountGroup {
+  id                 String   @id @default(cuid())
+  merchantId         String
+  shopDomain         String
+  discountKey        String
+  title              String
+  discountType       String
+  discountValue      String?
+  minimumOrderAmount String?
+  usageLimitPerNote  Int
+  shopifyDiscountId  String
+  status             String   @default("ACTIVE")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  merchant           Merchant @relation(fields: [merchantId], references: [id])
+
+  @@unique([merchantId, shopDomain, discountKey])
   @@index([shopDomain])
 }
 

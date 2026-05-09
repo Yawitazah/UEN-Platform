@@ -2,11 +2,208 @@ import { AuditAction } from "../constants";
 import { audit } from "../audit";
 import { prisma } from "../db";
 import { getValidUensForMerchant } from "./uens";
-import { createShopifyDiscountCode } from "./shopifyGraphql";
+import { addShopifyDiscountCodes, createShopifyDiscountCode } from "./shopifyGraphql";
+
+type GroupedDiscountOffer = {
+  discountType: string;
+  discountValue: unknown;
+  minimumOrderAmount?: unknown;
+  usageLimitPerNote: number;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
+};
+
+type GroupedDiscountConnection = {
+  merchantId: string;
+  shopDomain: string;
+  accessToken: string;
+  merchantName?: string;
+};
+
+function discountKey(offer: GroupedDiscountOffer) {
+  return [
+    offer.discountType,
+    Number(offer.discountValue ?? 0),
+    offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : "",
+    offer.usageLimitPerNote
+  ].join(":");
+}
+
+async function ensureDiscountGroup(connection: GroupedDiscountConnection, offer: GroupedDiscountOffer, firstCode: string) {
+  const key = discountKey(offer);
+  const existing = await prisma.shopifyDiscountGroup.findUnique({
+    where: { merchantId_shopDomain_discountKey: { merchantId: connection.merchantId, shopDomain: connection.shopDomain, discountKey: key } }
+  });
+  if (existing?.status === "ACTIVE") return existing;
+
+  const title = `${connection.merchantName ?? "UEN"} Universal Exchange Notes`;
+  const result = await createShopifyDiscountCode({
+    shopDomain: connection.shopDomain,
+    accessToken: connection.accessToken,
+    code: firstCode,
+    title,
+    discountType: offer.discountType as "PERCENTAGE" | "FIXED_AMOUNT",
+    discountValue: Number(offer.discountValue ?? 0),
+    usageLimitPerNote: offer.usageLimitPerNote,
+    minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
+    startsAt: offer.startsAt,
+    endsAt: offer.endsAt
+  });
+
+  return prisma.shopifyDiscountGroup.upsert({
+    where: { merchantId_shopDomain_discountKey: { merchantId: connection.merchantId, shopDomain: connection.shopDomain, discountKey: key } },
+    update: {
+      title,
+      discountType: offer.discountType,
+      discountValue: String(offer.discountValue ?? ""),
+      minimumOrderAmount: offer.minimumOrderAmount ? String(offer.minimumOrderAmount) : null,
+      usageLimitPerNote: offer.usageLimitPerNote,
+      shopifyDiscountId: result.shopifyDiscountId,
+      status: "ACTIVE"
+    },
+    create: {
+      merchantId: connection.merchantId,
+      shopDomain: connection.shopDomain,
+      discountKey: key,
+      title,
+      discountType: offer.discountType,
+      discountValue: String(offer.discountValue ?? ""),
+      minimumOrderAmount: offer.minimumOrderAmount ? String(offer.minimumOrderAmount) : null,
+      usageLimitPerNote: offer.usageLimitPerNote,
+      shopifyDiscountId: result.shopifyDiscountId
+    }
+  });
+}
+
+export async function syncCodesToGroupedShopifyDiscount(input: {
+  connection: GroupedDiscountConnection;
+  offer: GroupedDiscountOffer;
+  codes: Array<{ id: string; code: string; kind: "note" | "inventory" }>;
+}) {
+  if (!input.codes.length) return { created: 0, skipped: 0, errors: 0 };
+  if (input.offer.discountType !== "PERCENTAGE" && input.offer.discountType !== "FIXED_AMOUNT") {
+    throw new Error("Shopify sync currently supports PERCENTAGE and FIXED_AMOUNT offers");
+  }
+
+  let created = 0;
+  let skipped = 0;
+  let errors = 0;
+  const group = await ensureDiscountGroup(input.connection, input.offer, input.codes[0].code);
+
+  for (const code of input.codes) {
+    const existing =
+      code.kind === "note"
+        ? await prisma.shopifySyncedNote.findUnique({
+            where: { merchantId_universalExchangeNoteId: { merchantId: input.connection.merchantId, universalExchangeNoteId: code.id } }
+          })
+        : await prisma.shopifyInventorySyncedCode.findUnique({
+            where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: code.id } }
+          });
+    if (existing?.syncStatus === "SYNCED") {
+      skipped += 1;
+      continue;
+    }
+
+    try {
+      if (!(created === 0 && code.code === input.codes[0].code && group.createdAt.getTime() > Date.now() - 30_000)) {
+        await addShopifyDiscountCodes({
+          shopDomain: input.connection.shopDomain,
+          accessToken: input.connection.accessToken,
+          shopifyDiscountId: group.shopifyDiscountId,
+          codes: [code.code]
+        });
+      }
+
+      if (code.kind === "note") {
+        await prisma.shopifySyncedNote.upsert({
+          where: { merchantId_universalExchangeNoteId: { merchantId: input.connection.merchantId, universalExchangeNoteId: code.id } },
+          update: {
+            shopDomain: input.connection.shopDomain,
+            uenCode: code.code,
+            shopifyDiscountId: group.shopifyDiscountId,
+            shopifyDiscountCodeId: group.shopifyDiscountId,
+            syncStatus: "SYNCED",
+            lastSyncedAt: new Date(),
+            errorMessage: null
+          },
+          create: {
+            merchantId: input.connection.merchantId,
+            shopDomain: input.connection.shopDomain,
+            universalExchangeNoteId: code.id,
+            uenCode: code.code,
+            shopifyDiscountId: group.shopifyDiscountId,
+            shopifyDiscountCodeId: group.shopifyDiscountId,
+            syncStatus: "SYNCED",
+            lastSyncedAt: new Date()
+          }
+        });
+      } else {
+        await prisma.shopifyInventorySyncedCode.upsert({
+          where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: code.id } },
+          update: {
+            shopDomain: input.connection.shopDomain,
+            uenCode: code.code,
+            shopifyDiscountId: group.shopifyDiscountId,
+            shopifyDiscountCodeId: group.shopifyDiscountId,
+            syncStatus: "SYNCED",
+            lastSyncedAt: new Date(),
+            errorMessage: null
+          },
+          create: {
+            inventoryCodeId: code.id,
+            merchantId: input.connection.merchantId,
+            shopDomain: input.connection.shopDomain,
+            uenCode: code.code,
+            shopifyDiscountId: group.shopifyDiscountId,
+            shopifyDiscountCodeId: group.shopifyDiscountId,
+            syncStatus: "SYNCED",
+            lastSyncedAt: new Date()
+          }
+        });
+      }
+      created += 1;
+    } catch (error) {
+      errors += 1;
+      const errorMessage = error instanceof Error ? error.message : "Unknown sync error";
+      if (code.kind === "note") {
+        await prisma.shopifySyncedNote.upsert({
+          where: { merchantId_universalExchangeNoteId: { merchantId: input.connection.merchantId, universalExchangeNoteId: code.id } },
+          update: { shopDomain: input.connection.shopDomain, uenCode: code.code, syncStatus: "ERROR", lastSyncedAt: new Date(), errorMessage },
+          create: {
+            merchantId: input.connection.merchantId,
+            shopDomain: input.connection.shopDomain,
+            universalExchangeNoteId: code.id,
+            uenCode: code.code,
+            syncStatus: "ERROR",
+            lastSyncedAt: new Date(),
+            errorMessage
+          }
+        });
+      } else {
+        await prisma.shopifyInventorySyncedCode.upsert({
+          where: { merchantId_inventoryCodeId: { merchantId: input.connection.merchantId, inventoryCodeId: code.id } },
+          update: { shopDomain: input.connection.shopDomain, uenCode: code.code, syncStatus: "ERROR", lastSyncedAt: new Date(), errorMessage },
+          create: {
+            inventoryCodeId: code.id,
+            merchantId: input.connection.merchantId,
+            shopDomain: input.connection.shopDomain,
+            uenCode: code.code,
+            syncStatus: "ERROR",
+            lastSyncedAt: new Date(),
+            errorMessage
+          }
+        });
+      }
+    }
+  }
+
+  return { created, skipped, errors };
+}
 
 export async function syncMerchantUensToShopify(merchantId: string, shopDomain: string, syncType = "MANUAL") {
   const connection = await prisma.shopifyConnection.findFirst({
-    where: { merchantId, shopDomain, status: "ACTIVE" }
+    where: { merchantId, shopDomain, status: "ACTIVE" },
+    include: { merchant: true }
   });
   if (!connection) throw new Error("Active Shopify connection not found");
 
@@ -30,75 +227,19 @@ export async function syncMerchantUensToShopify(merchantId: string, shopDomain: 
   let totalUpdated = inactive.length;
   let totalSkipped = 0;
   let totalErrors = 0;
-
-  for (const uen of uens) {
-    const existing = previouslySynced.find((row) => row.universalExchangeNoteId === uen.id);
-    if (existing?.syncStatus === "SYNCED") {
-      totalSkipped += 1;
-      continue;
-    }
-
-    try {
-      const result = await createShopifyDiscountCode({
-        shopDomain,
-        accessToken: connection.accessToken,
-        code: uen.code,
-        title: `${uen.code} Universal Exchange Note`,
-        discountType: offer.discountType,
-        discountValue: Number(offer.discountValue ?? 0),
-        usageLimitPerNote: offer.usageLimitPerNote,
-        minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
-        startsAt: offer.startsAt,
-        endsAt: offer.endsAt
-      });
-
-      await prisma.shopifySyncedNote.upsert({
-        where: { merchantId_universalExchangeNoteId: { merchantId, universalExchangeNoteId: uen.id } },
-        update: {
-          shopDomain,
-          uenCode: uen.code,
-          shopifyDiscountId: result.shopifyDiscountId,
-          shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-          syncStatus: "SYNCED",
-          lastSyncedAt: new Date(),
-          errorMessage: null
-        },
-        create: {
-          merchantId,
-          shopDomain,
-          universalExchangeNoteId: uen.id,
-          uenCode: uen.code,
-          shopifyDiscountId: result.shopifyDiscountId,
-          shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-          syncStatus: "SYNCED",
-          lastSyncedAt: new Date()
-        }
-      });
-      totalCreated += existing ? 0 : 1;
-      totalUpdated += existing ? 1 : 0;
-    } catch (error) {
-      totalErrors += 1;
-      await prisma.shopifySyncedNote.upsert({
-        where: { merchantId_universalExchangeNoteId: { merchantId, universalExchangeNoteId: uen.id } },
-        update: {
-          shopDomain,
-          uenCode: uen.code,
-          syncStatus: "ERROR",
-          lastSyncedAt: new Date(),
-          errorMessage: error instanceof Error ? error.message : "Unknown sync error"
-        },
-        create: {
-          merchantId,
-          shopDomain,
-          universalExchangeNoteId: uen.id,
-          uenCode: uen.code,
-          syncStatus: "ERROR",
-          lastSyncedAt: new Date(),
-          errorMessage: error instanceof Error ? error.message : "Unknown sync error"
-        }
-      });
-    }
-  }
+  const groupedSync = await syncCodesToGroupedShopifyDiscount({
+    connection: {
+      merchantId,
+      shopDomain,
+      accessToken: connection.accessToken,
+      merchantName: connection.merchant?.businessName
+    },
+    offer,
+    codes: uens.map((uen) => ({ id: uen.id, code: uen.code, kind: "note" as const }))
+  });
+  totalCreated += groupedSync.created;
+  totalSkipped += groupedSync.skipped;
+  totalErrors += groupedSync.errors;
 
   const status = totalErrors === 0 ? "SUCCESS" : totalCreated + totalUpdated > 0 ? "PARTIAL" : "FAILED";
   const log = await prisma.syncLog.create({
@@ -159,75 +300,19 @@ export async function syncNewUensToEligibleShopifyStores(exchangeHubId: string, 
     }
 
     for (const connection of merchant.shopifyConnections) {
-      for (const note of notes) {
-        const existing = await prisma.shopifySyncedNote.findUnique({
-          where: { merchantId_universalExchangeNoteId: { merchantId: merchant.id, universalExchangeNoteId: note.id } }
-        });
-        if (existing?.syncStatus === "SYNCED") {
-          skipped += 1;
-          continue;
-        }
-
-        try {
-          const result = await createShopifyDiscountCode({
-            shopDomain: connection.shopDomain,
-            accessToken: connection.accessToken,
-            code: note.code,
-            title: `${note.code} Universal Exchange Note`,
-            discountType: offer.discountType,
-            discountValue: Number(offer.discountValue ?? 0),
-            usageLimitPerNote: offer.usageLimitPerNote,
-            minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
-            startsAt: offer.startsAt,
-            endsAt: offer.endsAt
-          });
-
-          await prisma.shopifySyncedNote.upsert({
-            where: { merchantId_universalExchangeNoteId: { merchantId: merchant.id, universalExchangeNoteId: note.id } },
-            update: {
-              shopDomain: connection.shopDomain,
-              uenCode: note.code,
-              shopifyDiscountId: result.shopifyDiscountId,
-              shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-              syncStatus: "SYNCED",
-              lastSyncedAt: new Date(),
-              errorMessage: null
-            },
-            create: {
-              merchantId: merchant.id,
-              shopDomain: connection.shopDomain,
-              universalExchangeNoteId: note.id,
-              uenCode: note.code,
-              shopifyDiscountId: result.shopifyDiscountId,
-              shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-              syncStatus: "SYNCED",
-              lastSyncedAt: new Date()
-            }
-          });
-          synced += 1;
-        } catch (error) {
-          errors += 1;
-          await prisma.shopifySyncedNote.upsert({
-            where: { merchantId_universalExchangeNoteId: { merchantId: merchant.id, universalExchangeNoteId: note.id } },
-            update: {
-              shopDomain: connection.shopDomain,
-              uenCode: note.code,
-              syncStatus: "ERROR",
-              lastSyncedAt: new Date(),
-              errorMessage: error instanceof Error ? error.message : "Unknown sync error"
-            },
-            create: {
-              merchantId: merchant.id,
-              shopDomain: connection.shopDomain,
-              universalExchangeNoteId: note.id,
-              uenCode: note.code,
-              syncStatus: "ERROR",
-              lastSyncedAt: new Date(),
-              errorMessage: error instanceof Error ? error.message : "Unknown sync error"
-            }
-          });
-        }
-      }
+      const groupedSync = await syncCodesToGroupedShopifyDiscount({
+        connection: {
+          merchantId: merchant.id,
+          shopDomain: connection.shopDomain,
+          accessToken: connection.accessToken,
+          merchantName: merchant.businessName
+        },
+        offer,
+        codes: notes.map((note) => ({ id: note.id, code: note.code, kind: "note" as const }))
+      });
+      synced += groupedSync.created;
+      skipped += groupedSync.skipped;
+      errors += groupedSync.errors;
 
       const status = errors === 0 ? "SUCCESS" : synced > 0 ? "PARTIAL" : "FAILED";
       await prisma.syncLog.create({

@@ -6,8 +6,7 @@ import { config } from "../config";
 import { AuditAction, MerchantStatus } from "../constants";
 import { prisma } from "../db";
 import { hashSecret } from "../security";
-import { createShopifyDiscountCode } from "../services/shopifyGraphql";
-import { syncMerchantUensToShopify } from "../services/sync";
+import { syncCodesToGroupedShopifyDiscount, syncMerchantUensToShopify } from "../services/sync";
 import { createOfferSchema, platformConnectionSchema } from "../validators";
 
 const router = express.Router();
@@ -173,40 +172,15 @@ async function createIssuanceDiscount(shopDomain: string, note: { id: string; co
     return;
   }
 
-  const result = await createShopifyDiscountCode({
-    shopDomain,
-    accessToken,
-    code: note.code,
-    title: `${note.code} Universal Exchange Note`,
-    discountType: offer.discountType,
-    discountValue: Number(offer.discountValue ?? 0),
-    usageLimitPerNote: offer.usageLimitPerNote,
-    minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined,
-    startsAt: offer.startsAt,
-    endsAt: offer.endsAt
-  });
-
-  await prisma.shopifySyncedNote.upsert({
-    where: { merchantId_universalExchangeNoteId: { merchantId: connection.merchantId, universalExchangeNoteId: note.id } },
-    update: {
-      shopDomain,
-      uenCode: note.code,
-      shopifyDiscountId: result.shopifyDiscountId,
-      shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-      syncStatus: "SYNCED",
-      lastSyncedAt: new Date(),
-      errorMessage: null
-    },
-    create: {
+  await syncCodesToGroupedShopifyDiscount({
+    connection: {
       merchantId: connection.merchantId,
       shopDomain,
-      universalExchangeNoteId: note.id,
-      uenCode: note.code,
-      shopifyDiscountId: result.shopifyDiscountId,
-      shopifyDiscountCodeId: result.shopifyDiscountCodeId,
-      syncStatus: "SYNCED",
-      lastSyncedAt: new Date()
-    }
+      accessToken,
+      merchantName: connection.merchant.businessName
+    },
+    offer,
+    codes: [{ id: note.id, code: note.code, kind: "note" }]
   });
 }
 

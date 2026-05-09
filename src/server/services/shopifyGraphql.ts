@@ -18,6 +18,10 @@ type ShopifyDiscountResult = {
   shopifyDiscountCodeId: string;
 };
 
+type ShopifyBulkAddResult = {
+  bulkCreationId: string;
+};
+
 const mutation = `
   mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
     discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
@@ -116,4 +120,64 @@ export async function createShopifyDiscountCode(input: DiscountInput): Promise<S
   }
 
   return { shopifyDiscountId: node.id, shopifyDiscountCodeId: codeNode.id };
+}
+
+export async function addShopifyDiscountCodes(input: {
+  shopDomain: string;
+  accessToken: string;
+  shopifyDiscountId: string;
+  codes: string[];
+}): Promise<ShopifyBulkAddResult> {
+  if (!input.codes.length) {
+    throw new Error("No discount codes were provided");
+  }
+
+  if (config.shopifySyncMode === "mock" || input.accessToken.startsWith("shpat_placeholder")) {
+    return { bulkCreationId: `gid://shopify/DiscountRedeemCodeBulkCreation/mock-${input.codes.length}` };
+  }
+
+  const response = await fetch(`https://${input.shopDomain}/admin/api/${config.shopifyApiVersion}/graphql.json`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-shopify-access-token": input.accessToken
+    },
+    body: JSON.stringify({
+      query: `
+        mutation discountRedeemCodeBulkAdd($discountId: ID!, $codes: [DiscountRedeemCodeInput!]!) {
+          discountRedeemCodeBulkAdd(discountId: $discountId, codes: $codes) {
+            bulkCreation {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `,
+      variables: {
+        discountId: input.shopifyDiscountId,
+        codes: input.codes.map((code) => ({ code }))
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shopify GraphQL request failed with ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const result = payload.data?.discountRedeemCodeBulkAdd;
+  const errors = result?.userErrors ?? payload.errors;
+  if (errors?.length) {
+    throw new Error(errors.map((error: { message: string }) => error.message).join("; "));
+  }
+
+  const bulkCreationId = result?.bulkCreation?.id;
+  if (!bulkCreationId) {
+    throw new Error("Shopify did not return a bulk code creation identifier");
+  }
+
+  return { bulkCreationId };
 }
