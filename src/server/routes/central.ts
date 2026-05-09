@@ -1,7 +1,7 @@
 import type { Router } from "express";
 import crypto from "node:crypto";
 import express from "express";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { audit } from "../audit";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
@@ -26,6 +26,8 @@ import {
 const router: Router = express.Router();
 const adminRoles = [AdminRole.SUPER_ADMIN, AdminRole.OPERATIONS, AdminRole.SUPPORT];
 const writeRoles = [AdminRole.SUPER_ADMIN, AdminRole.OPERATIONS];
+const siteContentClient = (prisma as any).siteContent;
+const siteContentSchema = z.object({ value: z.unknown() });
 
 function param(req: express.Request, name: string) {
   const value = req.params[name];
@@ -121,6 +123,40 @@ router.get("/admin/dashboard", requireRole(adminRoles), async (_req, res) => {
   ]);
 
   res.json({ counts: { exchangeHubs, holders, uens, merchants, syncedNotes }, recentSyncLogs: syncLogs });
+});
+
+router.get("/public/site-content", async (_req, res) => {
+  const rows = await siteContentClient.findMany();
+  const content = rows.reduce((acc: Record<string, unknown>, row: { key: string; value: string }) => {
+    try {
+      acc[row.key] = JSON.parse(row.value);
+    } catch {
+      acc[row.key] = row.value;
+    }
+    return acc;
+  }, {});
+  res.json(content);
+});
+
+router.get("/site-content", requireRole(adminRoles), async (_req, res) => {
+  const rows = await siteContentClient.findMany({ orderBy: { key: "asc" } });
+  res.json(rows.map((row: { key: string; value: string }) => ({ ...row, value: JSON.parse(row.value) })));
+});
+
+router.patch("/site-content/:key", requireRole(writeRoles), async (req, res) => {
+  try {
+    const key = param(req, "key");
+    const data = siteContentSchema.parse(req.body);
+    const saved = await siteContentClient.upsert({
+      where: { key },
+      update: { value: JSON.stringify(data.value) },
+      create: { key, value: JSON.stringify(data.value) }
+    });
+    await audit({ action: AuditAction.MERCHANT_OFFER_CHANGED, entityType: "SiteContent", entityId: saved.id, message: `Updated ${key} public content` });
+    res.json({ ...saved, value: JSON.parse(saved.value) });
+  } catch (error) {
+    handleError(res, error);
+  }
 });
 
 router.get("/exchange-hubs", requireRole(adminRoles), async (_req, res) => {

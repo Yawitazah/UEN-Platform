@@ -47,6 +47,55 @@ async function portalApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json();
 }
 
+type HomeSiteContent = {
+  heroEyebrow: string;
+  heroTitle: string;
+  heroBody: string;
+  primaryCtaText: string;
+  primaryCtaHref: string;
+  secondaryCtaText: string;
+  secondaryCtaHref: string;
+  heroPreset: string;
+  heroBgImage: string;
+  heroVideoUrl: string;
+  heroTextColor: string;
+  heroAccentColor: string;
+  heroTitleSize: number;
+  faviconUrl: string;
+  mediaLibrary: string[];
+};
+
+const defaultHomeContent: HomeSiteContent = {
+  heroEyebrow: "The possibilities are endless when we UENite",
+  heroTitle: "When we UENite, the possibilities are endless.",
+  heroBody: "Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.",
+  primaryCtaText: "Join the Merchant Network",
+  primaryCtaHref: "/merchants/register",
+  secondaryCtaText: "Choose your path",
+  secondaryCtaHref: "#audiences",
+  heroPreset: "emerald",
+  heroBgImage: "",
+  heroVideoUrl: "",
+  heroTextColor: "#ffffff",
+  heroAccentColor: "#75e3ad",
+  heroTitleSize: 76,
+  faviconUrl: "",
+  mediaLibrary: [
+    "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=1200&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=1200&auto=format&fit=crop"
+  ]
+};
+
+function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined): HomeSiteContent {
+  return {
+    ...defaultHomeContent,
+    ...(value ?? {}),
+    heroTitleSize: Number(value?.heroTitleSize ?? defaultHomeContent.heroTitleSize),
+    mediaLibrary: Array.isArray(value?.mediaLibrary) ? value.mediaLibrary : defaultHomeContent.mediaLibrary
+  };
+}
+
 function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +120,7 @@ function useData<T>(loader: () => Promise<T>, deps: React.DependencyList = []) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/register";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -101,6 +150,7 @@ function Shell() {
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
           <Route path="/holder/portal" element={<HolderPortal />} />
+          <Route path="/holder/register" element={<HolderRegister />} />
         </Routes>
       ) : (
       <div className="app">
@@ -202,6 +252,20 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
 }
 
 function UeniteHome() {
+  const siteContent = useData<Record<string, Partial<HomeSiteContent>>>(() => api("/api/public/site-content"));
+  const [publicAdmin, setPublicAdmin] = useState<any | null>(null);
+  const content = normalizeHomeContent(siteContent.data?.home);
+  const heroStyle = {
+    "--uenite-accent": content.heroAccentColor,
+    color: content.heroTextColor,
+    ...(content.heroBgImage ? { backgroundImage: `linear-gradient(135deg, rgba(7, 18, 14, 0.82), rgba(18, 51, 38, 0.74)), url("${content.heroBgImage}")` } : {})
+  } as React.CSSProperties;
+  const particles = Array.from({ length: 24 }, (_, index) => ({
+    left: `${(index * 37) % 96}%`,
+    top: `${8 + ((index * 23) % 78)}%`,
+    delay: `${index * -0.32}s`,
+    size: `${4 + (index % 4)}px`
+  }));
   const paths = [
     {
       Icon: ShoppingBag,
@@ -231,9 +295,35 @@ function UeniteHome() {
       className: "path-holder"
     }
   ];
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => setPublicAdmin(payload?.user ?? null))
+      .catch(() => setPublicAdmin(null));
+  }, []);
+  useEffect(() => {
+    if (!content.faviconUrl) return;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = content.faviconUrl;
+  }, [content.faviconUrl]);
   return (
     <main className="uenite-main">
-      <section className="uenite-hero">
+      <section className={`uenite-hero uenite-hero-${content.heroPreset}`} style={heroStyle}>
+        {content.heroVideoUrl && (
+          <video className="hero-video-bg" autoPlay muted loop playsInline>
+            <source src={content.heroVideoUrl} />
+          </video>
+        )}
+        <div className="network-particles" aria-hidden="true">
+          {particles.map((particle, index) => (
+            <span key={index} style={{ left: particle.left, top: particle.top, animationDelay: particle.delay, width: particle.size, height: particle.size }} />
+          ))}
+        </div>
         <nav className="uenite-nav">
           <a className="uenite-logo" href="/">
             <Shield size={24} />
@@ -247,12 +337,12 @@ function UeniteHome() {
         </nav>
         <div className="uenite-hero-grid">
           <div className="uenite-copy">
-            <span className="eyebrow"><Star size={16} /> The possibilities are endless when we UENite</span>
-            <h1>When we UENite, the possibilities are endless.</h1>
-            <p>Creators and influencers keep direct audience data, supporters receive Universal Exchange Notes, and merchants turn that value into checkout-ready sales. Build the exchange without leaving your own store.</p>
+            <span className="eyebrow"><Star size={16} /> {content.heroEyebrow}</span>
+            <h1 style={{ color: content.heroTextColor, fontSize: `clamp(46px, 7vw, ${content.heroTitleSize}px)` }}>{content.heroTitle}</h1>
+            <p style={{ color: content.heroTextColor }}>{content.heroBody}</p>
             <div className="hero-actions">
-              <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
-              <a className="text-link" href="#audiences">Choose your path</a>
+              <a className="button-link button-link-large" href={content.primaryCtaHref}>{content.primaryCtaText}</a>
+              <a className="text-link" href={content.secondaryCtaHref}>{content.secondaryCtaText}</a>
             </div>
             <div className="creator-proof">
               <span><strong className="mini-money">$</strong> Sell notes through your own Shopify store</span>
@@ -417,7 +507,99 @@ function UeniteHome() {
         </div>
         <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
       </section>
+      {publicAdmin && <SiteEditor initialContent={content} onSaved={siteContent.reload} />}
     </main>
+  );
+}
+
+function SiteEditor({ initialContent, onSaved }: { initialContent: HomeSiteContent; onSaved: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<HomeSiteContent>(initialContent);
+  const [status, setStatus] = useState("");
+  const shareLinks = [
+    ["Homepage", `${window.location.origin}/`],
+    ["Merchant signup", `${window.location.origin}/merchants/register`],
+    ["Login", `${window.location.origin}/login`]
+  ];
+  useEffect(() => setDraft(initialContent), [initialContent]);
+  const update = (patch: Partial<HomeSiteContent>) => setDraft((current) => ({ ...current, ...patch }));
+  const save = async () => {
+    setStatus("Saving...");
+    await api("/api/site-content/home", { method: "PATCH", body: JSON.stringify({ value: draft }) });
+    await onSaved();
+    setStatus("Live");
+  };
+  const copy = async (url: string) => {
+    await navigator.clipboard.writeText(url);
+    setStatus("Copied link");
+  };
+  return (
+    <>
+      <button className="site-edit-toggle" onClick={() => setOpen((value) => !value)} title="Edit public page">
+        <SlidersHorizontal size={18} />
+      </button>
+      {open && (
+        <aside className="site-editor-panel">
+          <div className="editor-head">
+            <div>
+              <strong>Page Editor</strong>
+              <span>{status || "Admin only"}</span>
+            </div>
+            <button className="icon-button" onClick={() => setOpen(false)} title="Close editor"><X size={16} /></button>
+          </div>
+          <div className="editor-scroll">
+            <label>Hero eyebrow<input value={draft.heroEyebrow} onChange={(event) => update({ heroEyebrow: event.target.value })} /></label>
+            <label>Hero headline<textarea value={draft.heroTitle} onChange={(event) => update({ heroTitle: event.target.value })} /></label>
+            <label>Hero body<textarea value={draft.heroBody} onChange={(event) => update({ heroBody: event.target.value })} /></label>
+            <div className="editor-grid">
+              <label>Primary CTA<input value={draft.primaryCtaText} onChange={(event) => update({ primaryCtaText: event.target.value })} /></label>
+              <label>Primary link<input value={draft.primaryCtaHref} onChange={(event) => update({ primaryCtaHref: event.target.value })} /></label>
+              <label>Secondary CTA<input value={draft.secondaryCtaText} onChange={(event) => update({ secondaryCtaText: event.target.value })} /></label>
+              <label>Secondary link<input value={draft.secondaryCtaHref} onChange={(event) => update({ secondaryCtaHref: event.target.value })} /></label>
+            </div>
+            <div className="editor-grid">
+              <label>Preset
+                <select value={draft.heroPreset} onChange={(event) => update({ heroPreset: event.target.value })}>
+                  <option value="emerald">Emerald network</option>
+                  <option value="gold">Gold exchange</option>
+                  <option value="violet">Violet creator</option>
+                  <option value="midnight">Midnight market</option>
+                </select>
+              </label>
+              <label>Headline size
+                <input type="range" min="52" max="104" value={draft.heroTitleSize} onChange={(event) => update({ heroTitleSize: Number(event.target.value) })} />
+              </label>
+              <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
+              <label>Accent color<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
+            </div>
+            <label>Hero background image URL<input value={draft.heroBgImage} onChange={(event) => update({ heroBgImage: event.target.value })} placeholder="https://..." /></label>
+            <label>Hero video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>
+            <label>Favicon URL<input value={draft.faviconUrl} onChange={(event) => update({ faviconUrl: event.target.value })} placeholder="https://.../favicon.png" /></label>
+            <label>Media library URLs<textarea value={draft.mediaLibrary.join("\n")} onChange={(event) => update({ mediaLibrary: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
+            <div className="media-library-list">
+              {draft.mediaLibrary.map((url) => (
+                <button key={url} type="button" onClick={() => update({ heroBgImage: url })}>
+                  <img src={url} alt="" />
+                  <span>Use</span>
+                </button>
+              ))}
+            </div>
+            <div className="editor-share">
+              <strong>Share</strong>
+              {shareLinks.map(([label, url]) => (
+                <button key={label} type="button" onClick={() => copy(url)}>
+                  <Copy size={14} /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="editor-actions">
+            <button className="ghost" onClick={() => setDraft(initialContent)}>Undo</button>
+            <button onClick={save}><UploadCloud size={16} /> Save live</button>
+          </div>
+        </aside>
+      )}
+    </>
   );
 }
 
@@ -731,6 +913,7 @@ function Dashboard({ user }: { user: any }) {
   return (
     <>
       <Header title="Admin Dashboard" subtitle="Operate Exchange Hubs, UEN validity, merchant access, and Shopify syncs." user={user} />
+      <SharePanel />
       {error && <Notice tone="bad">{error}</Notice>}
       {loading && <Notice>Loading dashboard...</Notice>}
       {data && (
@@ -756,6 +939,34 @@ function Dashboard({ user }: { user: any }) {
         </>
       )}
     </>
+  );
+}
+
+function SharePanel() {
+  const links = [
+    ["UENite homepage", `${window.location.origin}/`],
+    ["Merchant signup", `${window.location.origin}/merchants/register`],
+    ["Sign in", `${window.location.origin}/login`]
+  ];
+  const [copied, setCopied] = useState("");
+  const copyLink = async (label: string, url: string) => {
+    await navigator.clipboard.writeText(url);
+    setCopied(label);
+  };
+  return (
+    <section className="share-panel">
+      <div>
+        <span>Share UENite</span>
+        <strong>Send the right link without leaving admin.</strong>
+      </div>
+      <div className="share-links">
+        {links.map(([label, url]) => (
+          <button className="ghost" key={label} onClick={() => copyLink(label, url)}>
+            <Copy size={15} /> {copied === label ? "Copied" : label}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1261,6 +1472,165 @@ function FormGrid({ children }: { children: React.ReactNode }) {
 
 function Notice({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "bad" }) {
   return <div className={`notice notice-${tone}`}>{children}</div>;
+}
+
+// ─── HolderRegister ───
+
+function HolderRegister() {
+  const params = new URLSearchParams(window.location.search);
+  const preselectedHub = params.get("hub") ?? "";
+  const hubs = useData<any[]>(() => fetch("/api/public/exchange-hubs").then((r) => r.json()));
+  const [form, setForm] = useState({ exchangeHubId: preselectedHub, firstName: "", lastName: "", email: "" });
+  const [result, setResult] = useState<any | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const submit = async () => {
+    setError("");
+    if (!form.exchangeHubId || !form.email) { setError("Exchange Hub and email are required."); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/holder/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Registration failed");
+      setResult(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copy = () => {
+    navigator.clipboard.writeText(window.location.origin + result.portalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
+
+  return (
+    <div className="holder-reg-root">
+      <nav className="holder-reg-nav">
+        <a className="uenite-logo" href="/"><Shield size={22} /><span>UENite</span></a>
+      </nav>
+
+      <div className="holder-reg-body">
+        <div className="holder-reg-card">
+          {!result ? (
+            <>
+              <div className="holder-reg-icon"><Wallet size={32} /></div>
+              <h1 className="holder-reg-title">Access your UEN wallet</h1>
+              <p className="holder-reg-sub">Enter your details to get your personal portal link. If you already have UEN codes from an Exchange Hub, they'll appear in your wallet.</p>
+
+              {error && <div className="holder-reg-error">{error}</div>}
+
+              <div className="holder-reg-form">
+                <label className="holder-reg-label">
+                  Exchange Hub
+                  <select
+                    className="holder-reg-input"
+                    value={form.exchangeHubId}
+                    onChange={(e) => setForm({ ...form, exchangeHubId: e.target.value })}
+                  >
+                    <option value="">Select your hub…</option>
+                    {(hubs.data ?? []).map((h: any) => (
+                      <option key={h.id} value={h.id}>{h.displayName}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="holder-reg-name-row">
+                  <label className="holder-reg-label">
+                    First name
+                    <input
+                      className="holder-reg-input"
+                      value={form.firstName}
+                      onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                      placeholder="Alex"
+                    />
+                  </label>
+                  <label className="holder-reg-label">
+                    Last name
+                    <input
+                      className="holder-reg-input"
+                      value={form.lastName}
+                      onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                      placeholder="Johnson"
+                    />
+                  </label>
+                </div>
+
+                <label className="holder-reg-label">
+                  Email address
+                  <input
+                    className="holder-reg-input"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="you@email.com"
+                  />
+                </label>
+
+                <button className="holder-reg-btn" onClick={submit} disabled={loading}>
+                  {loading ? "Setting up…" : <><Wallet size={16} /> Get My Portal Link</>}
+                </button>
+
+                <p className="holder-reg-fine">
+                  Already accessed your portal? Use your original link or enter your email above to retrieve it.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="holder-reg-success">
+              <div className="holder-reg-success-icon"><CheckCircle size={40} /></div>
+              <h1>You're in, {result.holder.firstName}!</h1>
+              <p>Your personal UEN wallet is ready. Save this link — it's how you access your wallet. Anyone with this link can view your wallet, so keep it private.</p>
+
+              <div className="holder-reg-link-box">
+                <span className="holder-reg-link-text">{window.location.origin + result.portalUrl}</span>
+                <button className="holder-reg-copy-btn" onClick={copy}>
+                  {copied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
+                </button>
+              </div>
+
+              <a className="holder-reg-open-btn" href={result.portalUrl}>
+                Open my wallet <ExternalLink size={16} />
+              </a>
+
+              <p className="holder-reg-fine">
+                <strong>{result.holder.exchangeHub}</strong> · {result.holder.email}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="holder-reg-side">
+          <div className="holder-reg-side-content">
+            <span className="eyebrow"><Ticket size={16} /> Your UEN wallet</span>
+            <h2>One link. All your notes. Every merchant.</h2>
+            <ul className="holder-reg-perks">
+              {[
+                [Wallet, "See all your Universal Exchange Notes in one place"],
+                [ShoppingBag, "Discover participating merchants and their current offers"],
+                [CheckCircle, "Track which codes you've used and where"],
+                [Bell, "Receive notifications and promos from your Exchange Hub"],
+                [Shield, "Your portal link is personal — no password needed"]
+              ].map(([Icon, text], i) => (
+                <li key={i}>
+                  <span className="holder-reg-perk-icon"><Icon size={16} /></span>
+                  <span>{text as string}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── HolderPortal ───

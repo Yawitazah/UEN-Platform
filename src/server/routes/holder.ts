@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import express from "express";
 import { prisma } from "../db";
 
@@ -195,6 +196,71 @@ router.post("/holder/notifications/:id/read", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not mark notification as read" });
+  }
+});
+
+// POST /api/holder/register  — self-registration
+// Finds or creates a holder by (exchangeHubId + email), generates a portal token, returns the portal URL.
+router.post("/holder/register", async (req, res) => {
+  try {
+    const { exchangeHubId, firstName, lastName, email } = req.body as {
+      exchangeHubId?: string;
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    };
+
+    if (!exchangeHubId || !email) {
+      return res.status(400).json({ error: "exchangeHubId and email are required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub || hub.status !== "ACTIVE") {
+      return res.status(404).json({ error: "Exchange Hub not found or inactive" });
+    }
+
+    // Find or create the holder
+    const holder = await prisma.holder.upsert({
+      where: { exchangeHubId_email: { exchangeHubId, email: normalizedEmail } },
+      update: {
+        // Only update name if provided and the existing record has placeholder values
+        ...(firstName ? { firstName } : {}),
+        ...(lastName ? { lastName } : {})
+      },
+      create: {
+        exchangeHubId,
+        email: normalizedEmail,
+        firstName: firstName?.trim() || "Holder",
+        lastName: lastName?.trim() || "",
+        status: "ACTIVE"
+      }
+    });
+
+    // Generate portal token if missing
+    const token = holder.portalToken ?? crypto.randomBytes(24).toString("base64url");
+    if (!holder.portalToken) {
+      await prisma.holder.update({
+        where: { id: holder.id },
+        data: { portalToken: token }
+      });
+    }
+
+    const portalUrl = `/holder/portal?token=${token}`;
+    res.status(201).json({
+      portalToken: token,
+      portalUrl,
+      holder: {
+        id: holder.id,
+        firstName: holder.firstName,
+        lastName: holder.lastName,
+        email: holder.email,
+        exchangeHub: hub.displayName
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not complete registration" });
   }
 });
 
