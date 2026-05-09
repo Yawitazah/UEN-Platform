@@ -8,12 +8,15 @@ import { requireMerchantAccess, requireRole } from "../security";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
   createAccessRuleSchema,
+  bulkGenerateCodesSchema,
+  bulkImportCodesSchema,
   createHolderSchema,
   createHubSchema,
   createIssuanceProductSchema,
   createMerchantSchema,
   createOfferSchema,
   createUenSchema,
+  updateHubSchema,
   validateUenSchema
 } from "../validators";
 
@@ -45,8 +48,11 @@ async function generatedCode(prefix = "") {
   for (let attempt = 0; attempt < 25; attempt += 1) {
     const number = Math.floor(Math.random() * max) + 1;
     const code = `${normalizedPrefix}${number}UEN`;
-    const existing = await prisma.universalExchangeNote.findUnique({ where: { code } });
-    if (!existing) return code;
+    const [existingNote, existingInventory] = await Promise.all([
+      prisma.universalExchangeNote.findUnique({ where: { code } }),
+      prisma.uenCodeInventory.findUnique({ where: { code } })
+    ]);
+    if (!existingNote && !existingInventory) return code;
   }
 
   throw new Error("Could not generate a unique UEN code");
@@ -81,6 +87,23 @@ router.post("/exchange-hubs", requireRole(writeRoles), async (req, res) => {
       data: { ...data, logoUrl: data.logoUrl || undefined, codePrefix: data.codePrefix?.toUpperCase() || undefined }
     });
     res.status(201).json(hub);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.patch("/exchange-hubs/:exchangeHubId", requireRole(writeRoles), async (req, res) => {
+  try {
+    const data = updateHubSchema.parse(req.body);
+    const hub = await prisma.exchangeHub.update({
+      where: { id: param(req, "exchangeHubId") },
+      data: {
+        ...data,
+        logoUrl: data.logoUrl || undefined,
+        codePrefix: data.codePrefix?.toUpperCase() || undefined
+      }
+    });
+    res.json(hub);
   } catch (error) {
     handleError(res, error);
   }
@@ -217,6 +240,21 @@ router.post("/uens/:uenId/remove-from-circulation", requireRole(writeRoles), asy
   }
 });
 
+router.delete("/uens/:uenId", requireRole(writeRoles), async (req, res) => {
+  try {
+    const uenId = param(req, "uenId");
+    await prisma.shopifySyncedNote.deleteMany({ where: { universalExchangeNoteId: uenId } });
+    await prisma.uenCodeInventory.updateMany({
+      where: { universalExchangeNoteId: uenId },
+      data: { status: "REMOVED", universalExchangeNoteId: null }
+    });
+    await prisma.universalExchangeNote.delete({ where: { id: uenId } });
+    res.json({ deleted: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.get("/merchants", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.merchant.findMany({ orderBy: { createdAt: "desc" }, include: { linkedExchangeHub: true } }));
 });
@@ -310,11 +348,21 @@ router.get("/sync-logs", requireRole(adminRoles), async (_req, res) => {
 });
 
 router.get("/issuance-products", requireRole(adminRoles), async (_req, res) => {
+  const products = await prisma.shopifyIssuanceProduct.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { exchangeHub: true }
+  });
+  const counts = await prisma.uenCodeInventory.groupBy({
+    by: ["issuanceProductId", "status"],
+    where: { issuanceProductId: { in: products.map((product) => product.id) } },
+    _count: true
+  });
   res.json(
-    await prisma.shopifyIssuanceProduct.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { exchangeHub: true }
-    })
+    products.map((product) => ({
+      ...product,
+      availableKeys: counts.find((count) => count.issuanceProductId === product.id && count.status === "AVAILABLE")?._count ?? 0,
+      issuedKeys: counts.find((count) => count.issuanceProductId === product.id && count.status === "ISSUED")?._count ?? 0
+    }))
   );
 });
 
@@ -347,6 +395,50 @@ router.get("/issuance-logs", requireRole(adminRoles), async (_req, res) => {
       include: { issuanceProduct: { include: { exchangeHub: true } } }
     })
   );
+});
+
+router.post("/exchange-hubs/:exchangeHubId/code-inventory/generate", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const data = bulkGenerateCodesSchema.parse(req.body);
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+    const created = [];
+    for (let index = 0; index < data.count; index += 1) {
+      created.push(
+        await prisma.uenCodeInventory.create({
+          data: {
+            exchangeHubId,
+            issuanceProductId: data.issuanceProductId,
+            code: await generatedCode(hub.codePrefix ?? ""),
+            source: "GENERATED"
+          }
+        })
+      );
+    }
+    res.status(201).json({ created: created.length });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+router.post("/exchange-hubs/:exchangeHubId/code-inventory/import", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const data = bulkImportCodesSchema.parse(req.body);
+    const result = await prisma.uenCodeInventory.createMany({
+      data: data.codes.map((code) => ({
+        exchangeHubId,
+        issuanceProductId: data.issuanceProductId,
+        code: code.toUpperCase(),
+        source: "IMPORTED"
+      })),
+      skipDuplicates: true
+    });
+    res.status(201).json({ created: result.count });
+  } catch (error) {
+    handleError(res, error);
+  }
 });
 
 router.get("/audit-logs", requireRole(adminRoles), async (_req, res) => {

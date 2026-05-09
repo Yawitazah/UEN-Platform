@@ -44,7 +44,8 @@ button.danger {
 }
 
 input,
-select {
+select,
+textarea {
   background: white;
   border: 1px solid #cbd5d1;
   border-radius: 6px;
@@ -54,12 +55,21 @@ select {
   width: 100%;
 }
 
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
 label {
   color: #526059;
   display: grid;
   gap: 6px;
   font-size: 13px;
   min-width: 180px;
+}
+
+label.wide {
+  grid-column: 1 / -2;
 }
 
 h1,

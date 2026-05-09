@@ -41,10 +41,31 @@ async function generateIssuedCode(prefix = "") {
   for (let attempt = 0; attempt < 25; attempt += 1) {
     const number = Math.floor(Math.random() * 9_999_999) + 1;
     const code = `${normalizedPrefix}${number}UEN`;
-    const existing = await prisma.universalExchangeNote.findUnique({ where: { code } });
-    if (!existing) return code;
+    const [existingNote, existingInventory] = await Promise.all([
+      prisma.universalExchangeNote.findUnique({ where: { code } }),
+      prisma.uenCodeInventory.findUnique({ where: { code } })
+    ]);
+    if (!existingNote && !existingInventory) return code;
   }
   throw new Error("Could not generate a unique UEN code");
+}
+
+function numericProductId(gidOrId: string) {
+  return gidOrId.split("/").pop() ?? gidOrId;
+}
+
+async function nextCodeForIssuance(exchangeHubId: string, issuanceProductId: string, prefix = "") {
+  const inventoryCode =
+    (await prisma.uenCodeInventory.findFirst({
+      where: { issuanceProductId, status: "AVAILABLE" },
+      orderBy: { createdAt: "asc" }
+    })) ??
+    (await prisma.uenCodeInventory.findFirst({
+      where: { exchangeHubId, issuanceProductId: null, status: "AVAILABLE" },
+      orderBy: { createdAt: "asc" }
+    }));
+
+  return inventoryCode ? { code: inventoryCode.code, inventoryCodeId: inventoryCode.id } : { code: await generateIssuedCode(prefix), inventoryCodeId: null };
 }
 
 function handleError(res: express.Response, error: unknown) {
@@ -240,13 +261,25 @@ router.post("/webhooks/orders-paid", async (req, res) => {
         }
       });
 
+      const issuedCode = await nextCodeForIssuance(mappedProduct.exchangeHubId, mappedProduct.id, mappedProduct.exchangeHub.codePrefix ?? "");
       const note = await prisma.universalExchangeNote.create({
         data: {
           exchangeHubId: mappedProduct.exchangeHubId,
           holderId: holder.id,
-          code: await generateIssuedCode(mappedProduct.exchangeHub.codePrefix ?? "")
+          code: issuedCode.code
         }
       });
+      if (issuedCode.inventoryCodeId) {
+        await prisma.uenCodeInventory.update({
+          where: { id: issuedCode.inventoryCodeId },
+          data: {
+            status: "ISSUED",
+            issuedToEmail: customerEmail,
+            issuedAt: new Date(),
+            universalExchangeNoteId: note.id
+          }
+        });
+      }
 
       await prisma.uenIssuanceLog.create({
         data: {
@@ -285,14 +318,14 @@ router.post("/platform-connection", async (req, res) => {
       update: {
         merchantId: apiKey.merchantId,
         accessToken: data.accessToken ?? "shpat_placeholder_local_dev",
-        scopes: "read_discounts,write_discounts",
+        scopes: config.shopifyScopes,
         status: "ACTIVE"
       },
       create: {
         merchantId: apiKey.merchantId,
         shopDomain: data.shopDomain,
         accessToken: data.accessToken ?? "shpat_placeholder_local_dev",
-        scopes: "read_discounts,write_discounts",
+        scopes: config.shopifyScopes,
         status: "ACTIVE"
       }
     });
@@ -326,6 +359,54 @@ router.get("/dashboard", async (req, res) => {
     merchantId: connection.merchantId,
     shopDomain: connection.shopDomain
   });
+});
+
+router.get("/products", async (req, res) => {
+  try {
+    const connection = await connectionFromRequest(req, res);
+    if (!connection) return;
+    const search = String(req.query.query ?? "");
+    const response = await fetch(`https://${connection.shopDomain}/admin/api/${config.shopifyApiVersion}/graphql.json`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-shopify-access-token": connection.accessToken
+      },
+      body: JSON.stringify({
+        query: `
+          query Products($first: Int!, $query: String) {
+            products(first: $first, query: $query) {
+              nodes {
+                id
+                title
+                handle
+                featuredMedia {
+                  preview {
+                    image { url }
+                  }
+                }
+              }
+            }
+          }
+        `,
+        variables: { first: 100, query: search || null }
+      })
+    });
+    if (!response.ok) return res.status(response.status).json({ error: "Could not fetch Shopify products" });
+    const payload = await response.json();
+    if (payload.errors?.length) return res.status(502).json({ error: payload.errors.map((error: { message: string }) => error.message).join("; ") });
+    res.json(
+      payload.data.products.nodes.map((product: { id: string; title: string; handle: string; featuredMedia?: { preview?: { image?: { url?: string } } } }) => ({
+        id: numericProductId(product.id),
+        gid: product.id,
+        title: product.title,
+        handle: product.handle,
+        imageUrl: product.featuredMedia?.preview?.image?.url
+      }))
+    );
+  } catch (error) {
+    handleError(res, error);
+  }
 });
 
 router.post("/offer-settings", async (req, res) => {

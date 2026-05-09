@@ -9,6 +9,6 @@ export const config = {
   shopifyApiKey: process.env.SHOPIFY_API_KEY ?? "",
   shopifyApiSecret: process.env.SHOPIFY_API_SECRET ?? "",
   shopifyAppUrl: process.env.SHOPIFY_APP_URL ?? "http://localhost:3000",
-  shopifyScopes: process.env.SHOPIFY_SCOPES ?? "read_discounts,write_discounts,read_orders",
+  shopifyScopes: process.env.SHOPIFY_SCOPES ?? "read_discounts,write_discounts,read_orders,read_products",
   bootstrapFirstBuildTarget: process.env.BOOTSTRAP_FIRST_BUILD_TARGET !== "false"
 };

@@ -182,6 +182,7 @@ function Dashboard() {
 function ExchangeHubs() {
   const { data, reload } = useData<any[]>(() => api("/api/exchange-hubs"));
   const [form, setForm] = useState({ name: "", displayName: "", hubType: "creator", codePrefix: "", subdomain: "" });
+  const [editing, setEditing] = useState<any | null>(null);
   const create = async () => {
     await api("/api/exchange-hubs", { method: "POST", body: JSON.stringify(form) });
     setForm({ name: "", displayName: "", hubType: "creator", codePrefix: "", subdomain: "" });
@@ -191,9 +192,35 @@ function ExchangeHubs() {
     await api(`/api/exchange-hubs/${id}/suspend`, { method: "POST" });
     await reload();
   };
+  const saveEdit = async () => {
+    if (!editing) return;
+    await api(`/api/exchange-hubs/${editing.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: editing.name,
+        displayName: editing.displayName,
+        hubType: editing.hubType,
+        codePrefix: editing.codePrefix ?? "",
+        subdomain: editing.subdomain ?? ""
+      })
+    });
+    setEditing(null);
+    await reload();
+  };
   return (
     <>
       <Header title="Exchange Hubs" subtitle="Create and suspend audience-holders that issue UENs." />
+      {editing && (
+        <FormGrid>
+          <Input label="Name" value={editing.name} onChange={(name) => setEditing({ ...editing, name })} />
+          <Input label="Display name" value={editing.displayName} onChange={(displayName) => setEditing({ ...editing, displayName })} />
+          <Input label="Hub type" value={editing.hubType} onChange={(hubType) => setEditing({ ...editing, hubType })} />
+          <Input label="Code prefix" value={editing.codePrefix ?? ""} onChange={(codePrefix) => setEditing({ ...editing, codePrefix })} />
+          <Input label="Subdomain" value={editing.subdomain ?? ""} onChange={(subdomain) => setEditing({ ...editing, subdomain })} />
+          <button onClick={saveEdit}><UploadCloud size={16} /> Save Hub</button>
+          <button className="ghost" onClick={() => setEditing(null)}>Cancel</button>
+        </FormGrid>
+      )}
       <FormGrid>
         <Input label="Name" value={form.name} onChange={(name) => setForm({ ...form, name })} />
         <Input label="Display name" value={form.displayName} onChange={(displayName) => setForm({ ...form, displayName })} />
@@ -210,7 +237,7 @@ function ExchangeHubs() {
           ["Code Prefix", (row) => row.codePrefix ?? "-"],
           ["Status", (row) => <Status value={row.status} />],
           ["Billing", (row) => row.billingStatus],
-          ["Action", (row) => <button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button>]
+          ["Action", (row) => <div className="actions"><button className="ghost" onClick={() => setEditing(row)}>Edit</button><button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button></div>]
         ]}
       />
     </>
@@ -265,6 +292,10 @@ function Uens() {
     await api(`/api/uens/${id}/remove-from-circulation`, { method: "POST" });
     await uens.reload();
   };
+  const hardDelete = async (id: string) => {
+    await api(`/api/uens/${id}`, { method: "DELETE" });
+    await uens.reload();
+  };
   return (
     <>
       <Header title="Universal Exchange Notes" subtitle="Generate, disable, or remove platform value/access units from circulation." />
@@ -275,7 +306,7 @@ function Uens() {
         <Input label="Manual code override" value={form.code} onChange={(code) => setForm({ ...form, code })} />
         <button onClick={create}><Ticket size={16} /> Generate UEN</button>
       </FormGrid>
-      <DataTable rows={uens.data ?? []} columns={[["Code", (r) => r.code], ["Hub", (r) => r.exchangeHub.displayName], ["Holder", (r) => r.holder.email], ["Status", (r) => <Status value={r.status} />], ["Actions", (r) => <div className="actions"><button className="ghost" onClick={() => disable(r.id)}>Disable</button><button className="ghost danger" onClick={() => removeFromCirculation(r.id)}>Remove from Circulation</button></div>]]} />
+      <DataTable rows={uens.data ?? []} columns={[["Code", (r) => r.code], ["Hub", (r) => r.exchangeHub.displayName], ["Holder", (r) => r.holder.email], ["Status", (r) => <Status value={r.status} />], ["Actions", (r) => <div className="actions"><button className="ghost" onClick={() => disable(r.id)}>Disable</button><button className="ghost danger" onClick={() => removeFromCirculation(r.id)}>Remove from Circulation</button><button className="ghost danger" onClick={() => hardDelete(r.id)}>Delete</button></div>]]} />
     </>
   );
 }
@@ -305,6 +336,11 @@ function IssuanceProducts() {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const products = useData<any[]>(() => api("/api/issuance-products"));
   const logs = useData<any[]>(() => api("/api/issuance-logs"));
+  const [shopifyProducts, setShopifyProducts] = useState<any[]>([]);
+  const [selectedIssuanceProductId, setSelectedIssuanceProductId] = useState("");
+  const [bulkCount, setBulkCount] = useState("25");
+  const [bulkCodes, setBulkCodes] = useState("");
+  const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
     exchangeHubId: "",
     shopDomain: "nubreed-love.myshopify.com",
@@ -312,23 +348,78 @@ function IssuanceProducts() {
     productTitle: "",
     digitalAssetUrl: ""
   });
+  const loadShopifyProducts = async () => {
+    const response = await fetch(`/shopify/api/products?shopDomain=${encodeURIComponent(form.shopDomain)}`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error ?? "Could not load products");
+    setShopifyProducts(payload);
+    setNotice(`Loaded ${payload.length} Shopify products`);
+  };
   const create = async () => {
     await api("/api/issuance-products", { method: "POST", body: JSON.stringify(form) });
     await products.reload();
     await logs.reload();
   };
+  const selectedHubId = products.data?.find((product) => product.id === selectedIssuanceProductId)?.exchangeHubId ?? form.exchangeHubId;
+  const generateCodes = async () => {
+    await api(`/api/exchange-hubs/${selectedHubId}/code-inventory/generate`, {
+      method: "POST",
+      body: JSON.stringify({ count: bulkCount, issuanceProductId: selectedIssuanceProductId || undefined })
+    });
+    setNotice(`Generated ${bulkCount} available codes`);
+    await products.reload();
+  };
+  const importCodes = async () => {
+    const codes = bulkCodes.split(/\r?\n|,/).map((code) => code.trim()).filter(Boolean);
+    await api(`/api/exchange-hubs/${selectedHubId}/code-inventory/import`, {
+      method: "POST",
+      body: JSON.stringify({ codes, issuanceProductId: selectedIssuanceProductId || undefined })
+    });
+    setBulkCodes("");
+    setNotice(`Imported ${codes.length} available codes`);
+    await products.reload();
+  };
   return (
     <>
       <Header title="Product Issuance" subtitle="Map Shopify products to Exchange Hubs so paid orders issue UENs." />
+      {notice && <Notice>{notice}</Notice>}
       <FormGrid>
         <Select label="Exchange Hub" value={form.exchangeHubId} options={hubs.data ?? []} onChange={(exchangeHubId) => setForm({ ...form, exchangeHubId })} />
         <Input label="Shop domain" value={form.shopDomain} onChange={(shopDomain) => setForm({ ...form, shopDomain })} />
-        <Input label="Shopify product ID" value={form.shopifyProductId} onChange={(shopifyProductId) => setForm({ ...form, shopifyProductId })} />
+        <button className="ghost" onClick={loadShopifyProducts}><RefreshCw size={16} /> Load Shopify Products</button>
+        <label>
+          Product
+          <select
+            value={form.shopifyProductId}
+            onChange={(event) => {
+              const product = shopifyProducts.find((item) => item.id === event.target.value);
+              setForm({ ...form, shopifyProductId: event.target.value, productTitle: product?.title ?? form.productTitle });
+            }}
+          >
+            <option value="">Select product...</option>
+            {shopifyProducts.map((product) => <option key={product.id} value={product.id}>{product.title}</option>)}
+          </select>
+        </label>
         <Input label="Product title" value={form.productTitle} onChange={(productTitle) => setForm({ ...form, productTitle })} />
         <Input label="Digital asset URL" value={form.digitalAssetUrl} onChange={(digitalAssetUrl) => setForm({ ...form, digitalAssetUrl })} />
         <button onClick={create}><Link2 size={16} /> Map Product</button>
       </FormGrid>
-      <DataTable rows={products.data ?? []} columns={[["Shop", (r) => r.shopDomain], ["Product ID", (r) => r.shopifyProductId], ["Title", (r) => r.productTitle ?? "-"], ["Hub", (r) => r.exchangeHub.displayName], ["Asset", (r) => r.digitalAssetUrl ?? "-"], ["Status", (r) => <Status value={r.status} />]]} />
+      <DataTable rows={products.data ?? []} columns={[["Shop", (r) => r.shopDomain], ["Title", (r) => r.productTitle ?? "-"], ["Hub", (r) => r.exchangeHub.displayName], ["Available", (r) => r.availableKeys], ["Issued", (r) => r.issuedKeys], ["Status", (r) => <Status value={r.status} />], ["Action", (r) => <button className="ghost" onClick={() => setSelectedIssuanceProductId(r.id)}>Manage Keys</button>]]} />
+      <section className="panel">
+        <h2>Code Inventory</h2>
+        <FormGrid>
+          <SelectText label="Mapped product ID" value={selectedIssuanceProductId} options={(products.data ?? []).map((product) => product.id)} onChange={setSelectedIssuanceProductId} />
+          <Input label="Generate count" value={bulkCount} onChange={setBulkCount} />
+          <button onClick={generateCodes}><UploadCloud size={16} /> Generate Codes</button>
+        </FormGrid>
+        <FormGrid>
+          <label className="wide">
+            Import codes
+            <textarea value={bulkCodes} onChange={(event) => setBulkCodes(event.target.value)} placeholder="One code per line or comma-separated" />
+          </label>
+          <button onClick={importCodes}><UploadCloud size={16} /> Import Codes</button>
+        </FormGrid>
+      </section>
       <h2>Issuance Logs</h2>
       <DataTable rows={logs.data ?? []} columns={[["Customer", (r) => r.customerEmail], ["Shop", (r) => r.shopDomain], ["Order", (r) => r.shopifyOrderId], ["Status", (r) => <Status value={r.status} />], ["Message", (r) => r.message ?? "-"]]} />
     </>

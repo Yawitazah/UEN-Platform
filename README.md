@@ -56,14 +56,14 @@ Production-minded MVP for a Universal Exchange Note platform with a Shopify merc
 - Shopify merchant connection token: `uen_dev_merchant_token`
 - Admin bearer token: `dev-admin-token`
 
-Local Shopify sync runs in mock mode by default using `SHOPIFY_SYNC_MODE=mock`, so syncing `1234567UEN` creates mock Shopify discount IDs without calling Shopify. Set `SHOPIFY_SYNC_MODE=live`, store a real offline Shopify access token in `ShopifyConnection.accessToken`, and keep scopes as `read_discounts,write_discounts` to call the Shopify Admin GraphQL API.
+Local Shopify sync runs in mock mode by default using `SHOPIFY_SYNC_MODE=mock`, so syncing `1234567UEN` creates mock Shopify discount IDs without calling Shopify. Set `SHOPIFY_SYNC_MODE=live`, store a real offline Shopify access token in `ShopifyConnection.accessToken`, and keep scopes as `read_discounts,write_discounts,read_orders,read_products` to call the Shopify Admin GraphQL API.
 
 ## Connect a real Shopify store for testing
 
 In the Shopify Dev Dashboard version screen, use:
 
 - App URL: `https://your-public-domain.example/shopify`
-- Scopes: `read_discounts,write_discounts`
+- Scopes: `read_discounts,write_discounts,read_orders,read_products`
 - Redirect URLs: `https://your-public-domain.example/shopify/auth/callback`
 - Preferences URL: `https://your-public-domain.example/shopify`
 - Embed app in Shopify admin: off for this MVP unless you add App Bridge and embedded-session handling
@@ -87,7 +87,7 @@ https://your-public-domain.example/shopify/auth?shop=your-store.myshopify.com
 
 The callback stores the offline Admin API token server-side in `ShopifyConnection`.
 
-For manual token testing instead of OAuth, create or install a Shopify app with Admin API scopes `read_discounts` and `write_discounts`, then run:
+For manual token testing instead of OAuth, create or install a Shopify app with Admin API scopes `read_discounts`, `write_discounts`, `read_orders`, and `read_products`, then run:
 
 ```bash
 $env:SHOPIFY_SHOP_DOMAIN="your-store.myshopify.com"
@@ -123,6 +123,8 @@ Restart the server and use `/shopify` to sync `1234567UEN`.
 - Exchange Hubs sell access through their own systems. For a Shopify-based Exchange Hub, the sale can be a normal Shopify product, and a post-purchase integration can call the central platform to create the Holder and generate the UEN.
 - Exchange Hubs can save a code prefix. Generated UENs use `1234567UEN` by default, or `NUBREED1234567UEN` when the hub has `NUBREED` as its prefix. The numeric portion is 1 to 7 digits.
 - The Product Issuance page maps a Shopify product ID to an Exchange Hub. Paid Shopify orders for mapped products issue UENs through the `orders/paid` webhook endpoint at `/shopify/webhooks/orders-paid`.
+- Product Issuance can pull products from the connected Shopify store using the Admin GraphQL `products` query. This requires `read_products` and the store must be reauthorized after adding the scope.
+- Product Issuance supports available code inventory. Admins can bulk-generate or bulk-import codes for a mapped product; paid orders issue from inventory first, then auto-generate if inventory is empty.
 - For digital artwork delivery, keep the artwork product/download in Shopify or a digital-download app, and store the download/asset URL on the Product Issuance mapping so the issued UEN and asset can be tracked together.
 - One UEN can sync to many merchants, with merchant-specific offer values.
 - Suspended Exchange Hubs cannot generate new UENs. Suspending a hub marks active UENs as suspended so they stop syncing.

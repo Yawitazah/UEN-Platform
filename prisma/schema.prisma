@@ -35,6 +35,7 @@ model ExchangeHub {
   linkedMerchants       Merchant[]              @relation("LinkedExchangeHub")
   accessRules           MerchantAccessRule[]
   issuanceProducts      ShopifyIssuanceProduct[]
+  inventoryCodes        UenCodeInventory[]
 }
 
 model Holder {
@@ -69,6 +70,7 @@ model UniversalExchangeNote {
   exchangeHub    ExchangeHub @relation(fields: [exchangeHubId], references: [id])
   holder         Holder     @relation(fields: [holderId], references: [id])
   syncedNotes    ShopifySyncedNote[]
+  inventoryCode  UenCodeInventory?
 
   @@index([exchangeHubId])
   @@index([holderId])
@@ -171,9 +173,30 @@ model ShopifyIssuanceProduct {
   updatedAt        DateTime    @updatedAt
   exchangeHub      ExchangeHub @relation(fields: [exchangeHubId], references: [id])
   issuanceLogs     UenIssuanceLog[]
+  inventoryCodes   UenCodeInventory[]
 
   @@unique([shopDomain, shopifyProductId])
   @@index([exchangeHubId])
+}
+
+model UenCodeInventory {
+  id                      String                 @id @default(cuid())
+  exchangeHubId           String
+  issuanceProductId        String?
+  code                    String                 @unique
+  status                  String                 @default("AVAILABLE")
+  source                  String                 @default("GENERATED")
+  issuedToEmail           String?
+  universalExchangeNoteId String?                @unique
+  issuedAt                DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  exchangeHub             ExchangeHub            @relation(fields: [exchangeHubId], references: [id])
+  issuanceProduct         ShopifyIssuanceProduct? @relation(fields: [issuanceProductId], references: [id])
+  universalExchangeNote   UniversalExchangeNote? @relation(fields: [universalExchangeNoteId], references: [id])
+
+  @@index([exchangeHubId, status])
+  @@index([issuanceProductId, status])
 }
 
 model UenIssuanceLog {

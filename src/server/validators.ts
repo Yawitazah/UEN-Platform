@@ -11,6 +11,8 @@ export const createHubSchema = z.object({
   subdomain: z.string().optional()
 });
 
+export const updateHubSchema = createHubSchema.partial();
+
 export const createHolderSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
@@ -66,4 +68,14 @@ export const createIssuanceProductSchema = z.object({
   productTitle: z.string().optional(),
   digitalAssetUrl: z.string().url().optional().or(z.literal("")),
   status: z.enum(["ACTIVE", "PAUSED", "DISABLED"]).default("ACTIVE")
+});
+
+export const bulkGenerateCodesSchema = z.object({
+  count: z.coerce.number().int().min(1).max(500),
+  issuanceProductId: z.string().optional()
+});
+
+export const bulkImportCodesSchema = z.object({
+  codes: z.array(z.string().min(4).max(64).regex(/^[A-Z0-9]+UEN$/i)).min(1).max(500),
+  issuanceProductId: z.string().optional()
 });
