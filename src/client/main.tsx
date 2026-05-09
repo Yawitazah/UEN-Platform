@@ -63,6 +63,11 @@ type HomeSiteContent = {
   heroTitleSize: number;
   faviconUrl: string;
   mediaLibrary: string[];
+  orbitCoreTitle: string;
+  orbitCoreSubtitle: string;
+  orbitHubLabel: string;
+  orbitHolderLabel: string;
+  orbitMerchantLabel: string;
 };
 
 const defaultHomeContent: HomeSiteContent = {
@@ -84,7 +89,12 @@ const defaultHomeContent: HomeSiteContent = {
     "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=1200&auto=format&fit=crop",
     "https://images.unsplash.com/photo-1556741533-6e6a62bd8b49?q=80&w=1200&auto=format&fit=crop"
-  ]
+  ],
+  orbitCoreTitle: "UEN",
+  orbitCoreSubtitle: "Universal Exchange Note",
+  orbitHubLabel: "Exchange Hub",
+  orbitHolderLabel: "Holder",
+  orbitMerchantLabel: "Merchant"
 };
 
 function normalizeHomeContent(value: Partial<HomeSiteContent> | null | undefined): HomeSiteContent {
@@ -256,6 +266,8 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
 function UeniteHome() {
   const siteContent = useData<Record<string, Partial<HomeSiteContent>>>(() => api("/api/public/site-content"));
   const [publicAdmin, setPublicAdmin] = useState<any | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [selectedField, setSelectedField] = useState<keyof HomeSiteContent | "heroBackground" | "share" | null>(null);
   const content = normalizeHomeContent(siteContent.data?.home);
   const heroStyle = {
     "--uenite-accent": content.heroAccentColor,
@@ -297,6 +309,15 @@ function UeniteHome() {
       className: "path-holder"
     }
   ];
+  const selectField = (field: keyof HomeSiteContent | "heroBackground" | "share") => (event: React.MouseEvent) => {
+    if (!publicAdmin) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedField(field);
+    setEditorOpen(true);
+  };
+  const editableClass = (field: keyof HomeSiteContent | "heroBackground" | "share") =>
+    publicAdmin ? `editable-surface ${selectedField === field ? "selected" : ""}` : "";
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
       .then((response) => (response.ok ? response.json() : null))
@@ -315,7 +336,7 @@ function UeniteHome() {
   }, [content.faviconUrl]);
   return (
     <main className="uenite-main">
-      <section className={`uenite-hero uenite-hero-${content.heroPreset}`} style={heroStyle}>
+      <section className={`uenite-hero uenite-hero-${content.heroPreset} ${editableClass("heroBackground")}`} style={heroStyle} onClick={selectField("heroBackground")}>
         {content.heroVideoUrl && (
           <video className="hero-video-bg" autoPlay muted loop playsInline>
             <source src={content.heroVideoUrl} />
@@ -340,12 +361,12 @@ function UeniteHome() {
         </nav>
         <div className="uenite-hero-grid">
           <div className="uenite-copy">
-            <span className="eyebrow"><Star size={16} /> {content.heroEyebrow}</span>
-            <h1 style={{ color: content.heroTextColor, fontSize: `clamp(46px, 7vw, ${content.heroTitleSize}px)` }}>{content.heroTitle}</h1>
-            <p style={{ color: content.heroTextColor }}>{content.heroBody}</p>
+            <span className={`eyebrow ${editableClass("heroEyebrow")}`} onClick={selectField("heroEyebrow")}><Star size={16} /> {content.heroEyebrow}</span>
+            <h1 className={editableClass("heroTitle")} onClick={selectField("heroTitle")} style={{ color: content.heroTextColor, fontSize: `clamp(46px, 7vw, ${content.heroTitleSize}px)` }}>{content.heroTitle}</h1>
+            <p className={editableClass("heroBody")} onClick={selectField("heroBody")} style={{ color: content.heroTextColor }}>{content.heroBody}</p>
             <div className="hero-actions">
-              <a className="button-link button-link-large" href={content.primaryCtaHref}>{content.primaryCtaText}</a>
-              <a className="text-link" href={content.secondaryCtaHref}>{content.secondaryCtaText}</a>
+              <a className={`button-link button-link-large ${editableClass("primaryCtaText")}`} onClick={selectField("primaryCtaText")} href={content.primaryCtaHref}>{content.primaryCtaText}</a>
+              <a className={`text-link ${editableClass("secondaryCtaText")}`} onClick={selectField("secondaryCtaText")} href={content.secondaryCtaHref}>{content.secondaryCtaText}</a>
             </div>
             <div className="creator-proof">
               <span><strong className="mini-money">$</strong> Sell notes through your own Shopify store</span>
@@ -357,10 +378,10 @@ function UeniteHome() {
             <div className="money-symbol money-one">$</div>
             <div className="money-symbol money-two">¢</div>
             <div className="money-symbol money-three">$</div>
-            <div className="orbit-core"><strong>UEN</strong><span>Universal Exchange Note</span></div>
-            <div className="orbit-node node-hub"><Users size={18} /><span>Exchange Hub</span></div>
-            <div className="orbit-node node-holder"><Ticket size={18} /><span>Holder</span></div>
-            <div className="orbit-node node-merchant"><ShoppingBag size={18} /><span>Merchant</span></div>
+            <div className={`orbit-core ${editableClass("orbitCoreTitle")}`} onClick={selectField("orbitCoreTitle")}><strong>{content.orbitCoreTitle}</strong><span>{content.orbitCoreSubtitle}</span></div>
+            <div className={`orbit-node node-hub ${editableClass("orbitHubLabel")}`} onClick={selectField("orbitHubLabel")}><Users size={18} /><span>{content.orbitHubLabel}</span></div>
+            <div className={`orbit-node node-holder ${editableClass("orbitHolderLabel")}`} onClick={selectField("orbitHolderLabel")}><Ticket size={18} /><span>{content.orbitHolderLabel}</span></div>
+            <div className={`orbit-node node-merchant ${editableClass("orbitMerchantLabel")}`} onClick={selectField("orbitMerchantLabel")}><ShoppingBag size={18} /><span>{content.orbitMerchantLabel}</span></div>
             <div className="orbit-ring orbit-ring-one" />
             <div className="orbit-ring orbit-ring-two" />
           </div>
@@ -510,15 +531,42 @@ function UeniteHome() {
         </div>
         <a className="button-link button-link-large" href="/merchants/register">Join the Merchant Network</a>
       </section>
-      {publicAdmin && <SiteEditor initialContent={content} onSaved={siteContent.reload} />}
+      {publicAdmin && <SiteEditor initialContent={content} onSaved={siteContent.reload} open={editorOpen} selectedField={selectedField} onOpenChange={setEditorOpen} onSelect={setSelectedField} />}
     </main>
   );
 }
 
-function SiteEditor({ initialContent, onSaved }: { initialContent: HomeSiteContent; onSaved: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
+function SiteEditor({
+  initialContent,
+  onSaved,
+  open,
+  selectedField,
+  onOpenChange,
+  onSelect
+}: {
+  initialContent: HomeSiteContent;
+  onSaved: () => Promise<void>;
+  open: boolean;
+  selectedField: keyof HomeSiteContent | "heroBackground" | "share" | null;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (field: keyof HomeSiteContent | "heroBackground" | "share" | null) => void;
+}) {
   const [draft, setDraft] = useState<HomeSiteContent>(initialContent);
   const [status, setStatus] = useState("");
+  const fieldLabels: Record<string, string> = {
+    heroBackground: "Hero background",
+    heroEyebrow: "Hero eyebrow",
+    heroTitle: "Hero headline",
+    heroBody: "Hero body",
+    primaryCtaText: "Primary button",
+    secondaryCtaText: "Secondary link",
+    orbitCoreTitle: "UEN center badge",
+    orbitHubLabel: "Exchange Hub icon label",
+    orbitHolderLabel: "Holder icon label",
+    orbitMerchantLabel: "Merchant icon label",
+    share: "Share and site settings"
+  };
+  const textFields = new Set<keyof HomeSiteContent>(["heroEyebrow", "heroTitle", "heroBody", "primaryCtaText", "secondaryCtaText", "orbitCoreTitle", "orbitHubLabel", "orbitHolderLabel", "orbitMerchantLabel"]);
   const shareLinks = [
     ["Homepage", `${window.location.origin}/`],
     ["Merchant signup", `${window.location.origin}/merchants/register`],
@@ -538,63 +586,79 @@ function SiteEditor({ initialContent, onSaved }: { initialContent: HomeSiteConte
   };
   return (
     <>
-      <button className="site-edit-toggle" onClick={() => setOpen((value) => !value)} title="Edit public page">
+      <button className={`site-edit-toggle ${open ? "active" : ""}`} onClick={() => { onOpenChange(!open); if (!open && !selectedField) onSelect("share"); }} title="Edit public page">
         <SlidersHorizontal size={18} />
       </button>
       {open && (
         <aside className="site-editor-panel">
           <div className="editor-head">
             <div>
-              <strong>Page Editor</strong>
-              <span>{status || "Admin only"}</span>
+              <strong>{selectedField ? fieldLabels[String(selectedField)] : "Click anything to edit"}</strong>
+              <span>{status || "Select visible text, buttons, icons, or the hero background"}</span>
             </div>
-            <button className="icon-button" onClick={() => setOpen(false)} title="Close editor"><X size={16} /></button>
+            <button className="icon-button" onClick={() => onOpenChange(false)} title="Close editor"><X size={16} /></button>
           </div>
           <div className="editor-scroll">
-            <label>Hero eyebrow<input value={draft.heroEyebrow} onChange={(event) => update({ heroEyebrow: event.target.value })} /></label>
-            <label>Hero headline<textarea value={draft.heroTitle} onChange={(event) => update({ heroTitle: event.target.value })} /></label>
-            <label>Hero body<textarea value={draft.heroBody} onChange={(event) => update({ heroBody: event.target.value })} /></label>
-            <div className="editor-grid">
-              <label>Primary CTA<input value={draft.primaryCtaText} onChange={(event) => update({ primaryCtaText: event.target.value })} /></label>
-              <label>Primary link<input value={draft.primaryCtaHref} onChange={(event) => update({ primaryCtaHref: event.target.value })} /></label>
-              <label>Secondary CTA<input value={draft.secondaryCtaText} onChange={(event) => update({ secondaryCtaText: event.target.value })} /></label>
-              <label>Secondary link<input value={draft.secondaryCtaHref} onChange={(event) => update({ secondaryCtaHref: event.target.value })} /></label>
-            </div>
-            <div className="editor-grid">
-              <label>Preset
-                <select value={draft.heroPreset} onChange={(event) => update({ heroPreset: event.target.value })}>
-                  <option value="emerald">Emerald network</option>
-                  <option value="gold">Gold exchange</option>
-                  <option value="violet">Violet creator</option>
-                  <option value="midnight">Midnight market</option>
-                </select>
-              </label>
-              <label>Headline size
-                <input type="range" min="52" max="104" value={draft.heroTitleSize} onChange={(event) => update({ heroTitleSize: Number(event.target.value) })} />
-              </label>
-              <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
-              <label>Accent color<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
-            </div>
-            <label>Hero background image URL<input value={draft.heroBgImage} onChange={(event) => update({ heroBgImage: event.target.value })} placeholder="https://..." /></label>
-            <label>Hero video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>
-            <label>Favicon URL<input value={draft.faviconUrl} onChange={(event) => update({ faviconUrl: event.target.value })} placeholder="https://.../favicon.png" /></label>
-            <label>Media library URLs<textarea value={draft.mediaLibrary.join("\n")} onChange={(event) => update({ mediaLibrary: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
-            <div className="media-library-list">
-              {draft.mediaLibrary.map((url) => (
-                <button key={url} type="button" onClick={() => update({ heroBgImage: url })}>
-                  <img src={url} alt="" />
-                  <span>Use</span>
-                </button>
-              ))}
-            </div>
-            <div className="editor-share">
-              <strong>Share</strong>
-              {shareLinks.map(([label, url]) => (
-                <button key={label} type="button" onClick={() => copy(url)}>
-                  <Copy size={14} /> {label}
-                </button>
-              ))}
-            </div>
+            {!selectedField && <Notice>Click a visible page element to edit that exact element.</Notice>}
+            {selectedField && textFields.has(selectedField as keyof HomeSiteContent) && (
+              <>
+                <label>Text
+                  {selectedField === "heroBody" || selectedField === "heroTitle" ? (
+                    <textarea value={String(draft[selectedField as keyof HomeSiteContent] ?? "")} onChange={(event) => update({ [selectedField]: event.target.value } as Partial<HomeSiteContent>)} />
+                  ) : (
+                    <input value={String(draft[selectedField as keyof HomeSiteContent] ?? "")} onChange={(event) => update({ [selectedField]: event.target.value } as Partial<HomeSiteContent>)} />
+                  )}
+                </label>
+                {selectedField === "orbitCoreTitle" && <label>Subtitle<input value={draft.orbitCoreSubtitle} onChange={(event) => update({ orbitCoreSubtitle: event.target.value })} /></label>}
+                {selectedField === "primaryCtaText" && <label>Button link<input value={draft.primaryCtaHref} onChange={(event) => update({ primaryCtaHref: event.target.value })} /></label>}
+                {selectedField === "secondaryCtaText" && <label>Link URL<input value={draft.secondaryCtaHref} onChange={(event) => update({ secondaryCtaHref: event.target.value })} /></label>}
+                <div className="editor-grid">
+                  <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
+                  <label>Accent<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
+                </div>
+                {selectedField === "heroTitle" && <label>Size<input type="range" min="52" max="104" value={draft.heroTitleSize} onChange={(event) => update({ heroTitleSize: Number(event.target.value) })} /></label>}
+              </>
+            )}
+            {selectedField === "heroBackground" && (
+              <>
+                <label>Preset
+                  <select value={draft.heroPreset} onChange={(event) => update({ heroPreset: event.target.value })}>
+                    <option value="emerald">Emerald network</option>
+                    <option value="gold">Gold exchange</option>
+                    <option value="violet">Violet creator</option>
+                    <option value="midnight">Midnight market</option>
+                  </select>
+                </label>
+                <label>Background image URL<input value={draft.heroBgImage} onChange={(event) => update({ heroBgImage: event.target.value })} placeholder="https://..." /></label>
+                <label>Video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>
+                <div className="editor-grid">
+                  <label>Text color<input type="color" value={draft.heroTextColor} onChange={(event) => update({ heroTextColor: event.target.value })} /></label>
+                  <label>Accent<input type="color" value={draft.heroAccentColor} onChange={(event) => update({ heroAccentColor: event.target.value })} /></label>
+                </div>
+                <div className="media-library-list">
+                  {draft.mediaLibrary.map((url) => (
+                    <button key={url} type="button" onClick={() => update({ heroBgImage: url })}>
+                      <img src={url} alt="" />
+                      <span>Use</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {selectedField === "share" && (
+              <>
+                <label>Favicon URL<input value={draft.faviconUrl} onChange={(event) => update({ faviconUrl: event.target.value })} placeholder="https://.../favicon.png" /></label>
+                <label>Media library URLs<textarea value={draft.mediaLibrary.join("\n")} onChange={(event) => update({ mediaLibrary: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
+                <div className="editor-share">
+                  <strong>Share</strong>
+                  {shareLinks.map(([label, url]) => (
+                    <button key={label} type="button" onClick={() => copy(url)}>
+                      <Copy size={14} /> {label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div className="editor-actions">
             <button className="ghost" onClick={() => setDraft(initialContent)}>Undo</button>

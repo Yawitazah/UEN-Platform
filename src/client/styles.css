@@ -744,6 +744,45 @@ th {
   z-index: 30;
 }
 
+.site-edit-toggle.active {
+  background: #75e3ad;
+  color: #07120e;
+}
+
+.editable-surface {
+  cursor: pointer;
+  outline: 1px dashed rgba(117, 227, 173, 0.34);
+  outline-offset: 6px;
+  position: relative;
+}
+
+.editable-surface:hover {
+  outline-color: rgba(251, 191, 36, 0.82);
+}
+
+.editable-surface.selected {
+  outline: 2px solid rgba(251, 191, 36, 0.95);
+  box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.12);
+}
+
+.uenite-hero.editable-surface {
+  outline-offset: -10px;
+}
+
+.uenite-hero.editable-surface::after {
+  background: rgba(7, 18, 14, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  bottom: 22px;
+  color: #e8fbf1;
+  content: "Click visible elements to edit";
+  font-size: 12px;
+  left: 28px;
+  padding: 7px 12px;
+  position: absolute;
+  z-index: 5;
+}
+
 .site-editor-panel {
   background: rgba(248, 250, 246, 0.96);
   border: 1px solid rgba(23, 32, 27, 0.13);
