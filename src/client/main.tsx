@@ -1581,53 +1581,83 @@ function SharePanel() {
 
 function PublicPreviews() {
   const groups = {
-    Public: [
-      ["Homepage", "/"],
-      ["About", "/about"],
-      ["Login", "/login"],
-      ["Signup Gateway", "/signup"]
-    ],
-    Holder: [
-      ["Holder Collection Demo", "/holder/collection"],
-      ["Holder Signup", "/holder/register"],
-      ["Holder Portal", "/holder/portal"]
-    ],
-    Merchant: [
-      ["Merchant Signup", "/merchants/register"],
-      ["Merchant App", "/shopify"],
-      ["Merchant Offers", "/offers"]
-    ],
-    Hub: [
-      ["Exchange Hub Signup", "/exchange-hub/register"],
-      ["Exchange Hubs Admin", "/exchange-hubs"],
-      ["Universal Exchange Notes", "/uens"]
-    ]
+    Public: {
+      summary: "Brand, education, signup, and login pages.",
+      pages: [
+        ["Homepage", "/", "Main UENITE brand and ecosystem story."],
+        ["About", "/about", "Plain-language overview of what UENITE is."],
+        ["Signup Gateway", "/signup", "Role selection for new users."],
+        ["Login", "/login", "Standard sign-in for admins and users."]
+      ]
+    },
+    Holder: {
+      summary: "Supporter wallet, collection, badges, rewards, and redemption view.",
+      pages: [
+        ["Collection Demo", "/holder/collection", "Game-like support vault with value, filters, and details."],
+        ["Holder Signup", "/holder/register", "Holder access form and portal link flow."],
+        ["Holder Portal", "/holder/portal", "Token-based live wallet view. Requires portal token for real data."]
+      ]
+    },
+    Merchant: {
+      summary: "Merchant onboarding, Shopify tools, offers, and redemption setup.",
+      pages: [
+        ["Merchant Signup", "/merchants/register", "Public merchant network registration."],
+        ["Shopify App", "/shopify", "Installed merchant app dashboard and sync controls."],
+        ["Merchant Offers", "/offers", "Admin offer management for participating stores."]
+      ]
+    },
+    Hub: {
+      summary: "Exchange Hub setup, Holders, UEN generation, and campaign operations.",
+      pages: [
+        ["Exchange Hub Signup", "/exchange-hub/register", "Public application path for creators and organizations."],
+        ["Exchange Hubs Admin", "/exchange-hubs", "Create, edit, and suspend Exchange Hubs."],
+        ["Universal Exchange Notes", "/uens", "Generate, disable, remove, or delete Notes."]
+      ]
+    }
   };
   const [activeGroup, setActiveGroup] = useState<keyof typeof groups>("Public");
-  const pages = groups[activeGroup];
+  const [selectedPage, setSelectedPage] = useState(0);
+  const role = groups[activeGroup];
+  const pages = role.pages;
+  const selected = pages[Math.min(selectedPage, pages.length - 1)];
+  const selectGroup = (group: keyof typeof groups) => {
+    setActiveGroup(group);
+    setSelectedPage(0);
+  };
+  const copySelected = async () => navigator.clipboard.writeText(`${window.location.origin}${selected[1]}`);
   return (
     <section className="preview-panel">
       <div className="preview-panel-head">
         <div>
-          <span>Page previews</span>
-          <strong>Switch views and open the pages you need to test.</strong>
+          <span>Page testing center</span>
+          <strong>Choose a role, review the purpose, then open the page to test it.</strong>
         </div>
         <div className="preview-switcher">
           {(Object.keys(groups) as Array<keyof typeof groups>).map((group) => (
-            <button key={group} className={activeGroup === group ? "active" : ""} onClick={() => setActiveGroup(group)}>{group}</button>
+            <button key={group} className={activeGroup === group ? "active" : ""} onClick={() => selectGroup(group)}>{group}</button>
           ))}
         </div>
       </div>
-      <div className="preview-list">
-        {pages.map(([label, path]) => (
-          <a className="preview-row" href={path} target="_blank" rel="noreferrer" key={path}>
-            <strong>{label}</strong>
-            <span>{path}</span>
-            <ExternalLink size={14} />
-          </a>
-        ))}
+      <div className="preview-console">
+        <aside className="preview-context">
+          <span>Viewing as</span>
+          <strong>{activeGroup}</strong>
+          <p>{role.summary}</p>
+          <div className="preview-actions">
+            <a className="button-link" href={selected[1]} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open selected</a>
+            <button className="ghost" onClick={copySelected}><Copy size={14} /> Copy link</button>
+          </div>
+        </aside>
+        <div className="preview-list">
+          {pages.map(([label, path, description], index) => (
+            <button className={`preview-row ${index === selectedPage ? "active" : ""}`} onClick={() => setSelectedPage(index)} key={path}>
+              <strong>{label}</strong>
+              <span>{description}</span>
+              <small>{path}</small>
+            </button>
+          ))}
+        </div>
       </div>
-      <iframe className="preview-focus" title={`${activeGroup} preview`} src={pages[0][1]} loading="lazy" />
     </section>
   );
 }

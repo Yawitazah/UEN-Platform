@@ -408,11 +408,10 @@ th {
   border: 1px solid #d9e2dd;
   border-radius: 10px;
   margin-bottom: 18px;
-  padding: 14px;
+  padding: 16px;
 }
 
-.preview-panel-head,
-.preview-card-head {
+.preview-panel-head {
   align-items: center;
   display: flex;
   gap: 14px;
@@ -452,45 +451,96 @@ th {
   color: white;
 }
 
-.preview-list {
+.preview-console {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  margin-top: 14px;
+}
+
+.preview-context {
+  background: linear-gradient(135deg, #0f2119, #1f6f5b);
+  border-radius: 10px;
+  color: white;
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  margin-top: 12px;
+  padding: 16px;
+}
+
+.preview-context > span {
+  color: #bfe8d1;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.preview-context strong {
+  font-size: 24px;
+}
+
+.preview-context p {
+  color: #e4f5eb;
+  line-height: 1.45;
+}
+
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.preview-actions .button-link,
+.preview-actions button {
+  min-height: 34px;
+}
+
+.preview-actions button.ghost {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+
+.preview-list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
 .preview-row {
-  align-items: center;
+  align-items: start;
   background: #f8faf6;
   border: 1px solid #d9e2dd;
   border-radius: 8px;
   color: #17201b;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   font-size: 13px;
-  gap: 4px 10px;
-  padding: 10px;
+  gap: 6px;
+  justify-items: start;
+  min-height: 118px;
+  padding: 12px;
   text-decoration: none;
+  white-space: normal;
+}
+
+.preview-row.active {
+  background: #eef8f2;
+  border-color: #1f6f5b;
+  box-shadow: inset 0 0 0 1px #1f6f5b;
+}
+
+.preview-row strong {
+  font-size: 15px;
 }
 
 .preview-row span {
   color: #607069;
-  grid-column: 1;
+  line-height: 1.35;
 }
 
-.preview-row svg {
+.preview-row small {
   color: #1f6f5b;
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-
-.preview-focus {
-  border: 1px solid #d9e2dd;
-  border-radius: 8px;
-  display: block;
-  height: 280px;
-  margin-top: 12px;
-  width: 100%;
+  font-weight: 700;
 }
 
 .text-link.dark {
@@ -500,13 +550,6 @@ th {
   gap: 6px;
 }
 
-.preview-card iframe {
-  border: 0;
-  display: block;
-  height: 260px;
-  transform-origin: top left;
-  width: 100%;
-}
 
 .uenite-main {
   background: #07120e;
@@ -3285,8 +3328,8 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .preview-focus {
-    height: 220px;
+  .preview-console {
+    grid-template-columns: 1fr;
   }
 }
 
