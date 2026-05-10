@@ -417,6 +417,7 @@ function Shell() {
           <nav>
             {[
               ["/admin", "Dashboard"],
+              ["/pages", "Pages"],
               ["/exchange-hubs", "Exchange Hubs"],
               ["/holders", "Holders"],
               ["/uens", "Universal Exchange Notes"],
@@ -444,6 +445,7 @@ function Shell() {
           ) : (
             <Routes>
               <Route path="/admin" element={<Dashboard user={user} />} />
+              <Route path="/pages" element={<PagesAdmin user={user} />} />
               <Route path="/exchange-hubs" element={<ExchangeHubs user={user} />} />
               <Route path="/holders" element={<Holders user={user} />} />
               <Route path="/uens" element={<Uens user={user} />} />
@@ -1521,8 +1523,6 @@ function Dashboard({ user }: { user: any }) {
   return (
     <>
       <Header title="Admin Dashboard" subtitle="Operate Exchange Hubs, UEN validity, merchant access, and Shopify syncs." user={user} />
-      <SharePanel />
-      <PublicPreviews />
       {error && <Notice tone="bad">{error}</Notice>}
       {loading && <Notice>Loading dashboard...</Notice>}
       {data && (
@@ -1547,6 +1547,16 @@ function Dashboard({ user }: { user: any }) {
           />
         </>
       )}
+    </>
+  );
+}
+
+function PagesAdmin({ user }: { user: any }) {
+  return (
+    <>
+      <Header title="Pages" subtitle="Test public pages, role views, signup flows, and portal experiences." user={user} />
+      <SharePanel />
+      <PublicPreviews />
     </>
   );
 }
