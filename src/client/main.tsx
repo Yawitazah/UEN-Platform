@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Pause, Play, RefreshCw, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
 import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
@@ -417,7 +417,7 @@ function Shell() {
           <nav>
             {[
               ["/admin", "Dashboard"],
-              ["/pages", "Pages"],
+              ["/pages", "Public Pages"],
               ["/exchange-hubs", "Exchange Hubs"],
               ["/holders", "Holders"],
               ["/uens", "Universal Exchange Notes"],
@@ -640,7 +640,7 @@ function UeniteHome() {
           </div>
           <div className="uenite-orbit" aria-hidden="true">
             <div className="money-symbol money-one">$</div>
-            <div className="money-symbol money-two">¢</div>
+            <div className="money-symbol money-two">$</div>
             <div className="money-symbol money-three">$</div>
             <div className="orbit-collection-card">
               <span>Holder collection</span>
@@ -933,11 +933,39 @@ const demoCollectionItems = [
   }
 ];
 
-function HolderCollectionExperience({ holderName = "Holder", items = demoCollectionItems }: { holderName?: string; items?: typeof demoCollectionItems }) {
+type CollectionItem = typeof demoCollectionItems[number];
+
+function HolderCollectionExperience({ holderName = "Holder", items = demoCollectionItems }: { holderName?: string; items?: CollectionItem[] }) {
   const [filter, setFilter] = useState("All");
+  const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState("Newest");
   const [selected, setSelected] = useState(items[0]);
-  const filtered = filter === "All" ? items : items.filter((item) => item.type.includes(filter) || item.rarity === filter);
+  const [actionMessage, setActionMessage] = useState("");
+  useEffect(() => {
+    setSelected(items[0]);
+  }, [items]);
+  const filtered = items
+    .filter((item) => filter === "All" ? true : item.type.includes(filter) || item.rarity === filter)
+    .filter((item) => {
+      const haystack = `${item.title} ${item.type} ${item.source} ${item.rarity} ${item.status}`.toLowerCase();
+      return haystack.includes(query.trim().toLowerCase());
+    })
+    .sort((a, b) => {
+      if (sortMode === "Value") return (Number(b.value.replace(/[^0-9.]/g, "")) || 0) - (Number(a.value.replace(/[^0-9.]/g, "")) || 0);
+      if (sortMode === "Rarity") return a.rarity.localeCompare(b.rarity);
+      return b.date.localeCompare(a.date);
+    });
   const totalValue = items.reduce((sum, item) => sum + (Number(item.value.replace(/[^0-9.]/g, "")) || 0), 0);
+  const selectItem = (item: CollectionItem) => {
+    setSelected(item);
+    setActionMessage("");
+  };
+  const openItem = () => {
+    setActionMessage(`${selected.title} is open. This is where the Holder would preview files, reward details, redemption utility, and the campaign memory attached to the item.`);
+  };
+  const previewTrade = () => {
+    setActionMessage(`${selected.title} is not transferable yet. Future trade, gift, or resale controls can be enabled per item type when the network rules are ready.`);
+  };
   return (
     <section className="collection-experience">
       <div className="collection-experience-head">
@@ -954,18 +982,39 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
       </div>
       <div className="collection-console">
         <div className="collection-console-toolbar">
-          {["All", "Note", "Download", "Badge", "Future"].map((option) => (
-            <button key={option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option}</button>
-          ))}
+          <div className="collection-filter-buttons">
+            {["All", "Note", "Download", "Badge", "Future"].map((option) => (
+              <button key={option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option}</button>
+            ))}
+          </div>
+          <label className="collection-search">
+            <span>Search</span>
+            <div><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find notes, badges, downloads..." /></div>
+          </label>
+          <label className="collection-sort">
+            <span>Sort</span>
+            <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+              <option>Newest</option>
+              <option>Value</option>
+              <option>Rarity</option>
+            </select>
+          </label>
         </div>
         <div className="collection-inventory">
           {filtered.map((item) => (
-            <button key={item.id} className={`collection-tile ${selected.id === item.id ? "active" : ""}`} onClick={() => setSelected(item)}>
+            <button key={item.id} className={`collection-tile ${selected.id === item.id ? "active" : ""}`} onClick={() => selectItem(item)}>
               <span>{item.type}</span>
               <strong>{item.title}</strong>
               <small>{item.rarity} / {item.value}</small>
             </button>
           ))}
+          {filtered.length === 0 && (
+            <div className="collection-empty">
+              <Search size={26} />
+              <strong>No collection items found</strong>
+              <span>Clear the search or switch filters to see more items.</span>
+            </div>
+          )}
         </div>
         <aside className="collection-detail">
           <span>{selected.type}</span>
@@ -978,9 +1027,10 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             <div><dt>Status</dt><dd>{selected.status}</dd></div>
             <div><dt>Value</dt><dd>{selected.value}</dd></div>
           </dl>
+          {actionMessage && <div className="collection-action-message">{actionMessage}</div>}
           <div className="collection-actions">
-            <button>Open Item</button>
-            <button className="ghost">Gift / Trade Preview</button>
+            <button onClick={openItem}>Open Item</button>
+            <button className="ghost" onClick={previewTrade}>Gift / Trade Preview</button>
           </div>
         </aside>
       </div>
@@ -1002,6 +1052,131 @@ function HolderCollectionDemo() {
       <HolderCollectionExperience holderName="Raquel" />
       <PoweredByFooter />
     </main>
+  );
+}
+
+function DemoHolderPortal() {
+  const [activeTab, setActiveTab] = useState<"collection" | "wallet" | "merchants">("collection");
+  const [notifOpen, setNotifOpen] = useState(false);
+  const demoCodes = [
+    { id: "code-1", code: "NUBREED9827391UEN", status: "ACTIVE", merchants: "3 synced stores" },
+    { id: "code-2", code: "LOVE70402UEN", status: "ACTIVE", merchants: "1 synced store" },
+    { id: "code-3", code: "PAYIT2026UEN", status: "GRACE_PERIOD", merchants: "Pending merchant access" }
+  ];
+  const demoMerchants = [
+    { id: "merchant-1", businessName: "Nubreed Global Truth", offer: "15% off", availableUens: 2, redeemedUens: 1, shopUrl: "https://nubreed-love.myshopify.com" },
+    { id: "merchant-2", businessName: "Infinite Love Goods", offer: "$10 off $50", availableUens: 1, redeemedUens: 0, shopUrl: "" },
+    { id: "merchant-3", businessName: "Future Merchant Partner", offer: "Free shipping", availableUens: 0, redeemedUens: 0, shopUrl: "" }
+  ];
+  return (
+    <div className="portal-root">
+      <nav className="portal-nav">
+        <div className="portal-nav-brand">
+          <div className="portal-hub-dot" style={{ background: "#75e3ad" }} />
+          <span><BrandWord /> Holder Demo</span>
+        </div>
+        <div className="portal-nav-actions">
+          <button className="portal-notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
+            <Bell size={20} />
+            <span className="portal-notif-badge">2</span>
+          </button>
+        </div>
+      </nav>
+
+      {notifOpen && (
+        <div className="portal-notif-drawer">
+          <div className="portal-notif-header">
+            <h3>Notifications</h3>
+            <button className="portal-icon-btn" onClick={() => setNotifOpen(false)}><X size={18} /></button>
+          </div>
+          <div className="portal-notif-item">
+            <strong>New merchant offer available</strong>
+            <p>Nubreed Global Truth is accepting your active Universal Exchange Notes.</p>
+            <span>Today</span>
+          </div>
+          <div className="portal-notif-item">
+            <strong>Collection value updated</strong>
+            <p>Your support vault now includes a future asset preview.</p>
+            <span>Today</span>
+          </div>
+        </div>
+      )}
+
+      <section className="portal-hero">
+        <div className="portal-hero-inner">
+          <div className="portal-hero-copy">
+            <p className="portal-greeting">Welcome back,</p>
+            <h1 className="portal-name">Raquel Holder</h1>
+            <div className="portal-stats-row">
+              <div className="portal-stat"><Wallet size={18} /><div><strong>2</strong><span>Active UENs</span></div></div>
+              <div className="portal-stat"><CheckCircle size={18} /><div><strong>1</strong><span>Times redeemed</span></div></div>
+              <div className="portal-stat"><DollarSign size={18} /><div><strong>$248.00</strong><span>Collection value</span></div></div>
+            </div>
+          </div>
+          <div className="portal-hero-uen-chip">
+            <div className="portal-uen-chip-inner">
+              <span>UENITE Network</span>
+              <strong>4</strong>
+              <span>items owned</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="portal-tabs">
+        <button className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}><Star size={16} /> Collection</button>
+        <button className={`portal-tab ${activeTab === "merchants" ? "active" : ""}`} onClick={() => setActiveTab("merchants")}><Globe size={16} /> Where to Redeem</button>
+        <button className={`portal-tab ${activeTab === "wallet" ? "active" : ""}`} onClick={() => setActiveTab("wallet")}><Wallet size={16} /> My Codes</button>
+      </div>
+
+      {activeTab === "collection" && <HolderCollectionExperience holderName="Raquel" />}
+
+      {activeTab === "merchants" && (
+        <section className="portal-section">
+          <div className="portal-section-inner">
+            <div className="portal-merchant-grid">
+              {demoMerchants.map((merchant) => (
+                <article key={merchant.id} className="portal-merchant-card">
+                  <div className="portal-merchant-offer"><Tag size={16} /><span>{merchant.offer}</span></div>
+                  <h3 className="portal-merchant-name">{merchant.businessName}</h3>
+                  <div className="portal-merchant-meta">
+                    <span className={merchant.availableUens > 0 ? "portal-avail-yes" : "portal-avail-no"}><CheckCircle size={13} /> {merchant.availableUens} available</span>
+                    <span className="portal-redeemed-count"><RefreshCw size={13} /> {merchant.redeemedUens} used</span>
+                  </div>
+                  {merchant.shopUrl ? (
+                    <a className="portal-shop-btn" href={merchant.shopUrl} target="_blank" rel="noopener noreferrer">Shop Now <ExternalLink size={14} /></a>
+                  ) : (
+                    <span className="portal-shop-note">Merchant listing preview</span>
+                  )}
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === "wallet" && (
+        <section className="portal-section">
+          <div className="portal-section-inner">
+            <div className="portal-code-grid">
+              {demoCodes.map((uen) => (
+                <article key={uen.id} className="portal-code-card">
+                  <div className="portal-code-top">
+                    <span className="portal-code-label">UEN Code</span>
+                    <button className="portal-copy-btn" onClick={() => navigator.clipboard.writeText(uen.code)} title="Copy code"><Copy size={14} /></button>
+                  </div>
+                  <div className="portal-code-value">{uen.code}</div>
+                  <div className="portal-code-footer">
+                    <span className={`portal-code-status ${uen.status === "ACTIVE" ? "active" : "inactive"}`}>{uen.status}</span>
+                    <span className="portal-code-meta"><CheckCircle size={12} /> {uen.merchants}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -1102,6 +1277,11 @@ function SiteEditor({
   const selectedIsImage = selectedField && imageFields.has(selectedKey);
   const selectedIsBackground = Boolean(selectedField && backgroundFields.has(String(selectedField)));
   const selectedIsText = selectedField && !selectedIsBackground && selectedField !== "share" && !selectedIsImage && selectedField !== "heroVideoUrl" && selectedField !== "faviconUrl" && selectedField !== "mediaLibrary";
+  const undo = () => {
+    setDraft(initialContent);
+    onPreview(initialContent);
+    setStatus("Preview reset");
+  };
   return (
     <>
       <button className={`site-edit-toggle ${open ? "active" : ""}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onOpenChange(!open); if (!open && !selectedField) onSelect("share"); }} title="Edit public page">
@@ -1161,11 +1341,14 @@ function SiteEditor({
                     ["linear-gradient(135deg, #020617 0%, #0f2f2e 52%, #070b12 100%)", "Midnight market", "midnight"],
                     ["#f8faf6", "Soft light", "light"],
                     ["#0c1a12", "Deep green", "deep"]
-                  ].map(([preset, label, id]) => (
-                    <button className={`preset-tile preset-${id} ${selectedField === "heroBackground" ? draft.heroPreset === id : String(draft[selectedKey] ?? "") === preset ? "active" : ""}`} key={id} type="button" onClick={() => selectedField === "heroBackground" ? update({ heroPreset: id, heroBgImage: "" } as Partial<HomeSiteContent>) : update({ [selectedKey]: preset } as Partial<HomeSiteContent>)}>
-                      <span>{label}</span>
-                    </button>
-                  ))}
+                  ].map(([preset, label, id]) => {
+                    const active = selectedField === "heroBackground" ? draft.heroPreset === id : String(draft[selectedKey] ?? "") === preset;
+                    return (
+                      <button className={`preset-tile preset-${id} ${active ? "active" : ""}`} key={id} type="button" onClick={() => selectedField === "heroBackground" ? update({ heroPreset: id, heroBgImage: "" } as Partial<HomeSiteContent>) : update({ [selectedKey]: preset } as Partial<HomeSiteContent>)}>
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 <label>Background CSS / color / image<input value={selectedField === "heroBackground" ? draft.heroBgImage : String(draft[selectedKey] ?? "")} onChange={(event) => selectedField === "heroBackground" ? update({ heroBgImage: event.target.value }) : update({ [selectedKey]: event.target.value } as Partial<HomeSiteContent>)} placeholder="#07120e or linear-gradient(...) or url(...)" /></label>
                 {selectedField === "heroBackground" && <label>Video URL<input value={draft.heroVideoUrl} onChange={(event) => update({ heroVideoUrl: event.target.value })} placeholder="https://...mp4" /></label>}
@@ -1204,7 +1387,7 @@ function SiteEditor({
             )}
           </div>
           <div className="editor-actions">
-            <button className="ghost" onClick={() => setDraft(initialContent)}>Undo</button>
+            <button className="ghost" onClick={undo}>Undo</button>
             <button onClick={save} disabled={uploading}><UploadCloud size={16} /> {uploading ? "Uploading..." : "Save live"}</button>
           </div>
         </aside>
@@ -1215,10 +1398,13 @@ function SiteEditor({
 
 function LoginPage() {
   return (
-    <main className="public-main login-public">
-      <a className="uenite-logo login-logo" href="/"><Shield size={24} /><span>UENite</span></a>
-      <LoginPanel onLogin={() => { window.location.href = "/admin"; }} />
-    </main>
+    <>
+      <main className="public-main login-public">
+        <a className="uenite-logo login-logo" href="/"><Shield size={24} /><BrandWord /></a>
+        <LoginPanel onLogin={() => { window.location.href = "/admin"; }} />
+      </main>
+      <PoweredByFooter />
+    </>
   );
 }
 
@@ -1254,7 +1440,7 @@ function MerchantRegister() {
   ];
   return (
     <PublicShell>
-      {/* ── Value band ── */}
+      {/* -- Value band -- */}
       <section className="value-band">
         <div className="section-inner">
           <div className="section-heading">
@@ -1274,15 +1460,15 @@ function MerchantRegister() {
         </div>
       </section>
 
-      {/* ── Community image band ── */}
+      {/* -- Community image band -- */}
       <section className="community-band">
         <div className="community-inner">
           <div className="community-text">
             <span className="eyebrow dark"><Users size={16} /> Real buyers, real communities</span>
             <h2>Not cold ads. Warm Holders.</h2>
-            <p>Every Holder has a UEN tied to a creator, ministry, or organization they already support. When they shop with you, they bring real intent — not impulse scrolling.</p>
+            <p>Every Holder has a UEN tied to a creator, ministry, or organization they already support. When they shop with you, they bring real intent - not impulse scrolling.</p>
             <ul className="community-list">
-              <li><CheckCircle size={18} /><span>Holders are pre-qualified — they already have value to spend with you</span></li>
+              <li><CheckCircle size={18} /><span>Holders are pre-qualified - they already have value to spend with you</span></li>
               <li><CheckCircle size={18} /><span>Zero ad spend needed to reach them</span></li>
               <li><CheckCircle size={18} /><span>Each Exchange Hub brings its own community of motivated buyers</span></li>
             </ul>
@@ -1298,13 +1484,13 @@ function MerchantRegister() {
         </div>
       </section>
 
-      {/* ── How it works ── */}
+      {/* -- How it works -- */}
       <section className="how-band" id="how-it-works">
         <div className="section-inner">
           <div className="section-heading">
             <span className="eyebrow dark"><RefreshCw size={16} /> How it works</span>
             <h2>Connect once. Start accepting notes.</h2>
-            <p>Five simple steps from installation to your first Holder checkout — no technical rebuilds required.</p>
+            <p>Five simple steps from installation to your first Holder checkout - no technical rebuilds required.</p>
           </div>
           <div className="steps-grid">
             {stepItems.map(({ Icon, title, body }, index) => (
@@ -1319,7 +1505,7 @@ function MerchantRegister() {
         </div>
       </section>
 
-      {/* ── Network image band ── */}
+      {/* -- Network image band -- */}
       <section className="network-band">
         <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?q=80&w=1400&auto=format&fit=crop" alt="" className="network-bg-img" />
         <div className="network-overlay" />
@@ -1329,12 +1515,12 @@ function MerchantRegister() {
           <div className="network-stats">
             <div><strong>Auto</strong><span>Note syncing</span></div>
             <div><strong>0</strong><span>Manual uploads</span></div>
-            <div><strong>∞</strong><span>Hub connections</span></div>
+            <div><strong>unlimited</strong><span>Hub connections</span></div>
           </div>
         </div>
       </section>
 
-      {/* ── Signup card ── */}
+      {/* -- Signup card -- */}
       <div className="public-card-wrap">
         <section className="public-card signup-card" id="merchant-signup">
           <div className="signup-inner">
@@ -1369,7 +1555,7 @@ function MerchantRegister() {
                 <h3>What you get</h3>
                 <ul>
                   {[
-                    [ShoppingBag, "Your existing Shopify checkout — no changes needed"],
+                    [ShoppingBag, "Your existing Shopify checkout - no changes needed"],
                     [Zap, "Automatic note syncing across all connected hubs"],
                     [SlidersHorizontal, "Full control over offer type, value, and limits"],
                     [TrendingUp, "Access to growing Holder traffic from multiple hubs"],
@@ -1387,7 +1573,7 @@ function MerchantRegister() {
         </section>
       </div>
 
-      {/* ── Benefit strip ── */}
+      {/* -- Benefit strip -- */}
       <section className="benefit-strip-outer">
         <div className="benefit-strip section-inner">
           {["Shopify app connection", "Automatic note syncing", "Access to Holder traffic", "Controlled discounts", "No manual code uploads", "Your store stays in control"].map((item) => (
@@ -1467,7 +1653,7 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
   return (
     <section className="login-panel">
       <h1>Sign in</h1>
-      <p>Access your UENite workspace, merchant tools, Exchange Hub controls, and platform dashboard.</p>
+      <p>Access your UENITE workspace, merchant tools, Exchange Hub controls, and platform dashboard.</p>
       {error && <Notice tone="bad">{error}</Notice>}
       <Input label="Email" value={email} onChange={setEmail} />
       <Input label="Password" value={password} onChange={setPassword} type="password" />
@@ -1522,7 +1708,7 @@ function Dashboard({ user }: { user: any }) {
   const { data, error, loading } = useData<any>(() => api("/api/admin/dashboard"));
   return (
     <>
-      <Header title="Admin Dashboard" subtitle="Operate Exchange Hubs, UEN validity, merchant access, and Shopify syncs." user={user} />
+      <Header title="Admin Dashboard" subtitle="Monitor platform operations, sync health, and system totals." user={user} />
       {error && <Notice tone="bad">{error}</Notice>}
       {loading && <Notice>Loading dashboard...</Notice>}
       {data && (
@@ -1554,7 +1740,7 @@ function Dashboard({ user }: { user: any }) {
 function PagesAdmin({ user }: { user: any }) {
   return (
     <>
-      <Header title="Pages" subtitle="Test public pages, role views, signup flows, and portal experiences." user={user} />
+      <Header title="Public Page Studio" subtitle="Share, preview, and test public pages without mixing them into the operational dashboard." user={user} />
       <SharePanel />
       <PublicPreviews />
     </>
@@ -1563,7 +1749,7 @@ function PagesAdmin({ user }: { user: any }) {
 
 function SharePanel() {
   const links = [
-    ["UENite homepage", `${window.location.origin}/`],
+    ["UENITE homepage", `${window.location.origin}/`],
     ["Merchant signup", `${window.location.origin}/merchants/register`],
     ["Sign in", `${window.location.origin}/login`]
   ];
@@ -1575,7 +1761,7 @@ function SharePanel() {
   return (
     <section className="share-panel">
       <div>
-        <span>Share UENite</span>
+        <span>Share UENITE</span>
         <strong>Send the right link without leaving admin.</strong>
       </div>
       <div className="share-links">
@@ -1594,34 +1780,34 @@ function PublicPreviews() {
     Public: {
       summary: "Brand, education, signup, and login pages.",
       pages: [
-        ["Homepage", "/", "Main UENITE brand and ecosystem story."],
-        ["About", "/about", "Plain-language overview of what UENITE is."],
-        ["Signup Gateway", "/signup", "Role selection for new users."],
-        ["Login", "/login", "Standard sign-in for admins and users."]
+        { label: "Homepage", path: "/", description: "Main UENITE brand and ecosystem story.", access: "Public" },
+        { label: "About", path: "/about", description: "Plain-language overview of what UENITE is.", access: "Public" },
+        { label: "Signup Gateway", path: "/signup", description: "Role selection for new users.", access: "Public" },
+        { label: "Login", path: "/login", description: "Standard sign-in for admins, merchants, hubs, and future users.", access: "Public" }
       ]
     },
     Holder: {
       summary: "Supporter wallet, collection, badges, rewards, and redemption view.",
       pages: [
-        ["Collection Demo", "/holder/collection", "Game-like support vault with value, filters, and details."],
-        ["Holder Signup", "/holder/register", "Holder access form and portal link flow."],
-        ["Holder Portal", "/holder/portal", "Token-based live wallet view. Requires portal token for real data."]
+        { label: "Collection Demo", path: "/holder/collection", description: "Game-like support vault with value, filters, and details.", access: "Public demo" },
+        { label: "Holder Signup", path: "/holder/register", description: "Holder access form and portal link flow.", access: "Public" },
+        { label: "Holder Portal Demo", path: "/holder/portal?demo=1", description: "Preview of the live Holder wallet, collection, merchant directory, and codes.", access: "Demo" }
       ]
     },
     Merchant: {
       summary: "Merchant onboarding, Shopify tools, offers, and redemption setup.",
       pages: [
-        ["Merchant Signup", "/merchants/register", "Public merchant network registration."],
-        ["Shopify App", "/shopify", "Installed merchant app dashboard and sync controls."],
-        ["Merchant Offers", "/offers", "Admin offer management for participating stores."]
+        { label: "Merchant Signup", path: "/merchants/register", description: "Public merchant network registration.", access: "Public" },
+        { label: "Shopify App", path: "/shopify", description: "Installed merchant app dashboard and sync controls.", access: "Login required" },
+        { label: "Merchant Offers", path: "/offers", description: "Admin offer management for participating stores.", access: "Admin" }
       ]
     },
     Hub: {
       summary: "Exchange Hub setup, Holders, UEN generation, and campaign operations.",
       pages: [
-        ["Exchange Hub Signup", "/exchange-hub/register", "Public application path for creators and organizations."],
-        ["Exchange Hubs Admin", "/exchange-hubs", "Create, edit, and suspend Exchange Hubs."],
-        ["Universal Exchange Notes", "/uens", "Generate, disable, remove, or delete Notes."]
+        { label: "Exchange Hub Signup", path: "/exchange-hub/register", description: "Public application path for creators and organizations.", access: "Public" },
+        { label: "Exchange Hubs Admin", path: "/exchange-hubs", description: "Create, edit, and suspend Exchange Hubs.", access: "Admin" },
+        { label: "Universal Exchange Notes", path: "/uens", description: "Generate, disable, remove, or delete Notes.", access: "Admin" }
       ]
     }
   };
@@ -1634,13 +1820,13 @@ function PublicPreviews() {
     setActiveGroup(group);
     setSelectedPage(0);
   };
-  const copySelected = async () => navigator.clipboard.writeText(`${window.location.origin}${selected[1]}`);
+  const copySelected = async () => navigator.clipboard.writeText(`${window.location.origin}${selected.path}`);
   return (
     <section className="preview-panel">
       <div className="preview-panel-head">
         <div>
-          <span>Page testing center</span>
-          <strong>Choose a role, review the purpose, then open the page to test it.</strong>
+          <span>Page testing studio</span>
+          <strong>Preview the page, then open it full size when you need to click through the flow.</strong>
         </div>
         <div className="preview-switcher">
           {(Object.keys(groups) as Array<keyof typeof groups>).map((group) => (
@@ -1653,20 +1839,38 @@ function PublicPreviews() {
           <span>Viewing as</span>
           <strong>{activeGroup}</strong>
           <p>{role.summary}</p>
+          <div className="preview-selected">
+            <small>Selected page</small>
+            <b>{selected.label}</b>
+            <em>{selected.access}</em>
+          </div>
           <div className="preview-actions">
-            <a className="button-link" href={selected[1]} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open selected</a>
+            <a className="button-link" href={selected.path} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open selected</a>
             <button className="ghost" onClick={copySelected}><Copy size={14} /> Copy link</button>
           </div>
         </aside>
         <div className="preview-list">
-          {pages.map(([label, path, description], index) => (
-            <button className={`preview-row ${index === selectedPage ? "active" : ""}`} onClick={() => setSelectedPage(index)} key={path}>
-              <strong>{label}</strong>
-              <span>{description}</span>
-              <small>{path}</small>
+          {pages.map((page, index) => (
+            <button className={`preview-row ${index === selectedPage ? "active" : ""}`} onClick={() => setSelectedPage(index)} key={page.path}>
+              <div>
+                <strong>{page.label}</strong>
+                <small>{page.access}</small>
+              </div>
+              <span>{page.description}</span>
+              <code>{page.path}</code>
             </button>
           ))}
         </div>
+      </div>
+      <div className="preview-frame-shell">
+        <div className="preview-frame-head">
+          <div>
+            <strong>{selected.label}</strong>
+            <span>{selected.description}</span>
+          </div>
+          <code>{selected.path}</code>
+        </div>
+        <iframe key={selected.path} title={`${selected.label} preview`} src={selected.path} />
       </div>
     </section>
   );
@@ -2176,7 +2380,7 @@ function Notice({ children, tone = "neutral" }: { children: React.ReactNode; ton
   return <div className={`notice notice-${tone}`}>{children}</div>;
 }
 
-// ─── HolderRegister ───
+// --- HolderRegister ---
 
 function HolderRegister() {
   const params = new URLSearchParams(window.location.search);
@@ -2217,7 +2421,7 @@ function HolderRegister() {
   return (
     <div className="holder-reg-root">
       <nav className="holder-reg-nav">
-        <a className="uenite-logo" href="/"><Shield size={22} /><span>UENite</span></a>
+        <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
       </nav>
 
       <div className="holder-reg-body">
@@ -2226,7 +2430,7 @@ function HolderRegister() {
             <>
               <div className="holder-reg-icon"><Wallet size={32} /></div>
               <h1 className="holder-reg-title">Access your UEN wallet</h1>
-              <p className="holder-reg-sub">Enter your details to get your personal portal link. If you already have UEN codes from an Exchange Hub, they'll appear in your wallet.</p>
+              <p className="holder-reg-sub">Enter your details to get your personal portal link. If you already have UEN codes from an Exchange Hub, they will appear in your wallet.</p>
 
               {error && <div className="holder-reg-error">{error}</div>}
 
@@ -2238,7 +2442,7 @@ function HolderRegister() {
                     value={form.exchangeHubId}
                     onChange={(e) => setForm({ ...form, exchangeHubId: e.target.value })}
                   >
-                    <option value="">Select your hub…</option>
+                    <option value="">Select your hub...</option>
                     {(hubs.data ?? []).map((h: any) => (
                       <option key={h.id} value={h.id}>{h.displayName}</option>
                     ))}
@@ -2278,7 +2482,7 @@ function HolderRegister() {
                 </label>
 
                 <button className="holder-reg-btn" onClick={submit} disabled={loading}>
-                  {loading ? "Setting up…" : <><Wallet size={16} /> Get My Portal Link</>}
+                  {loading ? "Setting up..." : <><Wallet size={16} /> Get My Portal Link</>}
                 </button>
 
                 <p className="holder-reg-fine">
@@ -2290,7 +2494,7 @@ function HolderRegister() {
             <div className="holder-reg-success">
               <div className="holder-reg-success-icon"><CheckCircle size={40} /></div>
               <h1>You're in, {result.holder.firstName}!</h1>
-              <p>Your personal UEN wallet is ready. Save this link — it's how you access your wallet. Anyone with this link can view your wallet, so keep it private.</p>
+              <p>Your personal UEN wallet is ready. Save this link - it's how you access your wallet. Anyone with this link can view your wallet, so keep it private.</p>
 
               <div className="holder-reg-link-box">
                 <span className="holder-reg-link-text">{window.location.origin + result.portalUrl}</span>
@@ -2304,7 +2508,7 @@ function HolderRegister() {
               </a>
 
               <p className="holder-reg-fine">
-                <strong>{result.holder.exchangeHub}</strong> · {result.holder.email}
+                <strong>{result.holder.exchangeHub}</strong> - {result.holder.email}
               </p>
             </div>
           )}
@@ -2320,7 +2524,7 @@ function HolderRegister() {
                 [ShoppingBag, "Discover participating merchants and their current offers"],
                 [CheckCircle, "Track which codes you've used and where"],
                 [Bell, "Receive notifications and promos from your Exchange Hub"],
-                [Shield, "Your portal link is personal — no password needed"]
+                [Shield, "Your portal link is personal - no password needed"]
               ].map(([Icon, text], i) => (
                 <li key={i}>
                   <span className="holder-reg-perk-icon"><Icon size={16} /></span>
@@ -2331,19 +2535,20 @@ function HolderRegister() {
           </div>
         </div>
       </div>
+      <PoweredByFooter />
     </div>
   );
 }
 
-// ─── HolderPortal ───
+// --- HolderPortal ---
 
 function HolderPortal() {
   const token = portalToken();
-  const wallet = useData<any>(() => portalApi("/api/holder/wallet"), [token]);
-  const merchants = useData<any[]>(() => portalApi("/api/holder/merchants"), [token]);
-  const banners = useData<any[]>(() => portalApi("/api/holder/banners"), [token]);
-  const [activeTab, setActiveTab] = useState<"collection" | "wallet" | "merchants">("collection");
-  const [notifOpen, setNotifOpen] = useState(false);
+  const demoMode = new URLSearchParams(window.location.search).get("demo") === "1";
+
+  if (!token && demoMode) {
+    return <DemoHolderPortal />;
+  }
 
   if (!token) {
     return (
@@ -2355,8 +2560,18 @@ function HolderPortal() {
     );
   }
 
+  return <LiveHolderPortal token={token} />;
+}
+
+function LiveHolderPortal({ token }: { token: string }) {
+  const wallet = useData<any>(() => portalApi("/api/holder/wallet"), [token]);
+  const merchants = useData<any[]>(() => portalApi("/api/holder/merchants"), [token]);
+  const banners = useData<any[]>(() => portalApi("/api/holder/banners"), [token]);
+  const [activeTab, setActiveTab] = useState<"collection" | "wallet" | "merchants">("collection");
+  const [notifOpen, setNotifOpen] = useState(false);
+
   if (wallet.loading) {
-    return <div className="portal-loading"><div className="portal-spinner" /><p>Loading your wallet…</p></div>;
+    return <div className="portal-loading"><div className="portal-spinner" /><p>Loading your wallet...</p></div>;
   }
 
   if (wallet.error || !wallet.data) {
@@ -2463,7 +2678,7 @@ function HolderPortal() {
           </div>
           <div className="portal-hero-uen-chip">
             <div className="portal-uen-chip-inner">
-              <span>UENite Network</span>
+              <span>UENITE Network</span>
               <strong>{totalActive}</strong>
               <span>Notes active</span>
             </div>
@@ -2516,7 +2731,7 @@ function HolderPortal() {
       {activeTab === "merchants" && (
         <section className="portal-section">
           <div className="portal-section-inner">
-            {merchants.loading && <p className="portal-loading-text">Loading merchants…</p>}
+            {merchants.loading && <p className="portal-loading-text">Loading merchants...</p>}
             {(merchants.data ?? []).length === 0 && !merchants.loading && (
               <div className="portal-empty">
                 <ShoppingBag size={40} />
@@ -2613,13 +2828,13 @@ function HolderPortal() {
 
       <footer className="portal-footer">
         <Shield size={16} />
-        <span>Powered by UENite (Universal Exchange Note)</span>
+        <span>Powered by UENITE (Universal Exchange Note)</span>
       </footer>
     </div>
   );
 }
 
-// ─── BannersAdmin ───
+// --- BannersAdmin ---
 
 function BannersAdmin({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
@@ -2656,7 +2871,7 @@ function BannersAdmin({ user }: { user: any }) {
         <div className="banner-preview" style={{ background: form.bgColor, color: form.textColor }}>
           <strong>{form.title || "Banner title preview"}</strong>
           {form.body && <p>{form.body}</p>}
-          {form.linkLabel && <span>{form.linkLabel} →</span>}
+          {form.linkLabel && <span>{`${form.linkLabel} ->`}</span>}
         </div>
         <FormGrid>
           <Input label="Title *" value={form.title} onChange={(title) => setForm({ ...form, title })} />
@@ -2693,7 +2908,7 @@ function BannersAdmin({ user }: { user: any }) {
         rows={banners.data ?? []}
         columns={[
           ["Preview", (r) => <div style={{ background: r.bgColor, color: r.textColor, padding: "6px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, minWidth: 100 }}>{r.title}</div>],
-          ["Body", (r) => r.body ?? "—"],
+          ["Body", (r) => r.body ?? "-"],
           ["Target", (r) => r.targetScope === "ALL" ? "All Holders" : r.targetScope],
           ["Priority", (r) => r.priority],
           ["Status", (r) => <Status value={r.status} />],
@@ -2709,7 +2924,7 @@ function BannersAdmin({ user }: { user: any }) {
   );
 }
 
-// ─── NotificationsAdmin ───
+// --- NotificationsAdmin ---
 
 function NotificationsAdmin({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
@@ -2738,7 +2953,7 @@ function NotificationsAdmin({ user }: { user: any }) {
           <Input label="Title *" value={form.title} onChange={(title) => setForm({ ...form, title })} />
           <label className="wide">
             Message *
-            <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Write your notification message here…" />
+            <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Write your notification message here..." />
           </label>
           <label>
             Send to
@@ -2768,7 +2983,7 @@ function NotificationsAdmin({ user }: { user: any }) {
   );
 }
 
-// ─── Hub Analytics Panel (used inside ExchangeHubs) ───
+// --- Hub Analytics Panel (used inside ExchangeHubs) ---
 
 function HubAnalyticsPanel({ hubId }: { hubId: string }) {
   const [period, setPeriod] = useState("month");
@@ -2795,7 +3010,7 @@ function HubAnalyticsPanel({ hubId }: { hubId: string }) {
           ))}
         </div>
       </div>
-      {loading && <p style={{ color: "#607069", fontSize: 13 }}>Loading…</p>}
+      {loading && <p style={{ color: "#607069", fontSize: 13 }}>Loading...</p>}
       {data && (
         <>
           <div className="analytics-stats">
@@ -2825,7 +3040,7 @@ function HubAnalyticsPanel({ hubId }: { hubId: string }) {
   );
 }
 
-// ─── Merchant Analytics Panel ───
+// --- Merchant Analytics Panel ---
 
 function MerchantAnalyticsPanel({ merchantId }: { merchantId: string }) {
   const [period, setPeriod] = useState("month");
@@ -2841,7 +3056,7 @@ function MerchantAnalyticsPanel({ merchantId }: { merchantId: string }) {
           ))}
         </div>
       </div>
-      {loading && <p style={{ color: "#607069", fontSize: 13 }}>Loading…</p>}
+      {loading && <p style={{ color: "#607069", fontSize: 13 }}>Loading...</p>}
       {data && (
         <div className="analytics-stats">
           <div className="analytics-stat"><strong>{data.totalSyncedUens}</strong><span>Synced UENs</span></div>
@@ -2854,7 +3069,7 @@ function MerchantAnalyticsPanel({ merchantId }: { merchantId: string }) {
   );
 }
 
-// ─── SignupGateway ───
+// --- SignupGateway ---
 
 function SignupGateway() {
   const roles = [
@@ -2865,7 +3080,7 @@ function SignupGateway() {
       body: "You have a Shopify store and want to reach motivated customers who already have a note to spend. Accept Universal Exchange Notes at checkout and grow your customer base through trusted communities.",
       perks: [
         "No changes to your Shopify checkout",
-        "Automatic note syncing — no CSV uploads",
+        "Automatic note syncing - no CSV uploads",
         "You set the offer, discount, and limits",
         "Access to warm traffic from multiple hubs"
       ],
@@ -2879,11 +3094,11 @@ function SignupGateway() {
       icon: Users,
       badge: "For creators & communities",
       title: "I lead a community",
-      body: "You have an audience, congregation, fan base, or following. You want to reward supporters with notes they can use at real stores — turning your community's energy into something tangible.",
+      body: "You have an audience, congregation, fan base, or following. You want to reward supporters with notes they can use at real stores - turning your community's energy into something tangible.",
       perks: [
         "Issue notes to anyone who supports you",
         "Choose which stores your supporters can shop at",
-        "Keep your supporter list — it's your data",
+        "Keep your supporter list - it's your data",
         "Works with your existing Shopify store"
       ],
       cta: "Apply as a Hub",
@@ -2914,7 +3129,7 @@ function SignupGateway() {
   return (
     <div className="signup-gw-root">
       <nav className="signup-gw-nav">
-        <a className="uenite-logo" href="/"><Shield size={22} /><span>UENite</span></a>
+        <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
         <div className="signup-gw-nav-links">
           <a href="/login">Sign in</a>
         </div>
@@ -2923,7 +3138,7 @@ function SignupGateway() {
       <div className="signup-gw-hero">
         <span className="eyebrow"><Star size={16} /> Universal Exchange Note Network</span>
         <h1>Choose how you want to participate</h1>
-        <p>UENite connects creators, stores, and supporters through a simple exchange system. Pick the role that fits you and get started in minutes — no complicated setup, no jargon.</p>
+        <p>UENITE connects creators, stores, and supporters through a simple exchange system. Pick the role that fits you and get started in minutes - no complicated setup, no jargon.</p>
       </div>
 
       <div className="signup-gw-cards">
@@ -2958,13 +3173,13 @@ function SignupGateway() {
 
       <div className="signup-gw-footer">
         <p>Already have an account? <a href="/login">Sign in here</a></p>
-        <p className="signup-gw-powered"><Shield size={14} /> Powered by UENite (Universal Exchange Note)</p>
+        <p className="signup-gw-powered"><Shield size={14} /> Powered by UENITE (Universal Exchange Note)</p>
       </div>
     </div>
   );
 }
 
-// ─── ExchangeHubRegister ───
+// --- ExchangeHubRegister ---
 
 function ExchangeHubRegister() {
   const [form, setForm] = useState({
@@ -3019,17 +3234,17 @@ function ExchangeHubRegister() {
   const whatYouGet = [
     [Ticket, "Issue Universal Exchange Notes to your supporters"],
     [ShoppingBag, "Choose which stores accept notes from your community"],
-    [Users, "Keep your supporter data — it stays with you"],
+    [Users, "Keep your supporter data - it stays with you"],
     [Globe, "Your community gets a private wallet to track their notes"],
-    [Zap, "Works with Shopify — no complex technical setup"],
+    [Zap, "Works with Shopify - no complex technical setup"],
     [Shield, "Full admin dashboard to manage your hub"]
   ];
 
   return (
     <div className="hub-apply-root">
       <nav className="hub-apply-nav">
-        <a className="uenite-logo" href="/"><Shield size={22} /><span>UENite</span></a>
-        <a className="hub-apply-back" href="/signup">← All options</a>
+        <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
+        <a className="hub-apply-back" href="/signup">Back to all options</a>
       </nav>
 
       <div className="hub-apply-body">
@@ -3109,7 +3324,7 @@ function ExchangeHubRegister() {
                 </label>
 
                 <button className="hub-apply-btn" onClick={submit} disabled={loading}>
-                  {loading ? "Submitting…" : <><Users size={16} /> Submit My Application</>}
+                  {loading ? "Submitting..." : <><Users size={16} /> Submit My Application</>}
                 </button>
 
                 <p className="hub-apply-fine">
@@ -3135,7 +3350,7 @@ function ExchangeHubRegister() {
           <div className="hub-apply-side-content">
             <span className="eyebrow"><Star size={16} /> What you get as a Hub</span>
             <h2>Turn your audience into a real exchange network</h2>
-            <p>As an approved Exchange Hub, you can issue Universal Exchange Notes to anyone in your community — and those notes become real value they can spend at participating stores.</p>
+            <p>As an approved Exchange Hub, you can issue Universal Exchange Notes to anyone in your community - and those notes become real value they can spend at participating stores.</p>
             <ul className="hub-apply-perks">
               {whatYouGet.map(([Icon, text], i) => (
                 <li key={i}>
@@ -3151,6 +3366,7 @@ function ExchangeHubRegister() {
           </div>
         </div>
       </div>
+      <PoweredByFooter />
     </div>
   );
 }

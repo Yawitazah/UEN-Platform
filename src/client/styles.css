@@ -407,6 +407,7 @@ th {
   background: white;
   border: 1px solid #d9e2dd;
   border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(23, 32, 27, 0.06);
   margin-bottom: 18px;
   padding: 16px;
 }
@@ -454,7 +455,7 @@ th {
 .preview-console {
   display: grid;
   gap: 14px;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
   margin-top: 14px;
 }
 
@@ -480,6 +481,33 @@ th {
 .preview-context p {
   color: #e4f5eb;
   line-height: 1.45;
+}
+
+.preview-selected {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 10px;
+}
+
+.preview-selected small {
+  color: #bfe8d1;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.preview-selected b {
+  font-size: 16px;
+}
+
+.preview-selected em {
+  color: #f7d774;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .preview-actions {
@@ -523,6 +551,14 @@ th {
   white-space: normal;
 }
 
+.preview-row div {
+  align-items: start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  width: 100%;
+}
+
 .preview-row.active {
   background: #eef8f2;
   border-color: #1f6f5b;
@@ -533,14 +569,65 @@ th {
   font-size: 15px;
 }
 
-.preview-row span {
+.preview-row span,
+.preview-row code {
   color: #607069;
   line-height: 1.35;
 }
 
 .preview-row small {
+  background: #e8f5ed;
+  border-radius: 999px;
   color: #1f6f5b;
   font-weight: 700;
+  padding: 4px 8px;
+}
+
+.preview-row code {
+  background: transparent;
+  color: #1f6f5b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preview-frame-shell {
+  border: 1px solid #d9e2dd;
+  border-radius: 10px;
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.preview-frame-head {
+  align-items: center;
+  background: #f8faf6;
+  border-bottom: 1px solid #d9e2dd;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.preview-frame-head div {
+  display: grid;
+  gap: 3px;
+}
+
+.preview-frame-head span {
+  color: #607069;
+  font-size: 13px;
+}
+
+.preview-frame-head code {
+  color: #1f6f5b;
+  font-weight: 800;
+}
+
+.preview-frame-shell iframe {
+  background: white;
+  border: 0;
+  display: block;
+  height: min(620px, 62vh);
+  width: 100%;
 }
 
 .text-link.dark {
@@ -1894,7 +1981,7 @@ th {
   margin-top: 0;
 }
 
-/* ─── Public pages ─── */
+/* --- Public pages --- */
 
 .public-main {
   background: #f5f7f1;
@@ -1913,7 +2000,7 @@ th {
   z-index: 1;
 }
 
-/* ─── Hero (unchanged — user likes it) ─── */
+/* --- Hero (unchanged - user likes it) --- */
 
 .public-hero {
   background:
@@ -2154,7 +2241,7 @@ th {
   width: 34px;
 }
 
-/* ─── Value band (dark) ─── */
+/* --- Value band (dark) --- */
 
 .value-band {
   background: linear-gradient(160deg, #0c1a12 0%, #0d2118 55%, #0c1a12 100%);
@@ -2254,7 +2341,7 @@ th {
   margin: 0;
 }
 
-/* ─── Community band ─── */
+/* --- Community band --- */
 
 .community-band {
   background: white;
@@ -2389,7 +2476,7 @@ th {
   right: -24px;
 }
 
-/* ─── How it works ─── */
+/* --- How it works --- */
 
 .how-band {
   background: linear-gradient(180deg, #f8faf6 0%, #eef3ee 100%);
@@ -2493,7 +2580,7 @@ th {
   margin: 0;
 }
 
-/* ─── Network band (photo + stats overlay) ─── */
+/* --- Network band (photo + stats overlay) --- */
 
 .network-band {
   overflow: hidden;
@@ -2559,7 +2646,7 @@ th {
   font-size: 14px;
 }
 
-/* ─── Signup card ─── */
+/* --- Signup card --- */
 
 .public-card-wrap {
   margin: 32px auto 0;
@@ -2673,7 +2760,7 @@ th {
   width: 100%;
 }
 
-/* ─── Benefit strip ─── */
+/* --- Benefit strip --- */
 
 .benefit-strip-outer {
   background: #0c1a12;
@@ -2709,7 +2796,7 @@ th {
   color: #75e3ad;
 }
 
-/* ─── Success panel ─── */
+/* --- Success panel --- */
 
 .success-panel {
   align-items: start;
@@ -2731,7 +2818,7 @@ th {
   line-height: 1.55;
 }
 
-/* ─── Compact install shell ─── */
+/* --- Compact install shell --- */
 
 .public-main-compact .public-hero {
   min-height: 360px;
@@ -2942,10 +3029,17 @@ th {
 }
 
 .collection-console-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.75fr) 160px;
+}
+
+.collection-filter-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  grid-column: 1 / -1;
 }
 
 .collection-console-toolbar button {
@@ -2959,6 +3053,56 @@ th {
   background: #75e3ad;
   border-color: #75e3ad;
   color: #07120e;
+}
+
+.collection-search,
+.collection-sort {
+  color: #c7d9d0;
+  display: grid;
+  font-size: 12px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.collection-search > div {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.collection-search svg {
+  color: #75e3ad;
+  flex-shrink: 0;
+}
+
+.collection-search input,
+.collection-sort select {
+  background: transparent;
+  border: 0;
+  color: white;
+  min-height: 34px;
+  padding: 0;
+}
+
+.collection-search input::placeholder {
+  color: rgba(232, 251, 241, 0.55);
+}
+
+.collection-sort select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 0 12px;
+}
+
+.collection-sort option {
+  background: #0d2118;
+  color: white;
 }
 
 .collection-inventory {
@@ -2996,6 +3140,29 @@ th {
 .collection-tile strong {
   font-size: 22px;
   line-height: 1.05;
+}
+
+.collection-empty {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  color: #c7d9d0;
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  justify-items: center;
+  min-height: 170px;
+  padding: 24px;
+  text-align: center;
+}
+
+.collection-empty svg {
+  color: #75e3ad;
+}
+
+.collection-empty strong {
+  color: white;
 }
 
 .collection-detail {
@@ -3047,6 +3214,17 @@ th {
   text-align: right;
 }
 
+.collection-action-message {
+  background: #eef8f2;
+  border: 1px solid #cfe7d9;
+  border-radius: 10px;
+  color: #29453c;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  padding: 10px;
+}
+
 .collection-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3087,7 +3265,7 @@ th {
   width: 28px;
 }
 
-/* ─── Signup form overrides ─── */
+/* --- Signup form overrides --- */
 
 /* Clean up the form grid inside the signup card */
 .signup-left .form-grid {
@@ -3103,7 +3281,7 @@ th {
   width: 100%;
 }
 
-/* ─── Responsive ─── */
+/* --- Responsive --- */
 
 @media (max-width: 900px) {
   .app,
@@ -3314,6 +3492,10 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .collection-console-toolbar {
+    grid-template-columns: 1fr;
+  }
+
   .collection-inventory {
     grid-template-columns: 1fr;
   }
@@ -3331,9 +3513,18 @@ th {
   .preview-console {
     grid-template-columns: 1fr;
   }
+
+  .preview-frame-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .preview-frame-shell iframe {
+    height: 520px;
+  }
 }
 
-/* ─── Animations ─── */
+/* --- Animations --- */
 
 @keyframes floatIn {
   from {
@@ -3442,9 +3633,9 @@ th {
   }
 }
 
-/* ══════════════════════════════════════════════
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    HOLDER PORTAL
-══════════════════════════════════════════════ */
+------------------------------------------------------------------------------------------------------------------------------------------ */
 
 .portal-root {
   background: #07120e;
@@ -3972,6 +4163,14 @@ th {
   opacity: 0.88;
 }
 
+.portal-shop-note {
+  color: #7fa898;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+
 /* Code grid */
 .portal-code-grid {
   display: grid;
@@ -4097,9 +4296,9 @@ th {
   padding: 24px;
 }
 
-/* ══════════════════════════════════════════════
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    ANALYTICS PANELS
-══════════════════════════════════════════════ */
+------------------------------------------------------------------------------------------------------------------------------------------ */
 
 .analytics-panel {
   background: white;
@@ -4195,9 +4394,9 @@ th {
   font-size: 13px;
 }
 
-/* ══════════════════════════════════════════════
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    BANNER PREVIEW
-══════════════════════════════════════════════ */
+------------------------------------------------------------------------------------------------------------------------------------------ */
 
 .banner-preview {
   border-radius: 12px;
@@ -4252,9 +4451,9 @@ th {
   }
 }
 
-/* ══════════════════════════════════════════════
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    HOLDER REGISTRATION PAGE
-══════════════════════════════════════════════ */
+------------------------------------------------------------------------------------------------------------------------------------------ */
 
 .holder-reg-root {
   background:
@@ -4536,9 +4735,9 @@ th {
   }
 }
 
-/* ══════════════════════════════════════════════
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    SIGNUP GATEWAY PAGE
-══════════════════════════════════════════════ */
+------------------------------------------------------------------------------------------------------------------------------------------ */
 
 .signup-gw-root {
   background:
@@ -4779,9 +4978,9 @@ th {
   }
 }
 
-/* ══════════════════════════════════════════════
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    EXCHANGE HUB APPLY PAGE
-══════════════════════════════════════════════ */
+------------------------------------------------------------------------------------------------------------------------------------------ */
 
 .hub-apply-root {
   background:
