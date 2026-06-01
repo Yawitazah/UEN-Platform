@@ -5548,6 +5548,7 @@ th {
 .collection-tile-album.active { border-color: #75e3ad; box-shadow: 0 0 0 2px rgba(117,227,173,0.35), 0 8px 32px rgba(0,0,0,0.5); }
 
 .tile-art-img {
+  animation: artBreathe 9s ease-in-out infinite;
   bottom: 0;
   height: 100%;
   left: 0;
@@ -5556,12 +5557,15 @@ th {
   position: absolute;
   right: 0;
   top: 0;
+  transform-origin: center center;
   width: 100%;
-  transition: filter 0.3s, transform 0.3s;
+}
+@keyframes artBreathe {
+  0%, 100% { transform: scale(1);    filter: saturate(1); }
+  50%       { transform: scale(1.07); filter: saturate(1.15); }
 }
 .collection-tile-album:hover .tile-art-img {
-  filter: blur(2px) saturate(1.3);
-  transform: scale(1.04);
+  animation-duration: 4s;
 }
 
 .tile-art-overlay {
@@ -5570,13 +5574,11 @@ th {
   position: absolute;
 }
 
-/* Vinyl record */
+/* Vinyl record — top-left corner */
 .tile-vinyl-wrap {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  padding: 20px 0 10px;
-  position: relative;
+  left: 12px;
+  position: absolute;
+  top: 12px;
   z-index: 2;
 }
 
@@ -5927,7 +5929,6 @@ th {
 
 /* ── Static glass dome: corner glints + silver surface film ── */
 .tile-glass-dome {
-  border-radius: 18px;
   inset: 0;
   pointer-events: none;
   position: absolute;
@@ -5946,7 +5947,6 @@ th {
 
 /* ── Top rim: thin bright edge at the very top ── */
 .tile-glass-top-edge {
-  border-radius: 18px 18px 0 0;
   height: 2px;
   inset: 0 8px auto 8px;
   pointer-events: none;
@@ -5960,7 +5960,6 @@ th {
 
 /* ── Sweeping shimmer across the glass face ── */
 .tile-glass-shimmer {
-  border-radius: 18px;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
