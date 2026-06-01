@@ -5812,36 +5812,108 @@ th {
 }
 
 /* ═══════════════════════════════════════════
-   GLASS TROPHY ALBUM TILE
+   GLASS TROPHY ALBUM TILE — LED BORDER
 ═══════════════════════════════════════════ */
+
+/* Animatable custom property — the LED position around the border */
+@property --led-pos {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 
 .tile-album-frame {
   border-radius: 20px;
   position: relative;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s;
 }
 .tile-album-frame:hover { transform: translateY(-4px); }
+.tile-album-frame > button { position: relative; z-index: 2; }
 
-/* Static glowing border — like acrylic/glass edge lighting */
-.tile-album-frame > button.collection-tile-album {
-  border: 1px solid rgba(255,255,255,0.28);
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.06),
-    inset 0 0 0 1px rgba(255,255,255,0.08),
-    0 8px 32px rgba(0,0,0,0.55);
-  position: relative;
-  z-index: 2;
-}
-.tile-album-frame.active > button.collection-tile-album {
-  border-color: rgba(117,227,173,0.55);
-  box-shadow:
-    0 0 0 1px rgba(117,227,173,0.12),
-    inset 0 0 0 1px rgba(117,227,173,0.1),
-    0 0 28px rgba(117,227,173,0.2),
-    0 8px 32px rgba(0,0,0,0.55);
+/* ── LED strip chasing around the border ── */
+.tile-album-frame::before {
+  --led-pos: 0deg;
+  animation: ledChase 3s linear infinite;
+  border-radius: 20px;
+  content: "";
+  inset: -2px;
+  padding: 2px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 10;
+  /* Conic gradient: bright LED dot + trailing glow, rest is dim base */
+  background: conic-gradient(
+    from var(--led-pos),
+    rgba(255,255,255,0.06)  0deg,
+    rgba(255,255,255,0.06)  322deg,
+    rgba(117,227,173,0.18)  332deg,
+    rgba(117,227,173,0.55)  340deg,
+    rgba(200,255,230,0.88)  348deg,
+    rgba(255,255,255,1)     352deg,
+    rgba(255,255,255,1)     355deg,
+    rgba(200,255,230,0.85)  358deg,
+    rgba(117,227,173,0.4)   362deg,
+    rgba(255,255,255,0.1)   368deg,
+    rgba(255,255,255,0.06)  375deg
+  );
+  /* Mask: show only the border ring, hide the tile interior */
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
 }
 
-/* ── Static glass dome: locked specular highlights (never move) ── */
+/* Active: faster chase + green-shifted LED */
+.tile-album-frame.active::before {
+  animation-duration: 1.8s;
+  background: conic-gradient(
+    from var(--led-pos),
+    rgba(117,227,173,0.1)   0deg,
+    rgba(117,227,173,0.1)   318deg,
+    rgba(117,227,173,0.35)  330deg,
+    rgba(117,227,173,0.8)   340deg,
+    rgba(200,255,230,0.95)  348deg,
+    rgba(255,255,255,1)     352deg,
+    rgba(255,255,255,1)     355deg,
+    rgba(200,255,230,0.9)   358deg,
+    rgba(117,227,173,0.6)   364deg,
+    rgba(117,227,173,0.2)   372deg,
+    rgba(117,227,173,0.1)   378deg
+  );
+}
+
+/* Hover: slightly faster */
+.tile-album-frame:hover:not(.active)::before { animation-duration: 2.4s; }
+
+@keyframes ledChase {
+  from { --led-pos: 0deg; }
+  to   { --led-pos: 360deg; }
+}
+
+/* Outer glow that pulses with the LED color */
+.tile-album-frame::after {
+  animation: ledGlow 3s linear infinite;
+  border-radius: 22px;
+  content: "";
+  inset: -4px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+  box-shadow: 0 0 18px 2px rgba(117,227,173,0.12), 0 8px 32px rgba(0,0,0,0.5);
+}
+.tile-album-frame.active::after {
+  box-shadow: 0 0 28px 4px rgba(117,227,173,0.28), 0 8px 32px rgba(0,0,0,0.5);
+}
+@keyframes ledGlow {
+  0%, 100% { opacity: 0.7; }
+  50%       { opacity: 1; }
+}
+
+/* ── Static glass dome: corner glints + silver surface film ── */
 .tile-glass-dome {
   border-radius: 18px;
   inset: 0;
@@ -5849,52 +5921,32 @@ th {
   position: absolute;
   z-index: 4;
   background:
-    /* Corner glint — top-left bright spot, like a jewel corner */
     radial-gradient(ellipse 18% 14% at 6% 5%,
-      rgba(255,255,255,0.92) 0%,
-      rgba(255,255,255,0.45) 35%,
-      transparent 100%
-    ),
-    /* Top-right corner glint */
-    radial-gradient(ellipse 14% 10% at 94% 4%,
-      rgba(255,255,255,0.6) 0%,
-      rgba(255,255,255,0.22) 40%,
-      transparent 100%
-    ),
-    /* Bottom-left corner catch */
-    radial-gradient(ellipse 10% 8% at 5% 96%,
-      rgba(255,255,255,0.3) 0%,
-      transparent 100%
-    ),
-    /* Glass surface tint — very faint silver film */
+      rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.4) 38%, transparent 100%),
+    radial-gradient(ellipse 13% 10% at 94% 4%,
+      rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 45%, transparent 100%),
+    radial-gradient(ellipse 9% 7% at 5% 96%,
+      rgba(255,255,255,0.28) 0%, transparent 100%),
     linear-gradient(148deg,
-      rgba(255,255,255,0.06) 0%,
-      rgba(255,255,255,0.01) 45%,
-      transparent 65%,
-      rgba(255,255,255,0.03) 100%
-    );
+      rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 48%,
+      transparent 65%, rgba(255,255,255,0.03) 100%);
 }
 
-/* ── Top rim highlight — static bright edge across the top ── */
+/* ── Top rim: thin bright edge at the very top ── */
 .tile-glass-top-edge {
   border-radius: 18px 18px 0 0;
   height: 2px;
-  left: 8px;
+  inset: 0 8px auto 8px;
   pointer-events: none;
   position: absolute;
-  right: 8px;
-  top: 0;
   z-index: 5;
   background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(255,255,255,0.45) 15%,
-    rgba(255,255,255,0.9)  50%,
-    rgba(255,255,255,0.45) 85%,
-    transparent 100%
-  );
+    transparent 0%, rgba(255,255,255,0.4) 18%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 82%, transparent 100%);
 }
 
-/* ── Sweeping shimmer — light traveling ACROSS the glass face ── */
+/* ── Sweeping shimmer across the glass face ── */
 .tile-glass-shimmer {
   border-radius: 18px;
   inset: 0;
@@ -5903,22 +5955,14 @@ th {
   position: absolute;
   z-index: 6;
 }
-
-/* Primary sweep: wide diagonal band */
 .tile-glass-shimmer::before {
   animation: shimmerSweep 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  background: linear-gradient(
-    108deg,
-    transparent       0%,
-    transparent       28%,
-    rgba(255,255,255,0.03) 36%,
-    rgba(255,255,255,0.18) 44%,
-    rgba(255,255,255,0.55) 50%,
-    rgba(255,255,255,0.18) 56%,
-    rgba(255,255,255,0.03) 64%,
-    transparent       72%,
-    transparent       100%
-  );
+  background: linear-gradient(108deg,
+    transparent 0%, transparent 28%,
+    rgba(255,255,255,0.03) 36%, rgba(255,255,255,0.18) 44%,
+    rgba(255,255,255,0.52) 50%,
+    rgba(255,255,255,0.18) 56%, rgba(255,255,255,0.03) 64%,
+    transparent 72%, transparent 100%);
   content: "";
   height: 200%;
   left: 0;
@@ -5926,21 +5970,13 @@ th {
   top: -50%;
   width: 60%;
 }
-
-/* Secondary sweep: narrower, delayed, slightly different angle */
 .tile-glass-shimmer::after {
   animation: shimmerSweep 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  animation-delay: 0.18s;
-  background: linear-gradient(
-    112deg,
-    transparent       0%,
-    transparent       38%,
-    rgba(255,255,255,0.02) 44%,
-    rgba(255,255,255,0.12) 50%,
-    rgba(255,255,255,0.02) 56%,
-    transparent       62%,
-    transparent       100%
-  );
+  animation-delay: 0.2s;
+  background: linear-gradient(112deg,
+    transparent 0%, transparent 40%,
+    rgba(255,255,255,0.1) 50%,
+    transparent 60%, transparent 100%);
   content: "";
   height: 200%;
   left: 0;
@@ -5948,17 +5984,7 @@ th {
   top: -50%;
   width: 40%;
 }
-
 @keyframes shimmerSweep {
   0%        { transform: translateX(-120%); }
-  /* Fast cross, then long pause */
   28%, 100% { transform: translateX(400%); }
-}
-
-/* On hover, trigger an extra shimmer pass */
-.tile-album-frame:hover .tile-glass-shimmer::before {
-  animation-duration: 3.5s;
-}
-.tile-album-frame:hover .tile-glass-shimmer::after {
-  animation-duration: 3.5s;
 }
