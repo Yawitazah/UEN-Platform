@@ -61,8 +61,8 @@ router.get("/holder/digital-products/:id", async (req, res) => {
       prisma.digitalProductLike.groupBy({ by: ["trackId"], where: { trackId: { in: trackIds } }, _count: true }),
       prisma.digitalProductLike.findMany({ where: { holderId: holder.id, trackId: { in: trackIds } } })
     ]);
-    const likeCountMap = Object.fromEntries(likeCounts.map((l) => [l.trackId, l._count]));
-    const holderLikedSet = new Set(holderLikes.map((l) => l.trackId));
+    const likeCountMap = Object.fromEntries(likeCounts.map((l: { trackId: string; _count: number }) => [l.trackId, l._count]));
+    const holderLikedSet = new Set(holderLikes.map((l: { trackId: string }) => l.trackId));
 
     const tracks = product.tracks.map((t) => ({
       ...t,

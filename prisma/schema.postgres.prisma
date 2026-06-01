@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model AdminUser {
@@ -37,6 +38,7 @@ model ExchangeHub {
   accessRules            MerchantAccessRule[]
   issuanceProducts       ShopifyIssuanceProduct[]
   inventoryCodes         UenCodeInventory[]
+  digitalProducts        DigitalProduct[]
 }
 
 model Holder {
@@ -53,6 +55,8 @@ model Holder {
   exchangeHub            ExchangeHub             @relation(fields: [exchangeHubId], references: [id])
   universalExchangeNotes UniversalExchangeNote[]
   notifications          HolderNotification[]
+  digitalProductLikes    DigitalProductLike[]
+  digitalProductComments DigitalProductComment[]
 
   @@index([exchangeHubId])
   @@unique([exchangeHubId, email])
@@ -179,10 +183,12 @@ model ShopifyIssuanceProduct {
   productTitle     String?
   productImageUrl  String?
   digitalAssetUrl  String?
+  digitalProductId String?
   status           String           @default("ACTIVE")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   exchangeHub      ExchangeHub      @relation(fields: [exchangeHubId], references: [id])
+  digitalProduct   DigitalProduct?  @relation(fields: [digitalProductId], references: [id])
   issuanceLogs     UenIssuanceLog[]
   inventoryCodes   UenCodeInventory[]
 
@@ -364,4 +370,64 @@ model SiteContent {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model DigitalProduct {
+  id               String                @id @default(cuid())
+  exchangeHubId    String
+  title            String
+  artist           String?
+  type             String                @default("ALBUM")
+  artworkUrl       String?
+  description      String?
+  status           String                @default("ACTIVE")
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  exchangeHub      ExchangeHub           @relation(fields: [exchangeHubId], references: [id])
+  tracks           DigitalProductTrack[]
+  issuanceProducts ShopifyIssuanceProduct[]
+
+  @@index([exchangeHubId])
+}
+
+model DigitalProductTrack {
+  id               String                  @id @default(cuid())
+  digitalProductId String
+  title            String
+  trackNumber      Int
+  fileUrl          String
+  durationSeconds  Int?
+  status           String                  @default("ACTIVE")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  digitalProduct   DigitalProduct          @relation(fields: [digitalProductId], references: [id])
+  likes            DigitalProductLike[]
+  comments         DigitalProductComment[]
+
+  @@index([digitalProductId])
+}
+
+model DigitalProductLike {
+  id        String              @id @default(cuid())
+  holderId  String
+  trackId   String
+  createdAt DateTime            @default(now())
+  holder    Holder              @relation(fields: [holderId], references: [id])
+  track     DigitalProductTrack @relation(fields: [trackId], references: [id])
+
+  @@unique([holderId, trackId])
+  @@index([trackId])
+}
+
+model DigitalProductComment {
+  id               String              @id @default(cuid())
+  holderId         String
+  trackId          String
+  timestampSeconds Int                 @default(0)
+  body             String
+  createdAt        DateTime            @default(now())
+  holder           Holder              @relation(fields: [holderId], references: [id])
+  track            DigitalProductTrack @relation(fields: [trackId], references: [id])
+
+  @@index([trackId, timestampSeconds])
 }
