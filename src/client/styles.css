@@ -5891,6 +5891,7 @@ html { background: #050e09; }
 .tile-album-frame:hover { transform: translateY(-4px); }
 .tile-album-frame > button {
   display: flex;
+  height: 100%;
   position: relative;
   width: 100%;
   z-index: 2;
