@@ -5547,15 +5547,22 @@ th {
 .collection-tile-album:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.6); transform: translateY(-3px); }
 .collection-tile-album.active { border-color: #75e3ad; box-shadow: 0 0 0 2px rgba(117,227,173,0.35), 0 8px 32px rgba(0,0,0,0.5); }
 
-.tile-art-bg {
-  background-size: cover;
-  background-position: center;
-  bottom: 0; left: 0; right: 0; top: 0;
-  filter: blur(0px) saturate(1.1);
+.tile-art-img {
+  bottom: 0;
+  height: 100%;
+  left: 0;
+  object-fit: cover;
+  object-position: center;
   position: absolute;
-  transition: filter 0.3s;
+  right: 0;
+  top: 0;
+  width: 100%;
+  transition: filter 0.3s, transform 0.3s;
 }
-.collection-tile-album:hover .tile-art-bg { filter: blur(2px) saturate(1.3); }
+.collection-tile-album:hover .tile-art-img {
+  filter: blur(2px) saturate(1.3);
+  transform: scale(1.04);
+}
 
 .tile-art-overlay {
   background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.72) 100%);

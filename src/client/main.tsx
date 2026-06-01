@@ -1411,7 +1411,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
               return (
                 <div key={item.id} className={`tile-album-frame ${isActive ? "active" : ""}`}>
                   <button className={`collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
-                    <div className="tile-art-bg" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
+                    <img className="tile-art-img" src={item.artworkUrl} alt="" aria-hidden="true" />
                     <div className="tile-art-overlay" />
                     {/* Glass dome — static corner glints + silver film */}
                     <div className="tile-glass-dome" />
