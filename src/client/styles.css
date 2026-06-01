@@ -5550,7 +5550,6 @@ th {
 .tile-art-bg {
   background-size: cover;
   background-position: center;
-  border-radius: 18px;
   bottom: 0; left: 0; right: 0; top: 0;
   filter: blur(0px) saturate(1.1);
   position: absolute;
@@ -5560,7 +5559,6 @@ th {
 
 .tile-art-overlay {
   background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.72) 100%);
-  border-radius: 18px;
   bottom: 0; left: 0; right: 0; top: 0;
   position: absolute;
 }
