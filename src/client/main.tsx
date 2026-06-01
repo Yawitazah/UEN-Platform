@@ -1410,7 +1410,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             if (item.artworkUrl && item.assetType === "ALBUM") {
               return (
                 <div key={item.id} className={`tile-album-frame ${isActive ? "active" : ""}`}>
-                  <button className={`collection-tile collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  <button className={`collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
                     <div className="tile-art-bg" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
                     <div className="tile-art-overlay" />
                     {/* Glass dome — static corner glints + silver film */}
