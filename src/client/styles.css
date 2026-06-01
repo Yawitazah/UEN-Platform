@@ -3117,7 +3117,18 @@ th {
 .collection-inventory {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Single item spans full width */
+.collection-inventory > *:only-child {
+  grid-column: 1 / -1;
+}
+
+/* Last item alone in its row spans full width */
+.collection-inventory > .tile-album-frame:last-child:nth-child(odd),
+.collection-inventory > button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .collection-tile {
