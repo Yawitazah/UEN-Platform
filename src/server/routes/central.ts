@@ -5,6 +5,7 @@ import path from "node:path";
 import express from "express";
 import { z, ZodError } from "zod";
 import { audit } from "../audit";
+import { config } from "../config";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import { requireMerchantAccess, requireRole } from "../security";
@@ -73,6 +74,14 @@ async function generatedCode(prefix = "") {
 function publicConnection(connection: { accessToken: string; [key: string]: unknown }) {
   const { accessToken: _accessToken, ...safe } = connection;
   return safe;
+}
+
+function appOrigin(req: express.Request) {
+  return (config.shopifyAppUrl || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+}
+
+function absoluteAppUrl(req: express.Request, targetPath: string) {
+  return `${appOrigin(req)}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}`;
 }
 
 async function syncInventoryCodesToMerchantStores(exchangeHubId: string, inventoryCodes: Array<{ id: string; code: string }>) {
@@ -300,9 +309,14 @@ router.post("/merchant-onboarding/register", async (req, res) => {
       }
     });
 
+    const installPath = `/merchant/install/${token}`;
+    const shopifyInstallPath = `/shopify/auth?shop=${encodeURIComponent(onboarding.shopDomain)}&onboardingToken=${encodeURIComponent(onboarding.token)}`;
+
     res.status(201).json({
       token,
-      installUrl: `/merchant/install/${token}`,
+      installPath,
+      installUrl: absoluteAppUrl(req, installPath),
+      shopifyInstallUrl: absoluteAppUrl(req, shopifyInstallPath),
       onboarding: {
         id: onboarding.id,
         businessName: onboarding.businessName,
@@ -331,7 +345,10 @@ router.get("/merchant-onboarding/:token", async (req, res) => {
     merchantStatus: onboarding.merchant.status,
     offer: onboarding.merchant.offers[0] ?? null,
     exchangeHubs: onboarding.merchant.accessRules.map((rule) => rule.exchangeHub.displayName),
-    installUrl: `/shopify/auth?shop=${encodeURIComponent(onboarding.shopDomain)}&onboardingToken=${encodeURIComponent(onboarding.token)}`
+    installUrl: absoluteAppUrl(
+      req,
+      `/shopify/auth?shop=${encodeURIComponent(onboarding.shopDomain)}&onboardingToken=${encodeURIComponent(onboarding.token)}`
+    )
   });
 });
 

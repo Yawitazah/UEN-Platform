@@ -58,6 +58,19 @@ Production-minded MVP for a Universal Exchange Note platform with a Shopify merc
 
 Local Shopify sync runs in mock mode by default using `SHOPIFY_SYNC_MODE=mock`, so syncing `1234567UEN` creates mock Shopify discount IDs without calling Shopify. Set `SHOPIFY_SYNC_MODE=live`, store a real offline Shopify access token in `ShopifyConnection.accessToken`, and keep scopes as `read_discounts,write_discounts,read_orders,read_products` to call the Shopify Admin GraphQL API.
 
+## Shopify install link strategy
+
+Use two links together:
+
+1. Shopify Partner Dashboard install link: This is generated from the app Distribution page and is the link Shopify uses to authorize an app install on a merchant store.
+2. UEN merchant onboarding link: This app creates `/merchant/install/:token` links for store owners. The page confirms the merchant details and sends the owner into the Shopify OAuth install flow.
+
+For private friend installs, Shopify has two different paths:
+
+- Custom distribution: no App Store listing or review. Generate a store-specific install link for one Shopify store, for multiple stores in the same Plus organization, or for transfer-disabled development stores.
+- Public distribution with limited visibility: not searchable in the public App Store, but still uses an App Store listing URL and requires Shopify review. Use this when you want a broader non-searchable listing flow instead of generating a custom link per store.
+
+The generated UEN onboarding links are only valid if the Shopify app itself is configured with a distribution method that allows the target store to install it.
 ## Connect a real Shopify store for testing
 
 In the Shopify Dev Dashboard version screen, use:
@@ -67,6 +80,8 @@ In the Shopify Dev Dashboard version screen, use:
 - Redirect URLs: `https://your-public-domain.example/shopify/auth/callback`
 - Preferences URL: `https://your-public-domain.example/shopify`
 - Embed app in Shopify admin: off for this MVP unless you add App Bridge and embedded-session handling
+- Webhook endpoint for paid orders: `https://your-public-domain.example/shopify/webhooks/orders-paid`
+- Privacy webhook endpoint: `https://your-public-domain.example/shopify/webhooks/privacy`
 
 Set the app credentials and public URL locally:
 
@@ -86,6 +101,35 @@ https://your-public-domain.example/shopify/auth?shop=your-store.myshopify.com
 ```
 
 The callback stores the offline Admin API token server-side in `ShopifyConnection`.
+
+Before using the app with a real store, make sure the Shopify app version grants every scope in `SHOPIFY_SCOPES`. The OAuth callback rejects installs that return a smaller scope set than the server expects.
+
+For privacy compliance, configure Shopify privacy/compliance webhook topics to send to:
+
+```text
+https://your-public-domain.example/shopify/webhooks/privacy
+```
+
+The endpoint verifies Shopify's webhook HMAC and handles:
+
+- `customers/data_request` by recording an audit entry for follow-up.
+- `customers/redact` by anonymizing matching holder/customer records and removing related notifications.
+- `shop/redact` by redacting stored Shopify connection data and marking shop-specific synced records redacted.
+
+For a Shopify CLI-managed app, the equivalent TOML webhook block is:
+
+```toml
+[webhooks]
+api_version = "2026-01"
+
+[[webhooks.subscriptions]]
+topics = ["orders/paid"]
+uri = "https://your-public-domain.example/shopify/webhooks/orders-paid"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://your-public-domain.example/shopify/webhooks/privacy"
+```
 
 For manual token testing instead of OAuth, create or install a Shopify app with Admin API scopes `read_discounts`, `write_discounts`, `read_orders`, and `read_products`, then run:
 

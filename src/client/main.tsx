@@ -2039,8 +2039,10 @@ function MerchantRegister() {
                 <div className="success-panel">
                   <Ticket size={32} />
                   <h3>Registration created</h3>
-                  <p>Your install page is ready. Open it to connect Shopify and activate the merchant app.</p>
+                  <p>Your shareable install page is ready. Send this link to the store owner so they can connect Shopify.</p>
                   <span>Store {result.onboarding.shopDomain}</span>
+                  <span>Install link {result.installUrl}</span>
+                  <button type="button" className="button-link button-link-large" onClick={() => navigator.clipboard.writeText(result.installUrl)}><Copy size={16} /> Copy Install Link</button>
                   <a className="button-link button-link-large" href={result.installUrl}>Open Install Instructions</a>
                 </div>
               ) : (
@@ -2101,7 +2103,7 @@ function MerchantInstall() {
         {onboarding.loading && <Notice>Loading install details...</Notice>}
         {onboarding.data && (
           <>
-            {installed && <Notice>Shopify is connected. You can now configure the merchant offer in the embedded app.</Notice>}
+            {installed && <Notice>Shopify is connected. You can now configure the merchant offer in the UEN merchant dashboard.</Notice>}
             <div className="facts">
               <span>Merchant {onboarding.data.businessName}</span>
               <span>Store {onboarding.data.shopDomain}</span>
