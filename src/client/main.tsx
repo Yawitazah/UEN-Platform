@@ -1437,16 +1437,38 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
               );
             }
 
-            // ── Badge tile ──
+            // ── Badge tile — PS4/PS5 style achievement ──
             if (item.type.includes("Badge") || item.type.includes("Achievement")) {
               return (
-                <button key={item.id} className={`collection-tile collection-tile-badge ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
-                  <div className="tile-badge-icon">
-                    <Star size={28} />
+                <button key={item.id} className={`collection-tile-badge ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  {item.artworkUrl ? (
+                    // Exchange Hub custom artwork
+                    <img className="tile-art-img" src={item.artworkUrl} alt="" aria-hidden="true" />
+                  ) : (
+                    // Default — premium achievement visual
+                    <>
+                      <div className="badge-bg-atmos" />
+                      <div className="badge-rays" />
+                      <div className="badge-medal-wrap">
+                        <div className="badge-medal">
+                          <div className="badge-medal-inner" />
+                          <div className="badge-medal-shine" />
+                          <div className="badge-medal-icon">
+                            <span className="badge-heart-symbol">♥</span>
+                          </div>
+                          <div className="badge-sparkle badge-sparkle-1">✦</div>
+                          <div className="badge-sparkle badge-sparkle-2">✦</div>
+                        </div>
+                        <div className="badge-medal-glow" />
+                        <div className="badge-medal-glow badge-medal-glow-2" />
+                      </div>
+                    </>
+                  )}
+                  <div className="badge-info-bar">
+                    <span className="badge-type-tag">{typeLabel}</span>
+                    <strong className="badge-title-text">{item.title}</strong>
+                    <small className="badge-meta-text">{item.rarity} · {item.value}</small>
                   </div>
-                  <span>{typeLabel}</span>
-                  <strong>{item.title}</strong>
-                  <small>{item.rarity} · {item.value}</small>
                 </button>
               );
             }
