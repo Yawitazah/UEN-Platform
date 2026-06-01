@@ -1413,9 +1413,11 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
                   <button className={`collection-tile collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
                     <div className="tile-art-bg" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
                     <div className="tile-art-overlay" />
-                    {/* Glass dome — sits above art, below vinyl */}
+                    {/* Glass dome — static corner glints + silver film */}
                     <div className="tile-glass-dome" />
                     <div className="tile-glass-top-edge" />
+                    {/* Sweeping shimmer — light crossing the glass face */}
+                    <div className="tile-glass-shimmer" />
                     <div className="tile-vinyl-wrap">
                       <div className="tile-vinyl">
                         <div className="tile-vinyl-label" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
