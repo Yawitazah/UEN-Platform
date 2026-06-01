@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
@@ -887,7 +887,51 @@ function AboutPage() {
   );
 }
 
-const demoCollectionItems = [
+type AlbumTrack = {
+  id: string;
+  title: string;
+  trackNumber: number;
+  fileUrl: string;
+  durationSeconds?: number | null;
+  likeCount?: number;
+  likedByHolder?: boolean;
+};
+
+type CollectionItem = {
+  id: string;
+  type: string;
+  title: string;
+  source: string;
+  rarity: string;
+  value: string;
+  date: string;
+  status: string;
+  description: string;
+  // album-specific (optional)
+  assetType?: "ALBUM" | "BOOK" | "IMAGE";
+  artworkUrl?: string;
+  artist?: string;
+  tracks?: AlbumTrack[];
+};
+
+const demoCollectionItems: CollectionItem[] = [
+  {
+    id: "demo-album",
+    type: "Digital Album",
+    assetType: "ALBUM",
+    title: "If You — Type Beat 2026",
+    artist: "Nubreed Global Truth",
+    source: "Nubreed Global Truth",
+    rarity: "Exclusive",
+    value: "$45.00",
+    date: "Jun 1, 2026",
+    status: "Owned",
+    artworkUrl: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?q=80&w=900&auto=format&fit=crop",
+    description: "An exclusive trap / melodic rap instrumental drop issued to founding supporters of Nubreed Global Truth. Stream every track, drop timed comments, and share the moment with other holders.",
+    tracks: [
+      { id: "demo-t1", title: "If You (Gunna x Future Type Beat)", trackNumber: 1, fileUrl: "https://cdn.shopify.com/s/files/1/0566/5367/6659/files/FREE_Gunna_x_Future_Type_Beat_2026_-_If_You.mp3?v=1780289598", likeCount: 12, likedByHolder: false }
+    ]
+  },
   {
     id: "demo-note",
     type: "Universal Exchange Note",
@@ -934,14 +978,351 @@ const demoCollectionItems = [
   }
 ];
 
-type CollectionItem = typeof demoCollectionItems[number];
+type DemoComment = { id: string; body: string; timestampSeconds: number; holder: { firstName: string; lastName: string } };
 
-function HolderCollectionExperience({ holderName = "Holder", items = demoCollectionItems }: { holderName?: string; items?: CollectionItem[] }) {
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: CollectionItem; onClose: () => void; portalToken?: string }) {
+  const tracks = item.tracks ?? [];
+  const [trackIndex, setTrackIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.85);
+  const [liked, setLiked] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(tracks.map((t) => [t.id, t.likedByHolder ?? false]))
+  );
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>(() =>
+    Object.fromEntries(tracks.map((t) => [t.id, t.likeCount ?? 0]))
+  );
+  const [comments, setComments] = useState<DemoComment[]>([
+    { id: "dc1", body: "This beat is COLD 🔥", timestampSeconds: 8, holder: { firstName: "Raquel", lastName: "H." } },
+    { id: "dc2", body: "That melody at 0:22 hits different", timestampSeconds: 22, holder: { firstName: "Marcus", lastName: "T." } },
+    { id: "dc3", body: "Gunna would body this", timestampSeconds: 47, holder: { firstName: "Aliyah", lastName: "W." } },
+    { id: "dc4", body: "The 808s are perfect", timestampSeconds: 63, holder: { firstName: "Devon", lastName: "J." } },
+  ]);
+  const [commentInput, setCommentInput] = useState("");
+  const [nearbyComment, setNearbyComment] = useState<DemoComment | null>(null);
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const animRef = useRef<number>(0);
+  const waveformReady = useRef(false);
+
+  const track = tracks[trackIndex];
+
+  const initAudioContext = useCallback(() => {
+    if (!audioRef.current || waveformReady.current) return;
+    try {
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.82;
+      const source = ctx.createMediaElementSource(audioRef.current);
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      analyserRef.current = analyser;
+      sourceRef.current = source;
+      waveformReady.current = true;
+    } catch {
+      // CORS or context error — waveform degrades gracefully
+    }
+  }, []);
+
+  const drawWaveform = useCallback((active: boolean) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const barCount = 48;
+    const gap = 3;
+    const barW = (W - gap * (barCount - 1)) / barCount;
+    const centerY = H / 2;
+
+    let data: Uint8Array<ArrayBuffer>;
+    if (active && analyserRef.current) {
+      data = new Uint8Array(analyserRef.current.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+      analyserRef.current.getByteFrequencyData(data);
+    } else {
+      // Static idle waveform
+      const idle = new Uint8Array(barCount);
+      for (let i = 0; i < barCount; i++) idle[i] = Math.floor(28 + Math.abs(Math.sin(i * 0.45)) * 38);
+      data = idle;
+    }
+
+    for (let i = 0; i < barCount; i++) {
+      const di = Math.floor((i / barCount) * (data.length));
+      const ratio = (data[di] ?? 0) / 255;
+      const barH = Math.max(3, ratio * (H * 0.46));
+
+      const grad = ctx.createLinearGradient(0, centerY - barH, 0, centerY + barH);
+      grad.addColorStop(0, `rgba(117,227,173,${0.55 + ratio * 0.45})`);
+      grad.addColorStop(0.5, `rgba(52,211,153,${0.7 + ratio * 0.3})`);
+      grad.addColorStop(1, `rgba(117,227,173,${0.55 + ratio * 0.45})`);
+
+      ctx.shadowBlur = active ? 10 + ratio * 14 : 4;
+      ctx.shadowColor = "rgba(117,227,173,0.55)";
+      ctx.fillStyle = grad;
+
+      const x = i * (barW + gap);
+      ctx.beginPath();
+      ctx.roundRect(x, centerY - barH, barW, barH, 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(x, centerY, barW, barH, 2);
+      ctx.fill();
+    }
+
+    if (active) animRef.current = requestAnimationFrame(() => drawWaveform(true));
+  }, []);
+
+  useEffect(() => {
+    drawWaveform(false);
+  }, [drawWaveform]);
+
+  useEffect(() => {
+    if (playing) {
+      animRef.current = requestAnimationFrame(() => drawWaveform(true));
+    } else {
+      cancelAnimationFrame(animRef.current);
+      drawWaveform(false);
+    }
+    return () => cancelAnimationFrame(animRef.current);
+  }, [playing, drawWaveform]);
+
+  // Find nearest comment as time progresses
+  useEffect(() => {
+    const nearby = comments
+      .filter((c) => c.timestampSeconds <= currentTime + 2 && c.timestampSeconds >= currentTime - 1)
+      .sort((a, b) => Math.abs(a.timestampSeconds - currentTime) - Math.abs(b.timestampSeconds - currentTime))[0] ?? null;
+    setNearbyComment(nearby);
+  }, [currentTime, comments]);
+
+  const togglePlay = async () => {
+    if (!audioRef.current) return;
+    if (audioCtxRef.current?.state === "suspended") await audioCtxRef.current.resume();
+    if (playing) {
+      audioRef.current.pause();
+    } else {
+      initAudioContext();
+      await audioRef.current.play().catch(() => {});
+    }
+    setPlaying(!playing);
+  };
+
+  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audioRef.current.currentTime = ratio * duration;
+  };
+
+  const changeTrack = (index: number) => {
+    cancelAnimationFrame(animRef.current);
+    setTrackIndex(index);
+    setPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    waveformReady.current = false;
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close();
+      audioCtxRef.current = null;
+      analyserRef.current = null;
+      sourceRef.current = null;
+    }
+    drawWaveform(false);
+  };
+
+  const toggleLike = async (trackId: string) => {
+    if (portalToken) {
+      try {
+        const res = await fetch(`/api/holder/digital-products/${trackId}/like?token=${encodeURIComponent(portalToken)}`, { method: "POST" });
+        const data = await res.json();
+        setLiked((prev) => ({ ...prev, [trackId]: data.liked }));
+        setLikeCounts((prev) => ({ ...prev, [trackId]: (prev[trackId] ?? 0) + (data.liked ? 1 : -1) }));
+      } catch { /* ignore */ }
+    } else {
+      // Demo toggle
+      const next = !liked[trackId];
+      setLiked((prev) => ({ ...prev, [trackId]: next }));
+      setLikeCounts((prev) => ({ ...prev, [trackId]: (prev[trackId] ?? 0) + (next ? 1 : -1) }));
+    }
+  };
+
+  const postComment = async () => {
+    if (!commentInput.trim() || !track) return;
+    const ts = Math.floor(currentTime);
+    if (portalToken) {
+      try {
+        const res = await fetch(`/api/holder/digital-products/${track.id}/comments?token=${encodeURIComponent(portalToken)}`, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ body: commentInput.trim(), timestampSeconds: ts })
+        });
+        const c = await res.json();
+        setComments((prev) => [...prev, c].sort((a, b) => a.timestampSeconds - b.timestampSeconds));
+      } catch { /* ignore */ }
+    } else {
+      setComments((prev) => [...prev, { id: `local-${Date.now()}`, body: commentInput.trim(), timestampSeconds: ts, holder: { firstName: "You", lastName: "" } }].sort((a, b) => a.timestampSeconds - b.timestampSeconds));
+    }
+    setCommentInput("");
+  };
+
+  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div className="player-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="player-modal">
+        {/* Blurred background art */}
+        {item.artworkUrl && <div className="player-bg-blur" style={{ backgroundImage: `url(${item.artworkUrl})` }} />}
+        <div className="player-bg-dark" />
+
+        {/* Close */}
+        <button className="player-close" onClick={onClose}><X size={20} /></button>
+
+        <div className="player-layout">
+          {/* LEFT — Artwork + info */}
+          <div className="player-left">
+            <div className="player-artwork-wrap">
+              {item.artworkUrl
+                ? <img className="player-artwork" src={item.artworkUrl} alt={item.title} />
+                : <div className="player-artwork player-artwork-placeholder"><Ticket size={64} /></div>
+              }
+              {playing && <div className="player-artwork-glow" />}
+            </div>
+            <div className="player-album-info">
+              <h2 className="player-album-title">{item.title}</h2>
+              <p className="player-album-artist">{item.artist ?? item.source}</p>
+              <p className="player-album-meta">{tracks.length} track{tracks.length !== 1 ? "s" : ""} · Exclusive drop</p>
+            </div>
+
+            {/* Waveform */}
+            <div className="player-waveform-wrap">
+              {nearbyComment && (
+                <div className="player-comment-bubble">
+                  <strong>{nearbyComment.holder.firstName}</strong> {nearbyComment.body}
+                </div>
+              )}
+              <canvas ref={canvasRef} className="player-waveform" width={320} height={72} />
+            </div>
+
+            {/* Controls */}
+            <div className="player-controls">
+              <button className="player-ctrl-btn" onClick={() => changeTrack(Math.max(0, trackIndex - 1))} disabled={trackIndex === 0}>
+                ⏮
+              </button>
+              <button className="player-play-btn" onClick={togglePlay}>
+                {playing ? "⏸" : "▶"}
+              </button>
+              <button className="player-ctrl-btn" onClick={() => changeTrack(Math.min(tracks.length - 1, trackIndex + 1))} disabled={trackIndex === tracks.length - 1}>
+                ⏭
+              </button>
+              <input className="player-volume" type="range" min={0} max={1} step={0.02} value={volume}
+                onChange={(e) => { setVolume(Number(e.target.value)); if (audioRef.current) audioRef.current.volume = Number(e.target.value); }} />
+            </div>
+
+            {/* Progress bar */}
+            <div className="player-progress-wrap">
+              <span className="player-time">{formatTime(currentTime)}</span>
+              <div className="player-progress-track" onClick={seek}>
+                <div className="player-progress-fill" style={{ width: `${progressPct}%` }} />
+                {comments.map((c) => (
+                  <div key={c.id} className="player-comment-dot"
+                    style={{ left: `${duration > 0 ? (c.timestampSeconds / duration) * 100 : 0}%` }}
+                    title={`${formatTime(c.timestampSeconds)}: ${c.holder.firstName} — ${c.body}`} />
+                ))}
+              </div>
+              <span className="player-time">{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* RIGHT — Tracklist + Comments */}
+          <div className="player-right">
+            <div className="player-tracklist">
+              <h3 className="player-section-label">Tracklist</h3>
+              {tracks.map((t, i) => (
+                <button key={t.id} className={`player-track-row ${i === trackIndex ? "active" : ""}`} onClick={() => changeTrack(i)}>
+                  <span className="player-track-num">{i === trackIndex && playing ? "▶" : t.trackNumber}</span>
+                  <span className="player-track-title">{t.title}</span>
+                  <div className="player-track-actions">
+                    <button className={`player-like-btn ${liked[t.id] ? "liked" : ""}`}
+                      onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }}>
+                      ♥ {likeCounts[t.id] ?? 0}
+                    </button>
+                    {t.durationSeconds && <span className="player-track-dur">{formatTime(t.durationSeconds)}</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Comments */}
+            <div className="player-comments">
+              <h3 className="player-section-label">Community · {comments.length} comment{comments.length !== 1 ? "s" : ""}</h3>
+              <div className="player-comments-list">
+                {comments.map((c) => (
+                  <div key={c.id} className={`player-comment-item ${nearbyComment?.id === c.id ? "highlight" : ""}`}>
+                    <button className="player-comment-ts" onClick={() => { if (audioRef.current) audioRef.current.currentTime = c.timestampSeconds; }}>
+                      {formatTime(c.timestampSeconds)}
+                    </button>
+                    <div className="player-comment-body">
+                      <strong>{c.holder.firstName} {c.holder.lastName}</strong>
+                      <span>{c.body}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="player-comment-input-row">
+                <input
+                  className="player-comment-input"
+                  placeholder={`Comment at ${formatTime(Math.floor(currentTime))}…`}
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") postComment(); }}
+                />
+                <button className="player-comment-submit" onClick={postComment} disabled={!commentInput.trim()}>Post</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden audio element */}
+        {track && (
+          <audio
+            ref={audioRef}
+            src={track.fileUrl}
+            crossOrigin="anonymous"
+            preload="metadata"
+            onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
+            onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+            onEnded={() => {
+              if (trackIndex < tracks.length - 1) changeTrack(trackIndex + 1);
+              else setPlaying(false);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HolderCollectionExperience({ holderName = "Holder", items = demoCollectionItems, portalToken = "" }: { holderName?: string; items?: CollectionItem[]; portalToken?: string }) {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState("Newest");
   const [selected, setSelected] = useState(items[0]);
   const [actionMessage, setActionMessage] = useState("");
+  const [openAlbum, setOpenAlbum] = useState<CollectionItem | null>(null);
   useEffect(() => {
     setSelected(items[0]);
   }, [items]);
@@ -957,11 +1338,13 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
       return b.date.localeCompare(a.date);
     });
   const totalValue = items.reduce((sum, item) => sum + (Number(item.value.replace(/[^0-9.]/g, "")) || 0), 0);
-  const noteCount = items.filter((item) => item.type.includes("Note")).length;
+  const albumCount = items.filter((item) => item.assetType === "ALBUM").length;
+  const noteCount = items.filter((item) => item.type.includes("Note") && item.assetType !== "ALBUM").length;
   const downloadCount = items.filter((item) => item.type.includes("Download")).length;
   const badgeCount = items.filter((item) => item.type.includes("Badge")).length;
   const futureCount = items.filter((item) => item.type.includes("Future")).length;
   const typeSummary = [
+    albumCount > 0 ? `${albumCount} Album${albumCount !== 1 ? "s" : ""}` : "",
     noteCount > 0 ? `${noteCount} Note${noteCount !== 1 ? "s" : ""}` : "",
     downloadCount > 0 ? `${downloadCount} Download${downloadCount !== 1 ? "s" : ""}` : "",
     badgeCount > 0 ? `${badgeCount} Badge${badgeCount !== 1 ? "s" : ""}` : "",
@@ -972,6 +1355,10 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
     setActionMessage("");
   };
   const openItem = () => {
+    if (selected.assetType === "ALBUM" && selected.tracks?.length) {
+      setOpenAlbum(selected);
+      return;
+    }
     setActionMessage(`${selected.title} is open. This is where the Holder would preview files, reward details, redemption utility, and the campaign memory attached to the item.`);
   };
   const previewTrade = () => {
@@ -995,7 +1382,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
       <div className="collection-console">
         <div className="collection-console-toolbar">
           <div className="collection-filter-buttons">
-            {["All", "Note", "Download", "Badge", "Future"].map((option) => (
+            {["All", "Album", "Note", "Download", "Badge", "Future"].map((option) => (
               <button key={option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option}</button>
             ))}
           </div>
@@ -1046,11 +1433,14 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
           </dl>
           {actionMessage && <div className="collection-action-message">{actionMessage}</div>}
           <div className="collection-actions">
-            <button onClick={openItem}>Open Item</button>
+            <button onClick={openItem}>
+              {selected.assetType === "ALBUM" ? "▶ Play Album" : "Open Item"}
+            </button>
             <button className="ghost" onClick={previewTrade}>Gift / Trade Preview</button>
           </div>
         </aside>
       </div>
+      {openAlbum && <AudioPlayerModal item={openAlbum} onClose={() => setOpenAlbum(null)} portalToken={portalToken} />}
     </section>
   );
 }

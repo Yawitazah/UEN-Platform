@@ -8,6 +8,7 @@ import { config } from "./config";
 import { authenticate } from "./security";
 import authRoutes from "./routes/auth";
 import centralRoutes from "./routes/central";
+import digitalRoutes from "./routes/digital";
 import holderRoutes from "./routes/holder";
 import shopifyRoutes from "./routes/shopify";
 
@@ -41,6 +42,7 @@ app.use(authenticate);
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api", holderRoutes);
+app.use("/api", digitalRoutes);
 app.use("/api", centralRoutes);
 app.use("/shopify/api", shopifyRoutes);
 app.use("/shopify", shopifyRoutes);
