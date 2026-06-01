@@ -1649,7 +1649,7 @@ function DemoHolderPortal() {
                   </div>
                   <div className="portal-code-value">{uen.code}</div>
                   <div className="portal-code-footer">
-                    <span className={`portal-code-status ${uen.status === "ACTIVE" ? "active" : "inactive"}`}>{uen.status}</span>
+                    <span className={`portal-code-status ${uen.status === "ACTIVE" ? "active" : "inactive"}`}>{uen.status === "GRACE_PERIOD" ? "Grace Period" : uen.status}</span>
                     <span className="portal-code-meta"><CheckCircle size={12} /> {uen.merchants}</span>
                   </div>
                 </article>

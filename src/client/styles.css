@@ -4060,7 +4060,6 @@ html { background: #050e09; }
 .portal-tabs {
   background: rgba(5,14,9,0.95);
   backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(117,227,173,0.1);
   display: flex;
   gap: 0;
   padding: 0 24px;
@@ -4151,9 +4150,10 @@ html { background: #050e09; }
 
 .portal-merchant-offer {
   align-items: center;
-  background: linear-gradient(135deg, #fbbf24, #fef3c7);
+  background: rgba(117,227,173,0.12);
+  border: 1px solid rgba(117,227,173,0.25);
   border-radius: 999px;
-  color: #321b05;
+  color: #75e3ad;
   display: inline-flex;
   font-size: 13px;
   font-weight: 800;
@@ -4205,8 +4205,8 @@ html { background: #050e09; }
 }
 
 .portal-redeemed-count {
-  background: rgba(167, 139, 250, 0.12);
-  color: #a78bfa;
+  background: rgba(117,227,173,0.07);
+  color: #4a7a66;
 }
 
 .portal-shop-btn {
