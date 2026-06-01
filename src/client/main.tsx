@@ -368,7 +368,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -403,6 +403,7 @@ function Shell() {
           <Route path="/holder/register" element={<HolderRegister />} />
           <Route path="/signup" element={<SignupGateway />} />
           <Route path="/exchange-hub/register" element={<ExchangeHubRegister />} />
+          <Route path="/widget-preview" element={<WidgetPreviewPage />} />
         </Routes>
       ) : (
       <div className="app">
@@ -1116,8 +1117,9 @@ function DemoHolderPortal() {
           <div className="portal-hero-uen-chip">
             <div className="portal-uen-chip-inner">
               <span>UENITE Network</span>
-              <strong>4</strong>
-              <span>items owned</span>
+              <strong>3</strong>
+              <span className="uen-label">UEN</span>
+              <span>Notes active</span>
             </div>
           </div>
         </div>
@@ -1791,7 +1793,8 @@ function PublicPreviews() {
       pages: [
         { label: "Collection Demo", path: "/holder/collection", description: "Game-like support vault with value, filters, and details.", access: "Public demo" },
         { label: "Holder Signup", path: "/holder/register", description: "Holder access form and portal link flow.", access: "Public" },
-        { label: "Holder Portal Demo", path: "/holder/portal?demo=1", description: "Preview of the live Holder wallet, collection, merchant directory, and codes.", access: "Demo" }
+        { label: "Holder Portal Demo", path: "/holder/portal?demo=1", description: "Preview of the live Holder wallet, collection, merchant directory, and codes.", access: "Demo" },
+        { label: "UEN Widget Preview", path: "/widget-preview", description: "Floating merchant widget — shows UEN count, value, auto-apply and code-paste buttons as they appear on a merchant site.", access: "Demo" }
       ]
     },
     Merchant: {
@@ -2540,6 +2543,150 @@ function HolderRegister() {
   );
 }
 
+// --- WidgetPreviewPage ---
+
+function WidgetPreviewPage() {
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [codeShown, setCodeShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const demoCode = "NUBREED9827391UEN";
+  const demoAvailable = 3;
+  const demoOffer = "15% off";
+  const demoValue = "$45.00 in available value";
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(demoCode).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <main className="widget-preview-page">
+      <nav className="uenite-nav about-nav">
+        <a className="uenite-logo" href="/"><Shield size={24} /><BrandWord /></a>
+        <div>
+          <a href="/holder/portal?demo=1">Holder Portal</a>
+          <a href="/merchants/register">Merchant Signup</a>
+        </div>
+      </nav>
+
+      <section className="widget-preview-hero">
+        <span className="eyebrow dark"><Zap size={16} /> Merchant Widget Preview</span>
+        <h1>The UEN widget as it appears on a merchant's Shopify store</h1>
+        <p>Once a merchant installs the UEN app, this floating widget appears on every page of their store. UEN holders who are logged in will see their available notes and can redeem instantly.</p>
+      </section>
+
+      <div className="widget-preview-shell">
+        {/* Mock merchant storefront */}
+        <div className="widget-mock-store">
+          <div className="widget-mock-header">
+            <div className="widget-mock-logo"><ShoppingBag size={18} /><strong>Demo Merchant Store</strong></div>
+            <div className="widget-mock-nav"><span>Home</span><span>Shop</span><span>About</span><a href="#" className="widget-mock-cart"><Tag size={16} /> Cart (1)</a></div>
+          </div>
+          <div className="widget-mock-product">
+            <div className="widget-mock-product-img" />
+            <div className="widget-mock-product-info">
+              <span className="widget-mock-category">Featured Product</span>
+              <h2>Signature Collection Item</h2>
+              <p>A premium product available to UEN holders with an automatic 15% discount applied at checkout through the UEN merchant network.</p>
+              <div className="widget-mock-price">
+                <strong>$89.99</strong>
+                <span className="widget-mock-discount">UEN holders: ~$76.49</span>
+              </div>
+              <button className="widget-mock-buy">Add to Cart</button>
+            </div>
+          </div>
+          <p className="widget-mock-note"><Shield size={13} /> This store accepts Universal Exchange Notes. Look for the UEN widget button at the bottom right.</p>
+        </div>
+
+        {/* Floating FAB */}
+        <button className="widget-preview-fab" onClick={() => { setPanelOpen(!panelOpen); setCodeShown(false); }}>
+          <span className="widget-fab-dot" />
+          UEN Discount
+        </button>
+
+        {/* Widget panel */}
+        {panelOpen && (
+          <div className="widget-preview-panel">
+            <div className="widget-panel-header">
+              <span className="widget-panel-title">UEN Wallet</span>
+              <button className="widget-panel-close" onClick={() => setPanelOpen(false)}>×</button>
+            </div>
+
+            <div className="widget-count-display">
+              <strong>{demoAvailable}</strong>
+              <span className="widget-uen-label">UEN</span>
+              <p className="widget-value-line">Each worth <strong>{demoOffer}</strong> here</p>
+            </div>
+
+            <div className="widget-offer-pill">
+              Use 1 UEN → <strong>{demoOffer}</strong> at checkout
+            </div>
+
+            {!codeShown ? (
+              <div className="widget-actions">
+                <button className="widget-btn widget-btn-primary" onClick={() => { setPanelOpen(false); }}>
+                  Apply Discount Automatically
+                </button>
+                <button className="widget-btn widget-btn-secondary" onClick={() => setCodeShown(true)}>
+                  Generate Code to Paste
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="widget-actions">
+                  <button className="widget-btn widget-btn-primary" disabled>
+                    Apply Discount Automatically
+                  </button>
+                  <button className="widget-btn widget-btn-secondary" disabled>
+                    Code Generated
+                  </button>
+                </div>
+                <div className="widget-code-result">
+                  <p>Your discount code (paste at checkout):</p>
+                  <div className="widget-code-row">
+                    <code>{demoCode}</code>
+                    <button className="widget-copy-btn" onClick={copyCode}>{copied ? "Copied!" : "Copy"}</button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <p className="widget-footer-note"><Shield size={11} /> Powered by UENITE · {demoValue}</p>
+          </div>
+        )}
+      </div>
+
+      <section className="widget-preview-explainer">
+        <div className="widget-explainer-grid">
+          <article>
+            <Wallet size={28} />
+            <h3>Holder sees UEN count + value</h3>
+            <p>The big number shows how many UENs they have available at this specific merchant. Each UEN is worth whatever the merchant has set (e.g. 15% off).</p>
+          </article>
+          <article>
+            <Zap size={28} />
+            <h3>Two redemption paths</h3>
+            <p><strong>Auto:</strong> One click sends them straight to checkout with the discount pre-applied. <strong>Manual:</strong> Generates a unique code they copy and paste themselves.</p>
+          </article>
+          <article>
+            <Shield size={28} />
+            <h3>One use per merchant</h3>
+            <p>Each UEN can only be redeemed once per merchant. The same UEN stays valid at every other merchant in the network until used there.</p>
+          </article>
+          <article>
+            <Tag size={28} />
+            <h3>Install via Shopify</h3>
+            <p>Merchants install the UEN app from their Shopify admin. One script tag is injected automatically — no theme coding required.</p>
+          </article>
+        </div>
+      </section>
+
+      <PoweredByFooter />
+    </main>
+  );
+}
+
 // --- HolderPortal ---
 
 function HolderPortal() {
@@ -2680,6 +2827,7 @@ function LiveHolderPortal({ token }: { token: string }) {
             <div className="portal-uen-chip-inner">
               <span>UENITE Network</span>
               <strong>{totalActive}</strong>
+              <span className="uen-label">UEN</span>
               <span>Notes active</span>
             </div>
           </div>

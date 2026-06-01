@@ -5,7 +5,16 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "dist/client",
-    emptyOutDir: false
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        widget: "src/client/widget.ts"
+      },
+      output: {
+        entryFileNames: (chunk) => chunk.name === "widget" ? "widget.js" : "assets/[name]-[hash].js"
+      }
+    }
   },
   server: {
     port: 5173,

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import express from "express";
 import { prisma } from "../db";
+import { syncCodesToGroupedShopifyDiscount } from "../services/sync";
 
 const router = express.Router();
 
@@ -196,6 +197,103 @@ router.post("/holder/notifications/:id/read", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not mark notification as read" });
+  }
+});
+
+// POST /api/holder/redeem — on-demand discount code generation at a merchant
+// Mode "AUTO" returns an auto-apply checkout URL; mode "MANUAL" returns the code to paste.
+// One UEN is depleted per merchant per call — cross-merchant reuse is preserved.
+router.post("/holder/redeem", async (req, res) => {
+  try {
+    const token = String(req.query.token ?? req.body.token ?? "");
+    const holder = await holderFromToken(token);
+    if (!holder) return res.status(404).json({ error: "Invalid portal token" });
+
+    const { merchantId, mode = "AUTO" } = req.body as { merchantId?: string; mode?: "AUTO" | "MANUAL" };
+    if (!merchantId) return res.status(400).json({ error: "merchantId is required" });
+
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: merchantId },
+      include: {
+        offers: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 1 },
+        shopifyConnections: { where: { status: "ACTIVE" }, take: 1 },
+        accessRules: { where: { status: "ACTIVE" } }
+      }
+    });
+    if (!merchant || merchant.status !== "ACTIVE") {
+      return res.status(404).json({ error: "Merchant not found or inactive" });
+    }
+
+    const offer = merchant.offers[0];
+    if (!offer) return res.status(400).json({ error: "Merchant has no active offer" });
+
+    const connection = merchant.shopifyConnections[0];
+    if (!connection) return res.status(400).json({ error: "Merchant Shopify store not connected" });
+
+    // Check holder's hub is allowed at this merchant
+    const hubAllowed = merchant.accessRules.some((rule) => rule.exchangeHubId === holder.exchangeHubId);
+    if (!hubAllowed) return res.status(403).json({ error: "Your exchange hub is not authorized for this merchant" });
+
+    const holderUenIds = holder.universalExchangeNotes.map((u) => u.id);
+    if (!holderUenIds.length) return res.status(400).json({ error: "You have no active UENs" });
+
+    // Find a UEN that has NOT yet been redeemed at this merchant
+    const alreadyRedeemedUenIds = await prisma.shopifySyncedNote.findMany({
+      where: { merchantId, universalExchangeNoteId: { in: holderUenIds }, redeemedAt: { not: null } },
+      select: { universalExchangeNoteId: true }
+    });
+    const redeemedSet = new Set(alreadyRedeemedUenIds.map((r) => r.universalExchangeNoteId));
+    const availableUen = holder.universalExchangeNotes.find((u) => !redeemedSet.has(u.id));
+    if (!availableUen) return res.status(400).json({ error: "All your UENs have already been used at this merchant" });
+
+    // Check if a code was already synced (pre-loaded) for this UEN at this merchant
+    const existingSynced = await prisma.shopifySyncedNote.findUnique({
+      where: { merchantId_universalExchangeNoteId: { merchantId, universalExchangeNoteId: availableUen.id } }
+    });
+
+    let discountCode: string;
+    let shopifyDiscountId: string | null = null;
+
+    if (existingSynced?.syncStatus === "SYNCED" && existingSynced.uenCode) {
+      discountCode = existingSynced.uenCode;
+      shopifyDiscountId = existingSynced.shopifyDiscountId ?? null;
+    } else {
+      // Create the discount code on demand in Shopify
+      const syncResult = await syncCodesToGroupedShopifyDiscount({
+        connection: {
+          merchantId,
+          shopDomain: connection.shopDomain,
+          accessToken: connection.accessToken,
+          merchantName: merchant.businessName
+        },
+        offer,
+        codes: [{ id: availableUen.id, code: availableUen.code, kind: "note" }]
+      });
+      if (syncResult.errors > 0) {
+        return res.status(502).json({ error: "Could not create discount code in Shopify" });
+      }
+      discountCode = availableUen.code;
+      const syncedRecord = await prisma.shopifySyncedNote.findUnique({
+        where: { merchantId_universalExchangeNoteId: { merchantId, universalExchangeNoteId: availableUen.id } }
+      });
+      shopifyDiscountId = syncedRecord?.shopifyDiscountId ?? null;
+    }
+
+    const shopDomain = connection.shopDomain;
+    const autoApplyUrl = `https://${shopDomain}/discount/${encodeURIComponent(discountCode)}?redirect=/`;
+
+    return res.json({
+      code: discountCode,
+      uenId: availableUen.id,
+      mode,
+      shopDomain,
+      autoApplyUrl: mode === "AUTO" ? autoApplyUrl : null,
+      discountValue: offer.discountValue ? Number(offer.discountValue) : null,
+      discountType: offer.discountType
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not process redemption" });
   }
 });
 

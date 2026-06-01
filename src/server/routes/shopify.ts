@@ -36,6 +36,32 @@ function verifyShopifyWebhook(req: express.Request) {
   return hmac.length === digest.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
 }
 
+function shopifyScopes(value: string) {
+  return new Set(
+    value
+      .split(",")
+      .map((scope) => scope.trim())
+      .filter(Boolean)
+  );
+}
+
+function missingRequiredScopes(grantedScope = "") {
+  const granted = shopifyScopes(grantedScope);
+  return [...shopifyScopes(config.shopifyScopes)].filter((required) => {
+    if (granted.has(required)) return false;
+    if (required.startsWith("read_") && granted.has(required.replace(/^read_/, "write_"))) return false;
+    return true;
+  });
+}
+
+function privacyWebhookTopic(req: express.Request) {
+  return (req.header("x-shopify-topic") ?? "").toLowerCase();
+}
+
+function privacyWebhookShop(req: express.Request) {
+  return normalizeShop(req.header("x-shopify-shop-domain") ?? req.body?.shop_domain);
+}
+
 async function generateIssuedCode(prefix = "") {
   const normalizedPrefix = prefix.replace(/[^a-z0-9]/gi, "").toUpperCase();
   for (let attempt = 0; attempt < 25; attempt += 1) {
@@ -245,6 +271,11 @@ router.get("/auth/callback", async (req, res) => {
     }
 
     const tokenPayload = (await tokenResponse.json()) as { access_token: string; scope?: string };
+    const missingScopes = missingRequiredScopes(tokenPayload.scope ?? "");
+    if (missingScopes.length) {
+      return res.status(403).send(`Shopify did not grant required scopes: ${missingScopes.join(", ")}`);
+    }
+
     const onboardingToken = String(req.cookies?.shopify_onboarding_token ?? "");
     const onboarding = onboardingToken
       ? await prisma.merchantOnboarding.findUnique({ where: { token: onboardingToken }, include: { merchant: true } })
@@ -312,6 +343,34 @@ router.get("/auth/callback", async (req, res) => {
     });
 
     await subscribeOrdersPaidWebhook(shop, tokenPayload.access_token);
+
+    // Grandfather existing UEN codes into the newly connected merchant store
+    try {
+      await syncMerchantUensToShopify(merchant.id, shop, "AUTO_INSTALL");
+    } catch (syncError) {
+      console.warn("Auto-sync on merchant install failed (non-fatal):", syncError);
+    }
+
+    // Notify all holders in the linked hub about the new merchant
+    try {
+      const linkedHubId = merchant.linkedExchangeHubId;
+      if (linkedHubId) {
+        const holders = await prisma.holder.findMany({
+          where: { exchangeHubId: linkedHubId, status: "ACTIVE" }
+        });
+        if (holders.length) {
+          await prisma.holderNotification.createMany({
+            data: holders.map((h) => ({
+              holderId: h.id,
+              title: "New merchant joined the network",
+              body: `${merchant.businessName} is now accepting your Universal Exchange Notes. All your purchased UENs are ready to use at their store.`
+            }))
+          });
+        }
+      }
+    } catch (notifyError) {
+      console.warn("Holder notification on merchant install failed (non-fatal):", notifyError);
+    }
 
     res.clearCookie("shopify_oauth_state");
     res.clearCookie("shopify_onboarding_token");
@@ -392,11 +451,6 @@ router.post("/webhooks/orders-paid", async (req, res) => {
         });
       }
 
-      const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain } });
-      if (connection) {
-        await createIssuanceDiscount(shopDomain, note, connection.accessToken);
-      }
-
       await prisma.uenIssuanceLog.create({
         data: {
           issuanceProductId: mappedProduct.id,
@@ -441,6 +495,91 @@ router.post("/webhooks/orders-paid", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send("Webhook processing failed");
+  }
+});
+
+router.post("/webhooks/privacy", async (req, res) => {
+  try {
+    if (!verifyShopifyWebhook(req)) {
+      return res.status(401).send("Invalid Shopify webhook HMAC");
+    }
+
+    const topic = privacyWebhookTopic(req);
+    const shopDomain = privacyWebhookShop(req);
+    if (!shopDomain) return res.status(400).send("Missing shop domain");
+
+    const payload = req.body as {
+      customer?: { id?: number | string; email?: string; phone?: string };
+      shop_id?: number | string;
+      data_request?: { id?: number | string };
+    };
+    const email = payload.customer?.email?.trim().toLowerCase();
+
+    if (topic === "customers/data_request") {
+      await audit({
+        action: AuditAction.SHOPIFY_CONNECTION_CHANGED,
+        actorType: "system",
+        entityType: "ShopifyPrivacyRequest",
+        entityId: String(payload.data_request?.id ?? payload.customer?.id ?? shopDomain),
+        message: `Customer data request received for ${shopDomain}${email ? ` (${email})` : ""}`
+      });
+      return res.status(200).send("OK");
+    }
+
+    if (topic === "customers/redact") {
+      if (email) {
+        const holders = await prisma.holder.findMany({ where: { email } });
+        await prisma.$transaction([
+          prisma.holderNotification.deleteMany({ where: { holderId: { in: holders.map((holder) => holder.id) } } }),
+          prisma.uenIssuanceLog.updateMany({
+            where: { shopDomain, customerEmail: email },
+            data: { customerEmail: `redacted-${crypto.createHash("sha256").update(`${shopDomain}:${email}`).digest("hex").slice(0, 16)}@redacted.local` }
+          }),
+          prisma.uenCodeInventory.updateMany({
+            where: { issuedToEmail: email },
+            data: { issuedToEmail: null }
+          }),
+          prisma.holder.updateMany({
+            where: { email },
+            data: {
+              firstName: "Redacted",
+              lastName: "Customer",
+              email: `redacted-${crypto.createHash("sha256").update(email).digest("hex").slice(0, 16)}@redacted.local`,
+              phone: null,
+              portalToken: null,
+              status: "REDACTED"
+            }
+          })
+        ]);
+      }
+      return res.status(200).send("OK");
+    }
+
+    if (topic === "shop/redact") {
+      const connections = await prisma.shopifyConnection.findMany({ where: { shopDomain } });
+      await prisma.$transaction([
+        prisma.shopifyConnection.updateMany({ where: { shopDomain }, data: { accessToken: "", status: "REDACTED" } }),
+        prisma.shopifySyncedNote.updateMany({ where: { shopDomain }, data: { syncStatus: "REDACTED", errorMessage: null } }),
+        prisma.shopifyInventorySyncedCode.updateMany({ where: { shopDomain }, data: { syncStatus: "REDACTED", errorMessage: null } }),
+        prisma.shopifyDiscountGroup.updateMany({ where: { shopDomain }, data: { status: "REDACTED" } }),
+        prisma.shopifyIssuanceProduct.updateMany({ where: { shopDomain }, data: { status: "REDACTED", digitalAssetUrl: null } }),
+        prisma.auditLog.create({
+          data: {
+            action: AuditAction.SHOPIFY_CONNECTION_CHANGED,
+            actorType: "system",
+            entityType: "ShopifyPrivacyRequest",
+            entityId: connections[0]?.id ?? shopDomain,
+            message: `Shop redaction received for ${shopDomain}`
+          }
+        })
+      ]);
+      return res.status(200).send("OK");
+    }
+
+    return res.status(400).send("Unsupported privacy webhook topic");
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send("Privacy webhook processing failed");
   }
 });
 
