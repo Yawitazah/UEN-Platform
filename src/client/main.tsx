@@ -957,6 +957,16 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
       return b.date.localeCompare(a.date);
     });
   const totalValue = items.reduce((sum, item) => sum + (Number(item.value.replace(/[^0-9.]/g, "")) || 0), 0);
+  const noteCount = items.filter((item) => item.type.includes("Note")).length;
+  const downloadCount = items.filter((item) => item.type.includes("Download")).length;
+  const badgeCount = items.filter((item) => item.type.includes("Badge")).length;
+  const futureCount = items.filter((item) => item.type.includes("Future")).length;
+  const typeSummary = [
+    noteCount > 0 ? `${noteCount} Note${noteCount !== 1 ? "s" : ""}` : "",
+    downloadCount > 0 ? `${downloadCount} Download${downloadCount !== 1 ? "s" : ""}` : "",
+    badgeCount > 0 ? `${badgeCount} Badge${badgeCount !== 1 ? "s" : ""}` : "",
+    futureCount > 0 ? `${futureCount} Future` : ""
+  ].filter(Boolean).join(" · ");
   const selectItem = (item: CollectionItem) => {
     setSelected(item);
     setActionMessage("");
@@ -978,7 +988,8 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
         <div className="collection-total">
           <span>Total collection value</span>
           <strong><AnimatedNumber value={totalValue} prefix="$" suffix=".00" /></strong>
-          <small>{items.length} collection items</small>
+          <small>{items.length} collection item{items.length !== 1 ? "s" : ""}</small>
+          {typeSummary && <span className="collection-type-summary">{typeSummary}</span>}
         </div>
       </div>
       <div className="collection-console">
@@ -1002,13 +1013,18 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
           </label>
         </div>
         <div className="collection-inventory">
-          {filtered.map((item) => (
-            <button key={item.id} className={`collection-tile ${selected.id === item.id ? "active" : ""}`} onClick={() => selectItem(item)}>
-              <span>{item.type}</span>
-              <strong>{item.title}</strong>
-              <small>{item.rarity} / {item.value}</small>
-            </button>
-          ))}
+          {filtered.map((item, index) => {
+            const sameTypeBefore = filtered.slice(0, index).filter((i) => i.type === item.type).length;
+            const totalOfType = filtered.filter((i) => i.type === item.type).length;
+            const typeLabel = totalOfType > 1 ? `${item.type} ${sameTypeBefore + 1} of ${totalOfType}` : item.type;
+            return (
+              <button key={item.id} className={`collection-tile ${selected.id === item.id ? "active" : ""}`} onClick={() => selectItem(item)}>
+                <span>{typeLabel}</span>
+                <strong>{item.title}</strong>
+                <small>{item.rarity} / {item.value}</small>
+              </button>
+            );
+          })}
           {filtered.length === 0 && (
             <div className="collection-empty">
               <Search size={26} />
