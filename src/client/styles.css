@@ -5810,3 +5810,199 @@ th {
   .player-section-label { padding: 16px 16px 0; }
   .player-comments-list { padding: 0 16px 8px; }
 }
+
+/* ═══════════════════════════════════════════
+   GLASS TROPHY ALBUM TILE
+═══════════════════════════════════════════ */
+
+/* Wrapper — exists outside overflow:hidden so the rim can bleed out */
+.tile-album-frame {
+  border-radius: 20px;
+  position: relative;
+}
+
+/* ── Rotating arc of light around the border ── */
+.tile-album-frame::before {
+  animation: glassRimSpin 4s linear infinite;
+  background: conic-gradient(
+    from 0deg,
+    transparent       0deg,
+    transparent       28deg,
+    rgba(255,255,255,0.55)  50deg,
+    rgba(255,255,255,0.95)  68deg,
+    rgba(255,255,255,1)     78deg,
+    rgba(255,255,255,0.9)   90deg,
+    rgba(255,255,255,0.45) 115deg,
+    transparent       150deg,
+    transparent       205deg,
+    rgba(255,255,255,0.28) 222deg,
+    rgba(255,255,255,0.45) 232deg,
+    rgba(255,255,255,0.22) 245deg,
+    transparent       270deg,
+    transparent       360deg
+  );
+  border-radius: 21px;
+  content: "";
+  inset: -1.5px;
+  padding: 1.5px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 10;
+  /* Mask = show only the border ring, hide the interior */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Active: green-tinted rim, faster spin */
+.tile-album-frame.active::before {
+  animation-duration: 2.2s;
+  background: conic-gradient(
+    from 0deg,
+    transparent       0deg,
+    rgba(117,227,173,0.4)  28deg,
+    rgba(200,255,230,0.7)  50deg,
+    rgba(255,255,255,0.95) 68deg,
+    rgba(255,255,255,1)    78deg,
+    rgba(255,255,255,0.9)  90deg,
+    rgba(117,227,173,0.5) 120deg,
+    transparent       160deg,
+    rgba(117,227,173,0.2) 210deg,
+    rgba(255,255,255,0.4) 232deg,
+    rgba(117,227,173,0.2) 252deg,
+    transparent       280deg,
+    transparent       360deg
+  );
+}
+
+/* Outer glow ring — sits behind the tile, bleeds out like aura */
+.tile-album-frame::after {
+  animation: trophyAura 3.5s ease-in-out infinite alternate;
+  border-radius: 22px;
+  box-shadow:
+    0 0 12px 2px  rgba(255,255,255,0.12),
+    0 0 28px 4px  rgba(255,255,255,0.07),
+    0 0 50px 8px  rgba(117,227,173,0.08);
+  content: "";
+  inset: -3px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+@keyframes trophyAura {
+  from { opacity: 0.5; }
+  to   { opacity: 1; }
+}
+
+.tile-album-frame.active::after {
+  box-shadow:
+    0 0 16px 3px  rgba(255,255,255,0.2),
+    0 0 36px 6px  rgba(255,255,255,0.1),
+    0 0 64px 12px rgba(117,227,173,0.2);
+}
+
+@keyframes glassRimSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Hover: lift + rim brightens */
+.tile-album-frame:hover { transform: translateY(-4px); }
+.tile-album-frame:hover::before { animation-duration: 2.8s; }
+
+/* ── Glass dome — curved reflective surface over the artwork ── */
+.tile-glass-dome {
+  border-radius: 18px;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 4;
+  transition: opacity 0.25s;
+  background:
+    /* BIG specular highlight: the main curved-glass illusion */
+    radial-gradient(ellipse 78% 52% at 28% 16%,
+      rgba(255,255,255,0.60) 0%,
+      rgba(255,255,255,0.26) 28%,
+      rgba(255,255,255,0.07) 58%,
+      transparent 76%
+    ),
+    /* Sharp glint: tiny brilliant spark at top-left */
+    radial-gradient(ellipse 20% 15% at 11% 7%,
+      rgba(255,255,255,0.88) 0%,
+      rgba(255,255,255,0.38) 42%,
+      transparent 100%
+    ),
+    /* Right-edge catch light */
+    radial-gradient(ellipse 16% 52% at 96% 38%,
+      rgba(255,255,255,0.16) 0%,
+      transparent 82%
+    ),
+    /* Bottom-wrap reflection: light bending under the dome */
+    radial-gradient(ellipse 58% 20% at 50% 98%,
+      rgba(255,255,255,0.11) 0%,
+      transparent 100%
+    ),
+    /* Global silver-glass film */
+    linear-gradient(148deg,
+      rgba(255,255,255,0.09) 0%,
+      rgba(255,255,255,0.02) 38%,
+      transparent 62%,
+      rgba(255,255,255,0.05) 100%
+    );
+}
+
+/* Brighter on hover */
+.collection-tile-album:hover .tile-glass-dome {
+  background:
+    radial-gradient(ellipse 78% 52% at 28% 16%,
+      rgba(255,255,255,0.75) 0%,
+      rgba(255,255,255,0.34) 28%,
+      rgba(255,255,255,0.09) 58%,
+      transparent 76%
+    ),
+    radial-gradient(ellipse 20% 15% at 11% 7%,
+      rgba(255,255,255,0.98) 0%,
+      rgba(255,255,255,0.5)  42%,
+      transparent 100%
+    ),
+    radial-gradient(ellipse 16% 52% at 96% 38%,
+      rgba(255,255,255,0.22) 0%,
+      transparent 82%
+    ),
+    radial-gradient(ellipse 58% 20% at 50% 98%,
+      rgba(255,255,255,0.15) 0%,
+      transparent 100%
+    ),
+    linear-gradient(148deg,
+      rgba(255,255,255,0.11) 0%,
+      rgba(255,255,255,0.03) 38%,
+      transparent 62%,
+      rgba(255,255,255,0.06) 100%
+    );
+}
+
+/* ── Top rim: thin bright line across the very top of the glass ── */
+.tile-glass-top-edge {
+  border-radius: 18px 18px 0 0;
+  height: 2px;
+  left: 10px;
+  pointer-events: none;
+  position: absolute;
+  right: 10px;
+  top: 0;
+  z-index: 5;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.55) 18%,
+    rgba(255,255,255,0.95) 50%,
+    rgba(255,255,255,0.55) 82%,
+    transparent 100%
+  );
+}
+
+/* ── Ensure button is ABOVE the rim pseudo-elements ── */
+.tile-album-frame > button {
+  position: relative;
+  z-index: 2;
+}

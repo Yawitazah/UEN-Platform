@@ -1409,24 +1409,29 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             // ── Rich visual tile for items with artwork ──
             if (item.artworkUrl && item.assetType === "ALBUM") {
               return (
-                <button key={item.id} className={`collection-tile collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
-                  <div className="tile-art-bg" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
-                  <div className="tile-art-overlay" />
-                  <div className="tile-vinyl-wrap">
-                    <div className="tile-vinyl">
-                      <div className="tile-vinyl-label" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
-                      <div className="tile-vinyl-ring tile-vinyl-ring-1" />
-                      <div className="tile-vinyl-ring tile-vinyl-ring-2" />
-                      <div className="tile-vinyl-ring tile-vinyl-ring-3" />
-                      <div className="tile-vinyl-hole" />
+                <div key={item.id} className={`tile-album-frame ${isActive ? "active" : ""}`}>
+                  <button className={`collection-tile collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                    <div className="tile-art-bg" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
+                    <div className="tile-art-overlay" />
+                    {/* Glass dome — sits above art, below vinyl */}
+                    <div className="tile-glass-dome" />
+                    <div className="tile-glass-top-edge" />
+                    <div className="tile-vinyl-wrap">
+                      <div className="tile-vinyl">
+                        <div className="tile-vinyl-label" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
+                        <div className="tile-vinyl-ring tile-vinyl-ring-1" />
+                        <div className="tile-vinyl-ring tile-vinyl-ring-2" />
+                        <div className="tile-vinyl-ring tile-vinyl-ring-3" />
+                        <div className="tile-vinyl-hole" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="tile-art-info">
-                    <span className="tile-art-type">{typeLabel}</span>
-                    <strong className="tile-art-title">{item.title}</strong>
-                    <small className="tile-art-meta">{item.tracks?.length ?? 0} tracks · {item.value}</small>
-                  </div>
-                </button>
+                    <div className="tile-art-info">
+                      <span className="tile-art-type">{typeLabel}</span>
+                      <strong className="tile-art-title">{item.title}</strong>
+                      <small className="tile-art-meta">{item.tracks?.length ?? 0} tracks · {item.value}</small>
+                    </div>
+                  </button>
+                </div>
               );
             }
 
