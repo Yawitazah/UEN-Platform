@@ -1404,8 +1404,75 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             const sameTypeBefore = filtered.slice(0, index).filter((i) => i.type === item.type).length;
             const totalOfType = filtered.filter((i) => i.type === item.type).length;
             const typeLabel = totalOfType > 1 ? `${item.type} ${sameTypeBefore + 1} of ${totalOfType}` : item.type;
+            const isActive = selected.id === item.id;
+
+            // ── Rich visual tile for items with artwork ──
+            if (item.artworkUrl && item.assetType === "ALBUM") {
+              return (
+                <button key={item.id} className={`collection-tile collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  <div className="tile-art-bg" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
+                  <div className="tile-art-overlay" />
+                  <div className="tile-vinyl-wrap">
+                    <div className="tile-vinyl">
+                      <div className="tile-vinyl-label" style={{ backgroundImage: `url(${item.artworkUrl})` }} />
+                      <div className="tile-vinyl-ring tile-vinyl-ring-1" />
+                      <div className="tile-vinyl-ring tile-vinyl-ring-2" />
+                      <div className="tile-vinyl-ring tile-vinyl-ring-3" />
+                      <div className="tile-vinyl-hole" />
+                    </div>
+                  </div>
+                  <div className="tile-art-info">
+                    <span className="tile-art-type">{typeLabel}</span>
+                    <strong className="tile-art-title">{item.title}</strong>
+                    <small className="tile-art-meta">{item.tracks?.length ?? 0} tracks · {item.value}</small>
+                  </div>
+                </button>
+              );
+            }
+
+            // ── Badge tile ──
+            if (item.type.includes("Badge") || item.type.includes("Achievement")) {
+              return (
+                <button key={item.id} className={`collection-tile collection-tile-badge ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  <div className="tile-badge-icon">
+                    <Star size={28} />
+                  </div>
+                  <span>{typeLabel}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.rarity} · {item.value}</small>
+                </button>
+              );
+            }
+
+            // ── Future asset tile ──
+            if (item.type.includes("Future")) {
+              return (
+                <button key={item.id} className={`collection-tile collection-tile-future ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  <div className="tile-orb" />
+                  <span>{typeLabel}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.rarity} · {item.value}</small>
+                </button>
+              );
+            }
+
+            // ── UEN note tile ──
+            if (item.type.includes("Note")) {
+              return (
+                <button key={item.id} className={`collection-tile collection-tile-note ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  <div className="tile-uen-chip">
+                    <span>UEN</span>
+                  </div>
+                  <span>{typeLabel}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.rarity} · {item.value}</small>
+                </button>
+              );
+            }
+
+            // ── Default tile ──
             return (
-              <button key={item.id} className={`collection-tile ${selected.id === item.id ? "active" : ""}`} onClick={() => selectItem(item)}>
+              <button key={item.id} className={`collection-tile ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
                 <span>{typeLabel}</span>
                 <strong>{item.title}</strong>
                 <small>{item.rarity} / {item.value}</small>

@@ -5524,3 +5524,289 @@ th {
 .player-comment-input::placeholder{color:#4a6b5c}
 .player-comment-submit{background:#75e3ad;border:none;border-radius:8px;color:#0a1f16;cursor:pointer;font-size:12px;font-weight:700;padding:8px 14px;transition:opacity .15s}
 .player-comment-submit:disabled{cursor:default;opacity:.4}
+
+/* ═══════════════════════════════════════════
+   RICH COLLECTION TILES
+═══════════════════════════════════════════ */
+
+/* Album tile — artwork background + spinning vinyl */
+.collection-tile-album {
+  background: #0a1208;
+  border: 1px solid rgba(117,227,173,0.2);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 220px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  text-align: left;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.collection-tile-album:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.6); transform: translateY(-3px); }
+.collection-tile-album.active { border-color: #75e3ad; box-shadow: 0 0 0 2px rgba(117,227,173,0.35), 0 8px 32px rgba(0,0,0,0.5); }
+
+.tile-art-bg {
+  background-size: cover;
+  background-position: center;
+  border-radius: 18px;
+  bottom: 0; left: 0; right: 0; top: 0;
+  filter: blur(0px) saturate(1.1);
+  position: absolute;
+  transition: filter 0.3s;
+}
+.collection-tile-album:hover .tile-art-bg { filter: blur(2px) saturate(1.3); }
+
+.tile-art-overlay {
+  background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.72) 100%);
+  border-radius: 18px;
+  bottom: 0; left: 0; right: 0; top: 0;
+  position: absolute;
+}
+
+/* Vinyl record */
+.tile-vinyl-wrap {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.tile-vinyl {
+  animation: vinylSpin 5s linear infinite;
+  background: radial-gradient(circle,
+    #2a2a2a 0%, #1e1e1e 18%,
+    #141414 19%, #111 55%,
+    #1a1a1a 56%, #121212 57%,
+    #111 72%, #1c1c1c 73%,
+    #111 88%, #222 89%,
+    #1a1a1a 100%
+  );
+  border-radius: 50%;
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(255,255,255,0.07),
+    inset 0 0 0 1px rgba(255,255,255,0.04);
+  height: 96px;
+  position: relative;
+  width: 96px;
+}
+.collection-tile-album.active .tile-vinyl { animation-duration: 2.5s; }
+
+@keyframes vinylSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.tile-vinyl-label {
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%;
+  height: 34px;
+  left: 50%; top: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  z-index: 2;
+}
+
+.tile-vinyl-ring {
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.04);
+  left: 50%; top: 50%;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.tile-vinyl-ring-1 { height: 50px; width: 50px; }
+.tile-vinyl-ring-2 { height: 68px; width: 68px; }
+.tile-vinyl-ring-3 { height: 84px; width: 84px; border-color: rgba(255,255,255,0.06); }
+
+.tile-vinyl-hole {
+  background: #0a0a0a;
+  border-radius: 50%;
+  height: 6px;
+  left: 50%; top: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  z-index: 3;
+}
+
+/* Platinum sheen overlay on vinyl */
+.tile-vinyl::after {
+  animation: vinylSheen 5s linear infinite;
+  background: linear-gradient(135deg, transparent 30%, rgba(200,210,220,0.06) 50%, transparent 70%);
+  border-radius: 50%;
+  bottom: 0; left: 0; right: 0; top: 0;
+  content: "";
+  position: absolute;
+}
+@keyframes vinylSheen {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+.tile-art-info {
+  padding: 10px 14px 14px;
+  position: relative;
+  z-index: 2;
+}
+.tile-art-type {
+  color: #75e3ad;
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+.tile-art-title {
+  color: #fff;
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+.tile-art-meta {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+}
+
+/* Badge tile */
+.collection-tile-badge {
+  background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(180,130,10,0.12));
+  border-color: rgba(251,191,36,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.collection-tile-badge::before {
+  animation: badgeShimmer 3s ease-in-out infinite;
+  background: linear-gradient(135deg, transparent 35%, rgba(251,191,36,0.12) 50%, transparent 65%);
+  bottom: 0; content: ""; left: 0; position: absolute; right: 0; top: 0;
+}
+@keyframes badgeShimmer {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+.collection-tile-badge.active { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,0.3); }
+.tile-badge-icon {
+  align-items: center;
+  background: rgba(251,191,36,0.15);
+  border-radius: 50%;
+  color: #fbbf24;
+  display: flex;
+  height: 52px;
+  justify-content: center;
+  margin-bottom: 4px;
+  width: 52px;
+}
+
+/* Future asset tile */
+.collection-tile-future {
+  background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(60,20,100,0.18));
+  border-color: rgba(139,92,246,0.3);
+  overflow: hidden;
+  position: relative;
+}
+.collection-tile-future.active { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167,139,250,0.3); }
+.tile-orb {
+  animation: orbPulse 3s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(167,139,250,0.9) 0%, rgba(109,40,217,0.6) 40%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(12px);
+  height: 60px;
+  margin-bottom: 8px;
+  width: 60px;
+}
+@keyframes orbPulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.9); }
+  50%       { opacity: 1; transform: scale(1.15); }
+}
+
+/* UEN note tile */
+.collection-tile-note {
+  background: linear-gradient(135deg, rgba(117,227,173,0.1), rgba(26,107,66,0.15));
+  border-color: rgba(117,227,173,0.25);
+  overflow: hidden;
+  position: relative;
+}
+.collection-tile-note.active { border-color: #75e3ad; box-shadow: 0 0 0 2px rgba(117,227,173,0.25); }
+.tile-uen-chip {
+  align-items: center;
+  background: rgba(117,227,173,0.15);
+  border: 1px solid rgba(117,227,173,0.35);
+  border-radius: 8px;
+  display: inline-flex;
+  margin-bottom: 6px;
+  padding: 4px 12px;
+  width: fit-content;
+}
+.tile-uen-chip span {
+  color: #75e3ad;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE PLAYER IMPROVEMENTS
+═══════════════════════════════════════════ */
+
+@media (max-width: 720px) {
+  .player-overlay { padding: 0; align-items: flex-end; }
+
+  .player-modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-radius: 24px 24px 0 0;
+    max-height: 95vh;
+    overflow-y: auto;
+  }
+
+  .player-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: unset;
+  }
+
+  .player-left {
+    border-right: none;
+    border-bottom: 1px solid rgba(117,227,173,0.1);
+    padding: 24px 20px 20px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .player-artwork { height: 160px; width: 160px; }
+
+  .player-album-info { text-align: center; }
+  .player-album-title { font-size: 15px; }
+
+  .player-waveform { height: 56px; }
+
+  .player-controls { gap: 16px; }
+  .player-play-btn { height: 60px; width: 60px; font-size: 22px; }
+  .player-ctrl-btn { height: 44px; width: 44px; font-size: 18px; }
+
+  .player-progress-track { height: 6px; }
+
+  .player-right {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .player-comments-list { max-height: 180px; }
+
+  .player-comment-input { font-size: 14px; padding: 10px 14px; }
+  .player-comment-submit { padding: 10px 16px; font-size: 13px; }
+
+  .player-track-row { padding: 11px 16px; }
+  .player-comment-input-row { padding: 12px 16px; }
+  .player-section-label { padding: 16px 16px 0; }
+  .player-comments-list { padding: 0 16px 8px; }
+}
