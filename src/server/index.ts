@@ -47,6 +47,19 @@ app.use("/api", centralRoutes);
 app.use("/shopify/api", shopifyRoutes);
 app.use("/shopify", shopifyRoutes);
 
+// When Shopify opens the embedded app it hits the configured App URL
+// (currently /shopify) with hmac + shop params. Intercept that and route
+// through /shopify/auth so the auth flow (or the merchant portal shortcut)
+// handles it instead of the admin SPA.
+app.get("/shopify", (req, res, next) => {
+  const { shop, hmac } = req.query;
+  if (shop && hmac) {
+    const params = new URLSearchParams(req.query as Record<string, string>);
+    return res.redirect(`/shopify/auth?${params.toString()}`);
+  }
+  next();
+});
+
 const clientDir = path.resolve(process.cwd(), "dist/client");
 const uploadDir = path.resolve(process.cwd(), "uploads");
 app.use("/uploads", express.static(uploadDir));
