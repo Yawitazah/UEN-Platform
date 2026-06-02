@@ -487,9 +487,6 @@ function PublicShell({ children, compact = false, backTo }: { children: React.Re
       <section className="public-hero">
         <div className="hero-grid">
           <div className="hero-copy">
-            <div className="public-hero-toprow">
-              <div className="brand public-brand"><Shield size={24} /><div><strong><BrandWord /></strong><span>Merchant acceptance network</span></div></div>
-            </div>
             <span className="eyebrow"><Ticket size={16} /> New customer channel for Shopify merchants</span>
             <h1>Turn creator support into sales for your store</h1>
             <p>Accept Universal Exchange Notes and reach motivated Holders from creators, influencers, organizations, ministries, and communities. You control the offer. We handle the note syncing. Your store gets access to warm traffic.</p>
