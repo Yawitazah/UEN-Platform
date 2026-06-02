@@ -480,12 +480,15 @@ function Shell() {
 function PublicShell({ children, compact = false, backTo }: { children: React.ReactNode; compact?: boolean; backTo?: string }) {
   return (
     <main className={`public-main ${compact ? "public-main-compact" : ""}`}>
+      <nav className="public-top-nav">
+        <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
+        {backTo && <a className="reg-back-link" href={backTo}>Back to all options</a>}
+      </nav>
       <section className="public-hero">
         <div className="hero-grid">
           <div className="hero-copy">
             <div className="public-hero-toprow">
               <div className="brand public-brand"><Shield size={24} /><div><strong><BrandWord /></strong><span>Merchant acceptance network</span></div></div>
-              {backTo && <a className="public-hero-back" href={backTo}>Back to all options</a>}
             </div>
             <span className="eyebrow"><Ticket size={16} /> New customer channel for Shopify merchants</span>
             <h1>Turn creator support into sales for your store</h1>

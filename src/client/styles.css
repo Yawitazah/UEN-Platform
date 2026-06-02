@@ -2138,6 +2138,12 @@ th {
   justify-content: space-between;
   margin-bottom: 34px;
 }
+.public-top-nav {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 32px;
+}
 .public-hero-back {
   color: rgba(255,255,255,0.55);
   font-size: 13px;
@@ -4646,6 +4652,7 @@ html { background: #050e09; }
 .holder-reg-nav {
   align-items: center;
   display: flex;
+  justify-content: space-between;
   padding: 20px 28px;
 }
 
@@ -6851,8 +6858,9 @@ html { background: #050e09; }
   padding: 14px 24px;
 }
 .reg-back-link {
-  color: #607069;
+  color: rgba(255, 255, 255, 0.55);
   font-size: 13px;
   text-decoration: none;
+  white-space: nowrap;
 }
-.reg-back-link:hover { color: #17201b; }
+.reg-back-link:hover { color: #fff; }
