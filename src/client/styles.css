@@ -2145,6 +2145,13 @@ th {
 .public-brand {
   margin-bottom: 0;
 }
+.public-brand > div {
+  white-space: nowrap;
+}
+.public-brand strong {
+  white-space: nowrap;
+  display: inline-block;
+}
 
 .public-hero h1 {
   font-size: clamp(44px, 7vw, 78px);
