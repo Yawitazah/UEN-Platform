@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "build": "prisma generate --schema prisma/schema.postgres.prisma && tsc && vite build",
-    "start": "node dist/server/index.js",
+    "start": "prisma migrate resolve --rolled-back 20260602000002_historical_redemptions --schema prisma/schema.postgres.prisma; prisma migrate deploy --schema prisma/schema.postgres.prisma; node dist/server/index.js",
     "build:local": "prisma generate && tsc && vite build",
     "start:local": "node dist/server/index.js",
     "prisma:generate": "prisma generate",
