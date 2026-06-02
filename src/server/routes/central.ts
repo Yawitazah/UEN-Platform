@@ -668,11 +668,11 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
     const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain }, include: { merchant: true } });
     if (!connection) return res.status(404).json({ error: "Connection not found" });
 
-    const uenPattern = /[A-Z0-9]+UEN$/i;
     let pageUrl = `https://${shopDomain}/admin/api/${config.shopifyApiVersion}/orders.json?status=any&limit=250&fields=id,created_at,total_price,discount_codes`;
     let totalOrders = 0;
     let totalImported = 0;
     let totalSkipped = 0;
+    const sampleCodes: string[] = [];
 
     while (pageUrl) {
       const response = await fetch(pageUrl, {
@@ -687,7 +687,11 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
 
       for (const order of payload.orders) {
         for (const dc of order.discount_codes ?? []) {
-          if (!uenPattern.test(dc.code)) continue;
+          if (!dc.code) continue;
+          // Collect a sample of unique codes for debugging
+          if (sampleCodes.length < 20 && !sampleCodes.includes(dc.code)) {
+            sampleCodes.push(dc.code);
+          }
           try {
             await prisma.merchantHistoricalRedemption.upsert({
               where: {
@@ -721,7 +725,7 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
       pageUrl = nextMatch ? nextMatch[1] : "";
     }
 
-    res.json({ shopDomain, totalOrders, totalImported, totalSkipped, message: `Imported ${totalImported} historical redemptions from ${totalOrders} orders.` });
+    res.json({ shopDomain, totalOrders, totalImported, totalSkipped, sampleCodes, message: `Imported ${totalImported} historical redemptions from ${totalOrders} orders.` });
   } catch (error) {
     handleError(res, error);
   }

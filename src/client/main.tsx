@@ -2647,11 +2647,6 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
         setError(payload.error ?? "Could not sign in");
         return;
       }
-      const sessionCheck = await fetch("/api/auth/me", { credentials: "include" });
-      if (!sessionCheck.ok) {
-        setError("Signed in successfully but the session cookie could not be read. Try a hard refresh (Ctrl+Shift+R) or open in a new private window.");
-        return;
-      }
       onLogin();
     } catch (_error) {
       setError("Could not reach the app server. Refresh the page and try again.");
@@ -3272,7 +3267,8 @@ function Connections({ user }: { user: any }) {
     setImportStatus((prev) => ({ ...prev, [shopDomain]: "Importing — this may take a moment…" }));
     try {
       const result = await api<any>(`/api/shopify-connections/${encodeURIComponent(shopDomain)}/import-historical`, { method: "POST" });
-      setImportStatus((prev) => ({ ...prev, [shopDomain]: result.message ?? "Done" }));
+      const sampleText = result.sampleCodes?.length ? ` Sample codes: ${result.sampleCodes.slice(0, 5).join(", ")}` : " No discount codes found in orders.";
+      setImportStatus((prev) => ({ ...prev, [shopDomain]: (result.message ?? "Done") + sampleText }));
     } catch (err) {
       setImportStatus((prev) => ({ ...prev, [shopDomain]: err instanceof Error ? err.message : "Import failed" }));
     }
