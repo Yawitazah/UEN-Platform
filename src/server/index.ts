@@ -15,6 +15,11 @@ import shopifyRoutes from "./routes/shopify";
 
 const app = express();
 
+// Railway (and most reverse proxies) terminate SSL and forward HTTP.
+// Without trust proxy, req.secure is always false and cookies get
+// wrong SameSite/Secure values.
+app.set("trust proxy", true);
+
 app.use(helmet({ contentSecurityPolicy: false, xFrameOptions: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({

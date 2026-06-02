@@ -15,7 +15,9 @@ function cookieOptions(req: express.Request) {
   const secure = req.secure || req.header("x-forwarded-proto") === "https";
   return {
     httpOnly: true,
-    sameSite: (secure ? "none" : "lax") as "none" | "lax",
+    // Admin panel is always accessed directly (never in a cross-origin iframe)
+    // so Lax is correct and works in all browsers without third-party cookie issues.
+    sameSite: "lax" as const,
     secure,
     maxAge: 1000 * 60 * 60 * 24 * 7
   };
