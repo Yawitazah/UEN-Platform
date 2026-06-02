@@ -2933,6 +2933,16 @@ function ExchangeHubs({ user }: { user: any }) {
     await reload();
   };
 
+  const deleteHub = async (id: string, displayName: string) => {
+    if (!window.confirm(`Delete "${displayName}" and all associated records? This cannot be undone.`)) return;
+    try {
+      await api(`/api/exchange-hubs/${id}`, { method: "DELETE" });
+      await reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Delete failed");
+    }
+  };
+
   const pending = (data ?? []).filter((h) => h.status === "PENDING_REVIEW");
   const active = (data ?? []).filter((h) => h.status !== "PENDING_REVIEW");
 
@@ -2953,6 +2963,7 @@ function ExchangeHubs({ user }: { user: any }) {
                 <div className="actions">
                   <button onClick={() => approve(row.id)}><CheckCircle size={15} /> Approve</button>
                   <button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Deny</button>
+                  <button className="ghost danger" onClick={() => deleteHub(row.id, row.displayName)}>Delete</button>
                 </div>
               )]
             ]}
@@ -2988,7 +2999,7 @@ function ExchangeHubs({ user }: { user: any }) {
           ["UEN Value", (row) => `$${Number(row.uenValue ?? 1).toFixed(2)}`],
           ["Status", (row) => <Status value={row.status} />],
           ["Billing", (row) => row.billingStatus],
-          ["Action", (row) => <div className="actions"><button className="ghost" onClick={() => setEditing(row)}>Edit</button><button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button></div>]
+          ["Action", (row) => <div className="actions"><button className="ghost" onClick={() => setEditing(row)}>Edit</button><button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button><button className="ghost danger" onClick={() => deleteHub(row.id, row.displayName)}>Delete</button></div>]
         ]}
       />
       {active.map((hub: any) => (

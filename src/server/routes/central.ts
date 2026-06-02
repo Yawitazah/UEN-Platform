@@ -533,6 +533,39 @@ router.post("/exchange-hubs/:exchangeHubId/suspend", requireRole(writeRoles), as
   }
 });
 
+// Hard-delete an Exchange Hub and all records that depend on it.
+router.delete("/exchange-hubs/:exchangeHubId", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+
+    // Cascade through every table that references this hub
+    const uens = await prisma.universalExchangeNote.findMany({ where: { exchangeHubId }, select: { id: true } });
+    const uenIds = uens.map((u) => u.id);
+
+    await prisma.shopifySyncedNote.deleteMany({ where: { universalExchangeNoteId: { in: uenIds } } });
+    await prisma.uenCodeInventory.updateMany({ where: { universalExchangeNoteId: { in: uenIds } }, data: { universalExchangeNoteId: null, status: "REMOVED" } });
+    await prisma.universalExchangeNote.deleteMany({ where: { exchangeHubId } });
+
+    await prisma.uenIssuanceLog.deleteMany({ where: { issuanceProduct: { exchangeHubId } } });
+    await prisma.uenCodeInventory.deleteMany({ where: { exchangeHubId } });
+    await prisma.shopifyIssuanceProduct.deleteMany({ where: { exchangeHubId } });
+    await prisma.holder.deleteMany({ where: { exchangeHubId } });
+    await prisma.merchantAccessRule.deleteMany({ where: { exchangeHubId } });
+    await prisma.digitalProduct.deleteMany({ where: { exchangeHubId } });
+
+    // Unlink any merchants that were linked to this hub
+    await prisma.merchant.updateMany({ where: { linkedExchangeHubId: exchangeHubId }, data: { linkedExchangeHubId: null, isExchangeHub: false } });
+
+    await prisma.exchangeHub.delete({ where: { id: exchangeHubId } });
+
+    res.json({ deleted: true, displayName: hub.displayName });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.get("/holders", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.holder.findMany({ orderBy: { createdAt: "desc" }, include: { exchangeHub: true } }));
 });
