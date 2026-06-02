@@ -540,24 +540,49 @@ router.delete("/exchange-hubs/:exchangeHubId", requireRole(writeRoles), async (r
     const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
     if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
 
-    // Cascade through every table that references this hub
+    // Collect IDs we'll need for child lookups
     const uens = await prisma.universalExchangeNote.findMany({ where: { exchangeHubId }, select: { id: true } });
     const uenIds = uens.map((u) => u.id);
 
+    const inventoryCodes = await prisma.uenCodeInventory.findMany({ where: { exchangeHubId }, select: { id: true } });
+    const inventoryCodeIds = inventoryCodes.map((c) => c.id);
+
+    const holders = await prisma.holder.findMany({ where: { exchangeHubId }, select: { id: true } });
+    const holderIds = holders.map((h) => h.id);
+
+    const digitalProducts = await prisma.digitalProduct.findMany({ where: { exchangeHubId }, select: { id: true } });
+    const digitalProductIds = digitalProducts.map((d) => d.id);
+
+    const tracks = await prisma.digitalProductTrack.findMany({ where: { digitalProductId: { in: digitalProductIds } }, select: { id: true } });
+    const trackIds = tracks.map((t) => t.id);
+
+    // ── Leaf tables first (nothing references these) ──────────────────
+    await prisma.digitalProductLike.deleteMany({ where: { trackId: { in: trackIds } } });
+    await prisma.digitalProductComment.deleteMany({ where: { trackId: { in: trackIds } } });
+    await prisma.digitalProductTrack.deleteMany({ where: { digitalProductId: { in: digitalProductIds } } });
+
+    await prisma.holderNotification.deleteMany({ where: { holderId: { in: holderIds } } });
+
+    await prisma.shopifyInventorySyncedCode.deleteMany({ where: { inventoryCodeId: { in: inventoryCodeIds } } });
     await prisma.shopifySyncedNote.deleteMany({ where: { universalExchangeNoteId: { in: uenIds } } });
+
+    // ── Mid-level tables ──────────────────────────────────────────────
+    // Null out the UEN link on inventory codes before deleting UENs
     await prisma.uenCodeInventory.updateMany({ where: { universalExchangeNoteId: { in: uenIds } }, data: { universalExchangeNoteId: null, status: "REMOVED" } });
     await prisma.universalExchangeNote.deleteMany({ where: { exchangeHubId } });
 
     await prisma.uenIssuanceLog.deleteMany({ where: { issuanceProduct: { exchangeHubId } } });
+    // Null out digitalProductId so we can delete digital products afterwards
+    await prisma.shopifyIssuanceProduct.updateMany({ where: { exchangeHubId }, data: { digitalProductId: null } });
     await prisma.uenCodeInventory.deleteMany({ where: { exchangeHubId } });
     await prisma.shopifyIssuanceProduct.deleteMany({ where: { exchangeHubId } });
+
+    await prisma.digitalProduct.deleteMany({ where: { exchangeHubId } });
     await prisma.holder.deleteMany({ where: { exchangeHubId } });
     await prisma.merchantAccessRule.deleteMany({ where: { exchangeHubId } });
-    await prisma.digitalProduct.deleteMany({ where: { exchangeHubId } });
 
-    // Unlink any merchants that were linked to this hub
+    // ── Unlink merchants then delete the hub ──────────────────────────
     await prisma.merchant.updateMany({ where: { linkedExchangeHubId: exchangeHubId }, data: { linkedExchangeHubId: null, isExchangeHub: false } });
-
     await prisma.exchangeHub.delete({ where: { id: exchangeHubId } });
 
     res.json({ deleted: true, displayName: hub.displayName });
