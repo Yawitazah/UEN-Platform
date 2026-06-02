@@ -1903,13 +1903,12 @@ function SiteEditor({
 
 function LoginPage() {
   return (
-    <>
-      <main className="public-main login-public">
-        <a className="uenite-logo login-logo" href="/"><Shield size={24} /><BrandWord /></a>
+    <main className="admin-login-screen">
+      <div className="admin-login-card">
+        <a className="admin-login-brand" href="/"><Shield size={24} /><BrandWord /></a>
         <LoginPanel onLogin={() => { window.location.href = "/admin"; }} />
-      </main>
-      <PoweredByFooter />
-    </>
+      </div>
+    </main>
   );
 }
 
@@ -2650,7 +2649,7 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       }
       const sessionCheck = await fetch("/api/auth/me", { credentials: "include" });
       if (!sessionCheck.ok) {
-        setError("Sign-in was accepted, but the browser did not keep the session. In Shopify, confirm the app URL uses HTTPS and redeploy the latest Railway build.");
+        setError("Signed in successfully but the session cookie could not be read. Try a hard refresh (Ctrl+Shift+R) or open in a new private window.");
         return;
       }
       onLogin();

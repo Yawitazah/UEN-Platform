@@ -35,9 +35,14 @@ app.use((req, _res, next) => {
       .split(";")
       .map((part) => part.trim())
       .filter(Boolean)
-      .map((part) => {
-        const [key, ...rest] = part.split("=");
-        return [decodeURIComponent(key), decodeURIComponent(rest.join("="))];
+      .flatMap((part) => {
+        try {
+          const [key, ...rest] = part.split("=");
+          return [[decodeURIComponent(key.trim()), decodeURIComponent(rest.join("="))]];
+        } catch {
+          // Malformed percent-encoding in one cookie must not crash the whole parse
+          return [];
+        }
       })
   );
   next();
