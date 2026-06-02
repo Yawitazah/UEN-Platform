@@ -6298,3 +6298,107 @@ html { background: #050e09; }
   42%       { transform: scale(1.1); }
   70%       { transform: scale(1); }
 }
+
+/* ── Shopify Merchant Portal (/shopify/merchant) ── */
+.shopify-merchant-portal {
+  background: #0a1510;
+  color: #e2f0e8;
+  font-family: system-ui, sans-serif;
+  min-height: 100vh;
+  padding: 0 0 48px;
+}
+.smp-header {
+  align-items: center;
+  background: #0f1f18;
+  border-bottom: 1px solid rgba(52,211,153,0.15);
+  display: flex;
+  gap: 16px;
+  padding: 14px 24px;
+}
+.smp-brand {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  color: #75e3ad;
+}
+.smp-brand strong { font-size: 18px; }
+.smp-shop {
+  color: rgba(226,240,232,0.45);
+  font-size: 13px;
+  margin-left: auto;
+}
+.smp-card {
+  background: #0f1f18;
+  border: 1px solid rgba(52,211,153,0.12);
+  border-radius: 12px;
+  margin: 20px 20px 0;
+  padding: 24px;
+}
+.smp-card h2 {
+  color: #e2f0e8;
+  font-size: 17px;
+  margin: 0 0 6px;
+}
+.smp-subtitle {
+  color: rgba(226,240,232,0.55);
+  font-size: 13px;
+  margin: 0 0 18px;
+}
+.smp-card-warn { border-color: rgba(251,191,36,0.25); }
+.smp-card-help { border-color: rgba(52,211,153,0.08); }
+.smp-status-row {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.smp-status-item { display: flex; flex-direction: column; gap: 4px; }
+.smp-status-item span { color: rgba(226,240,232,0.5); font-size: 12px; }
+.smp-status-item strong { font-size: 15px; }
+.smp-green { color: #34d399; }
+.smp-warn  { color: #fbbf24; }
+.smp-form-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 16px;
+}
+.smp-form-grid label {
+  color: rgba(226,240,232,0.7);
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  gap: 6px;
+}
+.smp-form-grid input,
+.smp-form-grid select {
+  background: #0a1510;
+  border: 1px solid rgba(52,211,153,0.2);
+  border-radius: 6px;
+  color: #e2f0e8;
+  font-size: 14px;
+  padding: 8px 10px;
+}
+.smp-btn {
+  align-items: center;
+  background: #34d399;
+  border: none;
+  border-radius: 8px;
+  color: #07120e;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 7px;
+  padding: 10px 20px;
+  text-decoration: none;
+}
+.smp-btn:hover { background: #6ee7b7; }
+.smp-btn-outline {
+  background: transparent;
+  border: 1px solid rgba(52,211,153,0.35);
+  color: #34d399;
+}
+.smp-btn-outline:hover { background: rgba(52,211,153,0.08); }
+.smp-error   { color: #f87171; font-size: 13px; margin: 0 0 10px; }
+.smp-success { color: #34d399; font-size: 13px; margin: 0 0 10px; }
+.smp-link { color: #34d399; font-size: 13px; text-decoration: underline; }

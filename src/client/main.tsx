@@ -368,7 +368,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
   const refreshAuth = async () => {
     try {
       const response = await fetch("/api/auth/me", { credentials: "include" });
@@ -404,6 +404,7 @@ function Shell() {
           <Route path="/signup" element={<SignupGateway />} />
           <Route path="/exchange-hub/register" element={<ExchangeHubRegister />} />
           <Route path="/widget-preview" element={<WidgetPreviewPage />} />
+          <Route path="/shopify/merchant" element={<ShopifyMerchantPortal />} />
         </Routes>
       ) : (
       <div className="app">
@@ -1909,6 +1910,150 @@ function LoginPage() {
       </main>
       <PoweredByFooter />
     </>
+  );
+}
+
+function ShopifyMerchantPortal() {
+  const params = new URLSearchParams(window.location.search);
+  const shop = params.get("shopDomain") ?? params.get("shop") ?? "";
+  const dashboard = useData<any>(() => fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`).then((r) => (r.ok ? r.json() : Promise.reject(r))), [shop]);
+  const [offer, setOffer] = useState({ discountType: "PERCENTAGE", discountValue: "15", minimumOrderAmount: "", usageLimitPerNote: "1" });
+  const [saveMsg, setSaveMsg] = useState("");
+  const [saveErr, setSaveErr] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+
+  useEffect(() => {
+    if (dashboard.data?.activeOffer) {
+      const o = dashboard.data.activeOffer;
+      setOffer({
+        discountType: o.discountType ?? "PERCENTAGE",
+        discountValue: String(o.discountValue ?? 15),
+        minimumOrderAmount: String(o.minimumOrderAmount ?? ""),
+        usageLimitPerNote: String(o.usageLimitPerNote ?? 1)
+      });
+    }
+  }, [dashboard.data]);
+
+  const saveOffer = async () => {
+    setSaveMsg(""); setSaveErr("");
+    try {
+      await fetch(`/shopify/api/offer-settings?shopDomain=${encodeURIComponent(shop)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...offer, discountValue: Number(offer.discountValue), minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined, usageLimitPerNote: Number(offer.usageLimitPerNote) })
+      });
+      setSaveMsg("Offer saved.");
+      await dashboard.reload();
+    } catch {
+      setSaveErr("Could not save offer.");
+    }
+  };
+
+  const syncNow = async () => {
+    setSyncing(true); setSyncMsg("");
+    try {
+      const r = await fetch(`/shopify/api/sync?shopDomain=${encodeURIComponent(shop)}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await r.json();
+      setSyncMsg(data.message ?? "Sync complete.");
+      await dashboard.reload();
+    } catch {
+      setSyncMsg("Sync failed — try again.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  return (
+    <main className="shopify-merchant-portal">
+      <div className="smp-header">
+        <div className="smp-brand"><Shield size={20} /><strong><BrandWord /></strong></div>
+        <span className="smp-shop">{shop}</span>
+      </div>
+
+      {!shop && (
+        <div className="smp-card">
+          <p>No store domain found. Open this page from your Shopify admin app.</p>
+        </div>
+      )}
+
+      {shop && dashboard.loading && <div className="smp-card"><p>Loading your merchant dashboard…</p></div>}
+
+      {shop && dashboard.error && (
+        <div className="smp-card smp-card-warn">
+          <h2>Store not connected</h2>
+          <p>Your Shopify store isn't linked to a UEN merchant account yet.</p>
+          <a className="smp-btn" href={`/shopify/auth?shop=${encodeURIComponent(shop)}`}>Connect this store</a>
+        </div>
+      )}
+
+      {dashboard.data && (
+        <>
+          <div className="smp-card smp-status-row">
+            <div className="smp-status-item">
+              <span>Connection</span>
+              <strong className={dashboard.data.platformConnectionStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data.platformConnectionStatus}</strong>
+            </div>
+            <div className="smp-status-item">
+              <span>Merchant status</span>
+              <strong className={dashboard.data.merchantStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data.merchantStatus}</strong>
+            </div>
+            <div className="smp-status-item">
+              <span>Synced UEN codes</span>
+              <strong>{dashboard.data.totalSyncedUens}</strong>
+            </div>
+            <div className="smp-status-item">
+              <span>Last sync</span>
+              <strong>{dashboard.data.lastSyncTime ? new Date(dashboard.data.lastSyncTime).toLocaleString() : "Never"}</strong>
+            </div>
+          </div>
+
+          <div className="smp-card">
+            <h2>Offer Settings</h2>
+            <p className="smp-subtitle">This is the discount Holders receive when they use a UEN at your store checkout.</p>
+            <div className="smp-form-grid">
+              <label>
+                Type
+                <select value={offer.discountType} onChange={(e) => setOffer({ ...offer, discountType: e.target.value })}>
+                  <option value="PERCENTAGE">Percentage off</option>
+                  <option value="FIXED_AMOUNT">Fixed amount off</option>
+                </select>
+              </label>
+              <label>
+                Value {offer.discountType === "PERCENTAGE" ? "(%)" : "($)"}
+                <input type="number" min="1" value={offer.discountValue} onChange={(e) => setOffer({ ...offer, discountValue: e.target.value })} />
+              </label>
+              <label>
+                Minimum order ($, optional)
+                <input type="number" min="0" value={offer.minimumOrderAmount} onChange={(e) => setOffer({ ...offer, minimumOrderAmount: e.target.value })} />
+              </label>
+              <label>
+                Uses per note
+                <input type="number" min="1" value={offer.usageLimitPerNote} onChange={(e) => setOffer({ ...offer, usageLimitPerNote: e.target.value })} />
+              </label>
+            </div>
+            {saveErr && <p className="smp-error">{saveErr}</p>}
+            {saveMsg && <p className="smp-success">{saveMsg}</p>}
+            <button className="smp-btn" onClick={saveOffer}>Save offer</button>
+          </div>
+
+          <div className="smp-card">
+            <h2>UEN Code Sync</h2>
+            <p className="smp-subtitle">Approved UEN codes are pushed to your Shopify discount list automatically. You can also trigger a manual sync.</p>
+            {syncMsg && <p className="smp-success">{syncMsg}</p>}
+            <button className="smp-btn smp-btn-outline" onClick={syncNow} disabled={syncing}>
+              <RefreshCw size={15} /> {syncing ? "Syncing…" : "Sync UEN codes now"}
+            </button>
+          </div>
+
+          <div className="smp-card smp-card-help">
+            <h2>Need help?</h2>
+            <p>Holders with valid UEN codes will be able to use them at your Shopify checkout. Make sure your store is accepting discount codes and your offer is active.</p>
+            <a className="smp-link" href="/merchants/register">Learn more about the merchant network</a>
+          </div>
+        </>
+      )}
+    </main>
   );
 }
 

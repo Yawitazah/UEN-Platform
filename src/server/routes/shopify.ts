@@ -221,6 +221,15 @@ router.get("/auth", async (req, res) => {
     return res.status(500).send("SHOPIFY_API_KEY and SHOPIFY_API_SECRET must be configured");
   }
 
+  // If the store is already connected and this isn't a fresh onboarding flow,
+  // skip OAuth and send the merchant straight to their portal.
+  if (!onboardingToken) {
+    const existingConn = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
+    if (existingConn?.status === "ACTIVE") {
+      return res.redirect(`/shopify/merchant?shopDomain=${encodeURIComponent(shop)}`);
+    }
+  }
+
   const state = crypto.randomBytes(16).toString("hex");
   const redirectUri = `${config.shopifyAppUrl.replace(/\/$/, "")}/shopify/auth/callback`;
   const params = new URLSearchParams({
@@ -283,7 +292,7 @@ router.get("/auth/callback", async (req, res) => {
     if (onboarding && onboarding.shopDomain !== shop) return res.status(400).send("Onboarding link does not match this Shopify store");
     const existingConnection = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
     const matchedHub = await hubForShopDomain(shop);
-    const merchant =
+    let merchant =
       onboarding?.merchant ??
       (existingConnection ? await prisma.merchant.findUnique({ where: { id: existingConnection.merchantId } }) : null) ??
       (matchedHub ? await prisma.merchant.findFirst({ where: { linkedExchangeHubId: matchedHub.id } }) : null) ??
@@ -297,8 +306,31 @@ router.get("/auth/callback", async (req, res) => {
               linkedExchangeHubId: matchedHub.id
             }
           })
-        : await prisma.merchant.findFirst({ where: { businessName: "Merchant A" } }));
-    if (!merchant) return res.status(404).send("Merchant A is not seeded");
+        : null);
+
+    // Fresh self-serve install: auto-create an ACTIVE merchant so the store owner
+    // can configure their offer immediately without waiting for admin approval.
+    let freshInstall = false;
+    if (!merchant) {
+      const shopName = shop.replace(/\.myshopify\.com$/, "").replace(/-/g, " ");
+      merchant = await prisma.merchant.create({
+        data: {
+          businessName: shopName,
+          platformType: "SHOPIFY",
+          status: "ACTIVE"
+        }
+      });
+      await prisma.merchantOffer.create({
+        data: {
+          merchantId: merchant.id,
+          discountType: "PERCENTAGE",
+          discountValue: 15,
+          usageLimitPerNote: 1,
+          status: "ACTIVE"
+        }
+      });
+      freshInstall = true;
+    }
 
     const connection = await prisma.shopifyConnection.upsert({
       where: { shopDomain: shop },
@@ -374,7 +406,18 @@ router.get("/auth/callback", async (req, res) => {
 
     res.clearCookie("shopify_oauth_state");
     res.clearCookie("shopify_onboarding_token");
-    res.redirect(onboarding ? `/merchant/install/${encodeURIComponent(onboarding.token)}?installed=1` : `/shopify?shopDomain=${encodeURIComponent(shop)}`);
+    if (onboarding) {
+      res.redirect(`/merchant/install/${encodeURIComponent(onboarding.token)}?installed=1`);
+    } else if (freshInstall || config.shopifyApiKey) {
+      // Send the merchant back into the Shopify admin embedded context.
+      // /shopify/auth will detect the active connection and serve the merchant portal.
+      const embeddedUrl = config.shopifyApiKey
+        ? `https://${shop}/admin/apps/${config.shopifyApiKey}`
+        : `/shopify/merchant?shopDomain=${encodeURIComponent(shop)}`;
+      res.redirect(embeddedUrl);
+    } else {
+      res.redirect(`/shopify/merchant?shopDomain=${encodeURIComponent(shop)}`);
+    }
   } catch (error) {
     handleError(res, error);
   }
