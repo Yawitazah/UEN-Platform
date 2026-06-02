@@ -8,7 +8,8 @@ import { audit } from "../audit";
 import { config } from "../config";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
-import { requireMerchantAccess, requireRole } from "../security";
+import bcrypt from "bcryptjs";
+import { createMerchantSession, requireMerchantAccess, requireRole } from "../security";
 import { syncCodesToGroupedShopifyDiscount, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
@@ -268,6 +269,81 @@ router.post("/exchange-hub/apply", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not submit application" });
+  }
+});
+
+// POST /api/exchange-hub/register — public self-registration that creates a merchant
+// account immediately so they can log in, plus submits a hub application for review.
+router.post("/exchange-hub/register", async (req, res) => {
+  try {
+    const data = z.object({
+      displayName: z.string().min(2).max(120),
+      hubType: z.string().min(2).max(60),
+      contactName: z.string().max(120).optional(),
+      contactEmail: z.string().email(),
+      website: z.string().max(300).optional(),
+      description: z.string().max(800).optional(),
+      password: z.string().min(8)
+    }).parse(req.body);
+
+    const normalizedEmail = data.contactEmail.toLowerCase();
+
+    const existing = await prisma.merchant.findUnique({ where: { contactEmail: normalizedEmail } });
+    if (existing) {
+      return res.status(409).json({ error: "An account with that email already exists. Sign in instead." });
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    const merchant = await prisma.merchant.create({
+      data: {
+        businessName: data.displayName.trim(),
+        platformType: "SHOPIFY",
+        status: "ACTIVE",
+        contactEmail: normalizedEmail,
+        passwordHash
+      }
+    });
+
+    const slug = data.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const hub = await prisma.exchangeHub.create({
+      data: {
+        name: slug,
+        displayName: data.displayName.trim(),
+        hubType: data.hubType.toLowerCase().trim(),
+        status: "PENDING_REVIEW",
+        billingStatus: "PENDING",
+        uenValue: 1.00,
+        applicantMerchantId: merchant.id
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "EXCHANGE_HUB_APPLICATION",
+        actorType: "public",
+        entityType: "ExchangeHub",
+        entityId: hub.id,
+        message: `Self-registered hub application: ${data.displayName} (${normalizedEmail})`,
+        metadata: JSON.stringify({ contactName: data.contactName, website: data.website, description: data.description })
+      }
+    });
+
+    const token = createMerchantSession({ id: merchant.id, merchantId: merchant.id });
+    const secure = req.secure || req.header("x-forwarded-proto") === "https";
+    res.cookie("uen_merchant_session", token, {
+      httpOnly: true,
+      sameSite: (secure ? "none" : "lax") as "none" | "lax",
+      secure,
+      maxAge: 1000 * 60 * 60 * 24 * 30
+    });
+
+    res.status(201).json({
+      merchant: { id: merchant.id, businessName: merchant.businessName },
+      hub: { id: hub.id, displayName: hub.displayName },
+      message: "Account created. Your Exchange Hub application is under review."
+    });
+  } catch (error) {
+    handleError(res, error);
   }
 });
 

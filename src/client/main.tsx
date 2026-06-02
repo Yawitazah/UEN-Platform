@@ -469,7 +469,7 @@ function Shell() {
   );
 }
 
-function PublicShell({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
+function PublicShell({ children, compact = false, backTo }: { children: React.ReactNode; compact?: boolean; backTo?: string }) {
   return (
     <main className={`public-main ${compact ? "public-main-compact" : ""}`}>
       <section className="public-hero">
@@ -488,6 +488,7 @@ function PublicShell({ children, compact = false }: { children: React.ReactNode;
               <span>No second website</span>
               <span>No checkout rebuild</span>
             </div>
+            {backTo && <a className="public-back-link" href={backTo}>← All options</a>}
           </div>
           <div className="hero-visual" aria-hidden="true">
             <div className="note-card note-card-a"><span>Holder traffic</span><strong>NUBREED74201UEN</strong></div>
@@ -2453,7 +2454,7 @@ function MerchantRegister() {
     { Icon: TrendingUp, title: "You gain new customers", body: "Join a network where more Exchange Hubs can send motivated traffic." },
   ];
   return (
-    <PublicShell>
+    <PublicShell backTo="/signup">
       {/* -- Value band -- */}
       <section className="value-band">
         <div className="section-inner">
@@ -3485,7 +3486,7 @@ function HolderRegister() {
 
   const submit = async () => {
     setError("");
-    if (!form.exchangeHubId || !form.email) { setError("Exchange Hub and email are required."); return; }
+    if (!form.email) { setError("Please enter your email address."); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/holder/register", {
@@ -3513,6 +3514,7 @@ function HolderRegister() {
     <div className="holder-reg-root">
       <nav className="holder-reg-nav">
         <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
+        <a className="holder-reg-back" href="/signup">← All options</a>
       </nav>
 
       <div className="holder-reg-body">
@@ -3527,13 +3529,13 @@ function HolderRegister() {
 
               <div className="holder-reg-form">
                 <label className="holder-reg-label">
-                  Exchange Hub
+                  Where did you get your notes from?
                   <select
                     className="holder-reg-input"
                     value={form.exchangeHubId}
                     onChange={(e) => setForm({ ...form, exchangeHubId: e.target.value })}
                   >
-                    <option value="">Select your hub...</option>
+                    <option value="">Select your Exchange Hub (optional)</option>
                     {(hubs.data ?? []).map((h: any) => (
                       <option key={h.id} value={h.id}>{h.displayName}</option>
                     ))}
@@ -4424,7 +4426,9 @@ function ExchangeHubRegister() {
     contactName: "",
     contactEmail: "",
     website: "",
-    description: ""
+    description: "",
+    password: "",
+    confirmPassword: ""
   });
   const [result, setResult] = useState<any | null>(null);
   const [error, setError] = useState("");
@@ -4450,12 +4454,29 @@ function ExchangeHubRegister() {
       setError("Please enter a valid email address.");
       return;
     }
+    if (!form.password || form.password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch("/api/exchange-hub/apply", {
+      const res = await fetch("/api/exchange-hub/register", {
         method: "POST",
+        credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          displayName: form.displayName,
+          hubType: form.hubType,
+          contactName: form.contactName,
+          contactEmail: form.contactEmail,
+          website: form.website,
+          description: form.description,
+          password: form.password
+        })
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Could not submit application");
@@ -4539,6 +4560,28 @@ function ExchangeHubRegister() {
                 </label>
 
                 <label className="hub-apply-label">
+                  Create a password <span className="req">*</span>
+                  <input
+                    className="hub-apply-input"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="At least 8 characters"
+                  />
+                </label>
+
+                <label className="hub-apply-label">
+                  Confirm password <span className="req">*</span>
+                  <input
+                    className="hub-apply-input"
+                    type="password"
+                    value={form.confirmPassword}
+                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                    placeholder="Repeat your password"
+                  />
+                </label>
+
+                <label className="hub-apply-label">
                   Website or social link <span className="hub-apply-opt">(optional)</span>
                   <input
                     className="hub-apply-input"
@@ -4571,12 +4614,12 @@ function ExchangeHubRegister() {
           ) : (
             <div className="hub-apply-card hub-apply-success">
               <div className="hub-apply-success-icon"><CheckCircle size={44} /></div>
-              <h1>Application received!</h1>
-              <p>Thank you, <strong>{form.contactName || form.displayName}</strong>. We've received your application for <strong>{result.displayName}</strong> and our team will review it shortly.</p>
-              <p className="hub-apply-success-note">We'll reach out to <strong>{form.contactEmail}</strong> within a few business days. While you wait, feel free to explore the platform.</p>
+              <h1>You're in!</h1>
+              <p>Your merchant account is active. Your Exchange Hub application for <strong>{result.hub?.displayName}</strong> is under review — you'll be notified when it's approved.</p>
+              <p className="hub-apply-success-note">In the meantime, you can set up your store offer, connect Shopify, and explore your merchant dashboard.</p>
               <div className="hub-apply-success-links">
-                <a className="hub-apply-btn" href="/">Back to home</a>
-                <a className="hub-apply-btn-ghost" href="/merchants/register">Register a store instead</a>
+                <a className="hub-apply-btn" href="/shopify/merchant">Go to my merchant dashboard</a>
+                <a className="hub-apply-btn-ghost" href="/">Back to home</a>
               </div>
             </div>
           )}

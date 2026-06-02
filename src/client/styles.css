@@ -6797,3 +6797,22 @@ html { background: #050e09; }
   background: rgba(52,211,153,0.08);
   border-color: rgba(52,211,153,0.5);
 }
+
+/* ── Registration page back links ── */
+.holder-reg-back,
+.hub-apply-back {
+  color: rgba(226,240,232,0.5);
+  font-size: 13px;
+  text-decoration: none;
+}
+.holder-reg-back:hover,
+.hub-apply-back:hover { color: #34d399; }
+
+.public-back-link {
+  color: rgba(255,255,255,0.55);
+  display: inline-block;
+  font-size: 13px;
+  margin-top: 16px;
+  text-decoration: none;
+}
+.public-back-link:hover { color: #fff; }
