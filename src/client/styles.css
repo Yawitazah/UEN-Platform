@@ -783,6 +783,9 @@ th {
 }
 
 .brand-word {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   font-weight: 900;
   white-space: nowrap;
 }
