@@ -669,6 +669,29 @@ router.post("/merchants", requireRole(writeRoles), async (req, res) => {
   }
 });
 
+// Reset a merchant's login credentials (admin only).
+router.patch("/merchants/:merchantId/credentials", requireRole(writeRoles), async (req, res) => {
+  try {
+    const data = z.object({
+      contactEmail: z.string().email().optional(),
+      password: z.string().min(8).optional()
+    }).parse(req.body);
+    if (!data.contactEmail && !data.password) {
+      return res.status(400).json({ error: "Provide contactEmail, password, or both." });
+    }
+    const updates: Record<string, unknown> = {};
+    if (data.contactEmail) updates.contactEmail = data.contactEmail.toLowerCase();
+    if (data.password) updates.passwordHash = await bcrypt.hash(data.password, 12);
+    const merchant = await prisma.merchant.update({
+      where: { id: param(req, "merchantId") },
+      data: updates
+    });
+    res.json({ id: merchant.id, businessName: merchant.businessName, contactEmail: merchant.contactEmail });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.get("/merchant-offers", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.merchantOffer.findMany({ orderBy: { createdAt: "desc" }, include: { merchant: true } }));
 });

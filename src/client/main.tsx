@@ -2689,7 +2689,7 @@ function Header({ title, subtitle, user }: { title: string; subtitle: string; us
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     localStorage.removeItem("uen_admin_token");
-    authRefresh?.();
+    window.location.href = "/login";
   };
   return (
     <header className="page-header">
@@ -3101,9 +3101,24 @@ function Merchants({ user }: { user: any }) {
   const hubs = useData<any[]>(() => api("/api/exchange-hubs"));
   const merchants = useData<any[]>(() => api("/api/merchants"));
   const [form, setForm] = useState({ businessName: "", platformType: "SHOPIFY", isExchangeHub: false, linkedExchangeHubId: "" });
+  const [credForm, setCredForm] = useState({ merchantId: "", contactEmail: "", password: "" });
+  const [credMsg, setCredMsg] = useState("");
   const create = async () => {
     await api("/api/merchants", { method: "POST", body: JSON.stringify({ ...form, linkedExchangeHubId: form.linkedExchangeHubId || undefined }) });
     await merchants.reload();
+  };
+  const resetCredentials = async () => {
+    setCredMsg("");
+    try {
+      const body: Record<string, string> = {};
+      if (credForm.contactEmail) body.contactEmail = credForm.contactEmail;
+      if (credForm.password) body.password = credForm.password;
+      const result = await api<any>(`/api/merchants/${credForm.merchantId}/credentials`, { method: "PATCH", body: JSON.stringify(body) });
+      setCredMsg(`Done. ${result.businessName} (${result.contactEmail}) credentials updated.`);
+      setCredForm({ merchantId: "", contactEmail: "", password: "" });
+    } catch (err) {
+      setCredMsg(err instanceof Error ? err.message : "Failed");
+    }
   };
   return (
     <>
@@ -3113,7 +3128,17 @@ function Merchants({ user }: { user: any }) {
         <Select label="Linked hub" value={form.linkedExchangeHubId} options={hubs.data ?? []} onChange={(linkedExchangeHubId) => setForm({ ...form, linkedExchangeHubId, isExchangeHub: Boolean(linkedExchangeHubId) })} />
         <button onClick={create}><UploadCloud size={16} /> Create Merchant</button>
       </FormGrid>
-      <DataTable rows={merchants.data ?? []} columns={[["Business", (r) => r.businessName], ["Platform", (r) => r.platformType], ["Status", (r) => <Status value={r.status} />], ["Exchange Hub Merchant", (r) => r.isExchangeHub ? "Yes" : "No"]]} />
+      <DataTable rows={merchants.data ?? []} columns={[["Business", (r) => r.businessName], ["Platform", (r) => r.platformType], ["Email", (r) => r.contactEmail ?? "—"], ["Status", (r) => <Status value={r.status} />], ["Exchange Hub Merchant", (r) => r.isExchangeHub ? "Yes" : "No"]]} />
+      <section className="panel" style={{ marginTop: 24 }}>
+        <h2>Reset Merchant Login Credentials</h2>
+        {credMsg && <Notice tone={credMsg.startsWith("Done") ? "neutral" : "bad"}>{credMsg}</Notice>}
+        <FormGrid>
+          <Select label="Merchant" value={credForm.merchantId} options={merchants.data ?? []} labelKey="businessName" onChange={(merchantId) => setCredForm({ ...credForm, merchantId })} />
+          <Input label="New email (optional)" value={credForm.contactEmail} onChange={(contactEmail) => setCredForm({ ...credForm, contactEmail })} />
+          <Input label="New password (optional, min 8)" value={credForm.password} onChange={(password) => setCredForm({ ...credForm, password })} type="password" />
+          <button onClick={resetCredentials} disabled={!credForm.merchantId || (!credForm.contactEmail && !credForm.password)}>Reset Credentials</button>
+        </FormGrid>
+      </section>
     </>
   );
 }
