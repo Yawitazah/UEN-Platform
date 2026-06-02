@@ -2154,9 +2154,9 @@ function ShopifyMerchantPortal() {
                 <p>Your UEN performance at a glance.</p>
               </div>
               <div className="mp-period-tabs">
-                {["day", "month", "year"].map((p) => (
+                {(["day", "month", "year", "max"] as const).map((p) => (
                   <button key={p} className={`mp-period-btn ${period === p ? "active" : ""}`} onClick={() => setPeriod(p)}>
-                    {p === "day" ? "Today" : p === "month" ? "30 days" : "Year"}
+                    {p === "day" ? "Today" : p === "month" ? "30 days" : p === "year" ? "Year" : "Max"}
                   </button>
                 ))}
               </div>
@@ -2169,13 +2169,21 @@ function ShopifyMerchantPortal() {
                 <span className="mp-stat-sub">Ready to use at checkout</span>
               </div>
               <div className="mp-stat-card mp-stat-revenue">
-                <span className="mp-stat-label">Revenue from UENs</span>
-                <strong className="mp-stat-value">${analytics.loading ? "—" : (analytics.data?.revenueInPeriod ?? 0).toFixed(2)}</strong>
-                <span className="mp-stat-sub">Orders placed with a UEN code</span>
+                <span className="mp-stat-label">{period === "max" ? "All-time revenue" : "Revenue from UENs"}</span>
+                <strong className="mp-stat-value">
+                  ${analytics.loading ? "—" : period === "max"
+                    ? (analytics.data?.allTimeRevenue ?? 0).toFixed(2)
+                    : (analytics.data?.revenueInPeriod ?? 0).toFixed(2)}
+                </strong>
+                <span className="mp-stat-sub">{period === "max" ? "Total revenue ever from UEN codes" : "Orders placed with a UEN code"}</span>
               </div>
               <div className="mp-stat-card">
-                <span className="mp-stat-label">Redemptions this period</span>
-                <strong className="mp-stat-value">{analytics.loading ? "—" : analytics.data?.redemptionsInPeriod ?? 0}</strong>
+                <span className="mp-stat-label">{period === "max" ? "All-time redemptions" : "Redemptions this period"}</span>
+                <strong className="mp-stat-value">
+                  {analytics.loading ? "—" : period === "max"
+                    ? analytics.data?.allTimeRedemptions ?? 0
+                    : analytics.data?.redemptionsInPeriod ?? 0}
+                </strong>
                 <span className="mp-stat-sub">Codes used at checkout</span>
               </div>
               <div className="mp-stat-card">

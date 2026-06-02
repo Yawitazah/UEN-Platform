@@ -824,15 +824,24 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
     const since =
       period === "day" ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
       : period === "year" ? new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+      : period === "max" ? null
       : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const [totalSynced, redemptionsInPeriod, allTimeRedemptions, syncLogs] = await Promise.all([
+    const redemptionFilter = since
+      ? { merchantId, redeemedAt: { gte: since } }
+      : { merchantId, redeemedAt: { not: null } };
+
+    const [totalSynced, redemptionsInPeriod, allTimeRedemptions, allTimeRevenue, syncLogs] = await Promise.all([
       prisma.shopifySyncedNote.count({ where: { merchantId, syncStatus: "SYNCED" } }),
       prisma.shopifySyncedNote.findMany({
-        where: { merchantId, redeemedAt: { gte: since } },
+        where: redemptionFilter,
         select: { redeemedOrderAmount: true }
       }),
       prisma.shopifySyncedNote.count({ where: { merchantId, redeemedAt: { not: null } } }),
+      prisma.shopifySyncedNote.findMany({
+        where: { merchantId, redeemedAt: { not: null } },
+        select: { redeemedOrderAmount: true }
+      }),
       prisma.syncLog.findMany({
         where: { merchantId },
         orderBy: { createdAt: "desc" },
@@ -844,6 +853,7 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
     res.json({
       totalSyncedUens: totalSynced,
       allTimeRedemptions,
+      allTimeRevenue: allTimeRevenue.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0),
       redemptionsInPeriod: redemptionsInPeriod.length,
       revenueInPeriod: redemptionsInPeriod.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0),
       recentSyncLogs: syncLogs
