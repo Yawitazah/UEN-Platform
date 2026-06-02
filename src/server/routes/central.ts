@@ -385,6 +385,53 @@ router.patch("/exchange-hubs/:exchangeHubId", requireRole(writeRoles), async (re
   }
 });
 
+// Approve a pending Exchange Hub application — activates the hub and
+// upgrades the applicant merchant in one step.
+router.post("/exchange-hubs/:exchangeHubId/approve", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+    if (hub.status === "ACTIVE") return res.status(409).json({ error: "Already active" });
+
+    const updatedHub = await prisma.exchangeHub.update({
+      where: { id: exchangeHubId },
+      data: { status: "ACTIVE", billingStatus: "ACTIVE" }
+    });
+
+    // If this hub came from a merchant application, upgrade that merchant.
+    if (hub.applicantMerchantId) {
+      await prisma.merchant.update({
+        where: { id: hub.applicantMerchantId },
+        data: {
+          isExchangeHub: true,
+          linkedExchangeHubId: exchangeHubId,
+          businessName: hub.displayName
+        }
+      });
+      // Grant the merchant access to issue for this hub.
+      await prisma.merchantAccessRule.upsert({
+        where: { merchantId_exchangeHubId: { merchantId: hub.applicantMerchantId, exchangeHubId } },
+        update: { status: "ACTIVE" },
+        create: { merchantId: hub.applicantMerchantId, exchangeHubId, status: "ACTIVE" }
+      });
+    }
+
+    await audit({
+      action: AuditAction.EXCHANGE_HUB_SUSPENDED,
+      actorId: req.auth?.actorId,
+      actorType: req.auth?.actorType ?? "admin",
+      entityType: "ExchangeHub",
+      entityId: exchangeHubId,
+      message: `Exchange Hub approved and activated${hub.applicantMerchantId ? ` (merchant ${hub.applicantMerchantId} upgraded)` : ""}`
+    });
+
+    res.json(updatedHub);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.post("/exchange-hubs/:exchangeHubId/suspend", requireRole(writeRoles), async (req, res) => {
   try {
     const exchangeHubId = param(req, "exchangeHubId");

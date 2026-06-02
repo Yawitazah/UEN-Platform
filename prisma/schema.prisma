@@ -29,6 +29,7 @@ model ExchangeHub {
   customDomain           String?
   subdomain              String?                 @unique
   uenValue               Decimal                 @default(1.00)
+  applicantMerchantId    String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   holders                Holder[]

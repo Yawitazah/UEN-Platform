@@ -97,23 +97,76 @@ router.post("/logout", (req, res) => {
   res.json({ ok: true });
 });
 
-// Return current merchant from session.
+// Return current merchant from session — includes hub status so the portal
+// knows which UI to show without a separate fetch.
 router.get("/me", async (req, res) => {
   if (!req.auth || req.auth.actorType !== "merchant") return res.status(401).json({ error: "Not signed in" });
   const merchant = await prisma.merchant.findUnique({
     where: { id: req.auth.merchantId },
-    include: { shopifyConnections: { where: { status: "ACTIVE" }, take: 1 } }
+    include: {
+      shopifyConnections: { where: { status: "ACTIVE" }, take: 1 },
+      linkedExchangeHub: true
+    }
   });
   if (!merchant) return res.status(404).json({ error: "Merchant not found" });
+
+  // Check if they have a pending hub application
+  const pendingHub = merchant.isExchangeHub
+    ? null
+    : await prisma.exchangeHub.findFirst({
+        where: { applicantMerchantId: merchant.id, status: "PENDING_REVIEW" }
+      });
+
   res.json({
     merchant: {
       id: merchant.id,
       businessName: merchant.businessName,
       contactEmail: merchant.contactEmail,
       status: merchant.status,
-      shopDomain: merchant.shopifyConnections[0]?.shopDomain ?? null
+      shopDomain: merchant.shopifyConnections[0]?.shopDomain ?? null,
+      isExchangeHub: merchant.isExchangeHub,
+      hubStatus: merchant.isExchangeHub ? "APPROVED" : pendingHub ? "PENDING" : "NONE",
+      hub: merchant.linkedExchangeHub
+        ? { id: merchant.linkedExchangeHub.id, displayName: merchant.linkedExchangeHub.displayName }
+        : null
     }
   });
+});
+
+// Submit an Exchange Hub application from a logged-in merchant.
+router.post("/apply-hub", async (req, res) => {
+  try {
+    if (!req.auth || req.auth.actorType !== "merchant") return res.status(401).json({ error: "Not signed in" });
+    const data = z.object({
+      displayName: z.string().min(2).max(120),
+      hubType: z.string().min(2).max(60),
+      description: z.string().max(800).optional()
+    }).parse(req.body);
+
+    const merchant = await prisma.merchant.findUnique({ where: { id: req.auth.merchantId } });
+    if (!merchant) return res.status(404).json({ error: "Merchant not found" });
+    if (merchant.isExchangeHub) return res.status(409).json({ error: "Already an Exchange Hub" });
+
+    const existing = await prisma.exchangeHub.findFirst({ where: { applicantMerchantId: merchant.id, status: "PENDING_REVIEW" } });
+    if (existing) return res.status(409).json({ error: "Application already submitted and under review" });
+
+    const slug = data.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const hub = await prisma.exchangeHub.create({
+      data: {
+        name: slug,
+        displayName: data.displayName.trim(),
+        hubType: data.hubType.toLowerCase().trim(),
+        status: "PENDING_REVIEW",
+        billingStatus: "PENDING",
+        uenValue: 1.00,
+        applicantMerchantId: merchant.id
+      }
+    });
+
+    res.status(201).json({ id: hub.id, displayName: hub.displayName, status: hub.status });
+  } catch (error) {
+    handleError(res, error);
+  }
 });
 
 export default router;

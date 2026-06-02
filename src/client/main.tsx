@@ -1937,6 +1937,12 @@ function ShopifyMerchantPortal() {
   const [authState, setAuthState] = useState<"loading" | "no-account" | "login" | "dashboard">("loading");
   const [merchant, setMerchant] = useState<any>(null);
 
+  // Exchange Hub application form state
+  const [hubForm, setHubForm] = useState({ displayName: "", hubType: "creator", description: "" });
+  const [hubApplying, setHubApplying] = useState(false);
+  const [hubError, setHubError] = useState("");
+  const [hubMsg, setHubMsg] = useState("");
+
   // Create account form
   const [setupForm, setSetupForm] = useState({ businessName: shop.replace(/\.myshopify\.com$/, "").replace(/-/g, " "), email: "", password: "", confirmPassword: "" });
   const [setupError, setSetupError] = useState("");
@@ -2123,6 +2129,64 @@ function ShopifyMerchantPortal() {
             <p>Holders with valid UEN codes will be able to use them at your Shopify checkout.</p>
             <a className="smp-link" href="/merchants/register">Learn more about the merchant network</a>
           </div>
+
+          {/* ── Exchange Hub section ── */}
+          {merchant?.hubStatus === "APPROVED" && (
+            <div className="smp-card smp-card-hub-active">
+              <div className="smp-hub-badge"><Users size={18} /> Exchange Hub</div>
+              <h2>{merchant.hub?.displayName ?? merchant.businessName}</h2>
+              <p className="smp-subtitle">Your Exchange Hub is active. You can issue Universal Exchange Notes to your supporters and manage your holder network.</p>
+              <div className="smp-hub-status-row">
+                <span className="smp-green" style={{ fontWeight: 600, fontSize: 14 }}>✓ Active and issuing</span>
+              </div>
+            </div>
+          )}
+
+          {merchant?.hubStatus === "PENDING" && (
+            <div className="smp-card smp-card-hub-pending">
+              <div className="smp-hub-badge" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}><Users size={18} /> Exchange Hub Application</div>
+              <h2>Application under review</h2>
+              <p className="smp-subtitle">Your Exchange Hub application has been submitted. You'll be notified once it's reviewed.</p>
+            </div>
+          )}
+
+          {merchant?.hubStatus === "NONE" && (
+            <div className="smp-card smp-card-hub-apply">
+              <div className="smp-hub-badge"><Users size={18} /> Become an Exchange Hub</div>
+              <h2>Issue UEN codes to your community</h2>
+              <p className="smp-subtitle">Exchange Hubs issue Universal Exchange Notes to supporters, customers, or community members. Approved by the UENITE team.</p>
+              {hubError && <p className="smp-error">{hubError}</p>}
+              {hubMsg && <p className="smp-success">{hubMsg}</p>}
+              {!hubMsg && (
+                <div className="smp-form-grid">
+                  <label>Organization / Hub name<input value={hubForm.displayName} onChange={(e) => setHubForm({ ...hubForm, displayName: e.target.value })} placeholder="e.g. Hebrew Care" /></label>
+                  <label>Hub type<select value={hubForm.hubType} onChange={(e) => setHubForm({ ...hubForm, hubType: e.target.value })}><option value="creator">Creator</option><option value="ministry">Ministry / Church</option><option value="nonprofit">Nonprofit / Cause</option><option value="community">Community</option><option value="brand">Brand</option><option value="other">Other</option></select></label>
+                  <label style={{ gridColumn: "1 / -1" }}>Why do you want to issue notes? (optional)<input value={hubForm.description} onChange={(e) => setHubForm({ ...hubForm, description: e.target.value })} placeholder="Brief description of your community or cause" /></label>
+                </div>
+              )}
+              {!hubMsg && (
+                <button className="smp-btn smp-btn-outline" disabled={hubApplying || !hubForm.displayName} onClick={async () => {
+                  setHubApplying(true); setHubError("");
+                  try {
+                    const r = await fetch("/api/merchant/apply-hub", {
+                      method: "POST", credentials: "include",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify(hubForm)
+                    });
+                    const data = await r.json();
+                    if (!r.ok) { setHubError(data.error ?? "Could not submit application."); }
+                    else {
+                      setHubMsg("Application submitted! We'll review it and update your dashboard when approved.");
+                      setMerchant((prev: any) => ({ ...prev, hubStatus: "PENDING" }));
+                    }
+                  } catch { setHubError("Could not connect. Try again."); }
+                  finally { setHubApplying(false); }
+                }}>
+                  <Users size={15} /> {hubApplying ? "Submitting…" : "Apply as Exchange Hub"}
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
     </main>
@@ -2613,6 +2677,10 @@ function ExchangeHubs({ user }: { user: any }) {
     await api(`/api/exchange-hubs/${id}/suspend`, { method: "POST" });
     await reload();
   };
+  const approve = async (id: string) => {
+    await api(`/api/exchange-hubs/${id}/approve`, { method: "POST" });
+    await reload();
+  };
   const saveEdit = async () => {
     if (!editing) return;
     await api(`/api/exchange-hubs/${editing.id}`, {
@@ -2628,9 +2696,34 @@ function ExchangeHubs({ user }: { user: any }) {
     setEditing(null);
     await reload();
   };
+
+  const pending = (data ?? []).filter((h) => h.status === "PENDING_REVIEW");
+  const active = (data ?? []).filter((h) => h.status !== "PENDING_REVIEW");
+
   return (
     <>
       <Header title="Exchange Hubs" subtitle="Create and suspend audience-holders that issue UENs." user={user} />
+
+      {pending.length > 0 && (
+        <>
+          <h2 style={{ margin: "24px 0 8px", color: "#b45309" }}>⏳ Pending Applications ({pending.length})</h2>
+          <DataTable
+            rows={pending}
+            columns={[
+              ["Display Name", (row) => row.displayName],
+              ["Type", (row) => row.hubType],
+              ["Applied by", (row) => row.applicantMerchantId ? `Merchant ${row.applicantMerchantId.slice(0, 8)}…` : "Public form"],
+              ["Action", (row) => (
+                <div className="actions">
+                  <button onClick={() => approve(row.id)}><CheckCircle size={15} /> Approve</button>
+                  <button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Deny</button>
+                </div>
+              )]
+            ]}
+          />
+        </>
+      )}
+
       {editing && (
         <FormGrid>
           <Input label="Name" value={editing.name} onChange={(name) => setEditing({ ...editing, name })} />
@@ -2651,7 +2744,7 @@ function ExchangeHubs({ user }: { user: any }) {
         <button onClick={create}><UploadCloud size={16} /> Create Hub</button>
       </FormGrid>
       <DataTable
-        rows={data ?? []}
+        rows={active}
         columns={[
           ["Display Name", (row) => row.displayName],
           ["Type", (row) => row.hubType],
@@ -2662,7 +2755,7 @@ function ExchangeHubs({ user }: { user: any }) {
           ["Action", (row) => <div className="actions"><button className="ghost" onClick={() => setEditing(row)}>Edit</button><button className="ghost" onClick={() => suspend(row.id)}><Pause size={16} /> Suspend</button></div>]
         ]}
       />
-      {(data ?? []).map((hub: any) => (
+      {active.map((hub: any) => (
         <details key={hub.id} style={{ marginBottom: 12 }}>
           <summary style={{ cursor: "pointer", padding: "8px 0", fontWeight: 600, color: "#17201b" }}>
             <BarChart3 size={14} style={{ marginRight: 6, verticalAlign: "middle" }} />

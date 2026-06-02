@@ -6492,3 +6492,21 @@ html { background: #050e09; }
   padding: 4px 10px;
 }
 .smp-logout-btn:hover { border-color: rgba(52,211,153,0.4); color: #e2f0e8; }
+
+/* ── Exchange Hub cards in merchant portal ── */
+.smp-hub-badge {
+  align-items: center;
+  background: rgba(52,211,153,0.1);
+  border-radius: 20px;
+  color: #34d399;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 4px 12px;
+}
+.smp-card-hub-active { border-color: rgba(52,211,153,0.3); }
+.smp-card-hub-pending { border-color: rgba(251,191,36,0.25); }
+.smp-card-hub-apply { border-color: rgba(96,165,250,0.2); }
+.smp-hub-status-row { margin-top: 12px; }
