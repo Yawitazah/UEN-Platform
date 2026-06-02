@@ -31,8 +31,9 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    res.cookie("uen_session", createAdminSession(admin), cookieOptions(req));
-    res.json({ user: { id: admin.id, email: admin.email, role: admin.role } });
+    const sessionToken = createAdminSession(admin);
+    res.cookie("uen_session", sessionToken, cookieOptions(req));
+    res.json({ user: { id: admin.id, email: admin.email, role: admin.role }, token: sessionToken });
   } catch (error) {
     if (error instanceof ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.flatten() });

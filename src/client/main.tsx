@@ -371,7 +371,10 @@ function Shell() {
   const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
   const refreshAuth = async () => {
     try {
-      const response = await fetch("/api/auth/me", { credentials: "include" });
+      const storedToken = localStorage.getItem("uen_admin_token");
+      const headers: Record<string, string> = {};
+      if (storedToken) headers["authorization"] = `Bearer ${storedToken}`;
+      const response = await fetch("/api/auth/me", { credentials: "include", headers });
       if (!response.ok) throw new Error("Not signed in");
       const payload = await response.json();
       setUser(payload.user);
@@ -469,7 +472,7 @@ function Shell() {
   );
 }
 
-function PublicShell({ children, compact = false, backTo }: { children: React.ReactNode; compact?: boolean; backTo?: string }) {
+function PublicShell({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
     <main className={`public-main ${compact ? "public-main-compact" : ""}`}>
       <section className="public-hero">
@@ -488,7 +491,6 @@ function PublicShell({ children, compact = false, backTo }: { children: React.Re
               <span>No second website</span>
               <span>No checkout rebuild</span>
             </div>
-            {backTo && <a className="public-back-link" href={backTo}>← All options</a>}
           </div>
           <div className="hero-visual" aria-hidden="true">
             <div className="note-card note-card-a"><span>Holder traffic</span><strong>NUBREED74201UEN</strong></div>
@@ -2454,7 +2456,12 @@ function MerchantRegister() {
     { Icon: TrendingUp, title: "You gain new customers", body: "Join a network where more Exchange Hubs can send motivated traffic." },
   ];
   return (
-    <PublicShell backTo="/signup">
+    <>
+      <nav className="reg-top-nav">
+        <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
+        <a className="reg-back-link" href="/signup">Back to all options</a>
+      </nav>
+      <PublicShell>
       {/* -- Value band -- */}
       <section className="value-band">
         <div className="section-inner">
@@ -2599,6 +2606,7 @@ function MerchantRegister() {
         </div>
       </section>
     </PublicShell>
+    </>
   );
 }
 
@@ -2650,11 +2658,12 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password })
       });
+      const loginData = await response.json();
       if (!response.ok) {
-        const payload = await response.json();
-        setError(payload.error ?? "Could not sign in");
+        setError(loginData.error ?? "Could not sign in");
         return;
       }
+      if (loginData.token) localStorage.setItem("uen_admin_token", loginData.token);
       onLogin();
     } catch (_error) {
       setError("Could not reach the app server. Refresh the page and try again.");
@@ -3514,7 +3523,7 @@ function HolderRegister() {
     <div className="holder-reg-root">
       <nav className="holder-reg-nav">
         <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
-        <a className="holder-reg-back" href="/signup">← All options</a>
+        <a className="reg-back-link" href="/signup">Back to all options</a>
       </nav>
 
       <div className="holder-reg-body">
@@ -4501,7 +4510,7 @@ function ExchangeHubRegister() {
     <div className="hub-apply-root">
       <nav className="hub-apply-nav">
         <a className="uenite-logo" href="/"><Shield size={22} /><BrandWord /></a>
-        <a className="hub-apply-back" href="/signup">Back to all options</a>
+        <a className="reg-back-link" href="/signup">Back to all options</a>
       </nav>
 
       <div className="hub-apply-body">

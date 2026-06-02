@@ -6816,3 +6816,19 @@ html { background: #050e09; }
   text-decoration: none;
 }
 .public-back-link:hover { color: #fff; }
+
+/* ── Shared registration page top nav ── */
+.reg-top-nav {
+  align-items: center;
+  background: #f5f7f1;
+  border-bottom: 1px solid #d9e2dd;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 24px;
+}
+.reg-back-link {
+  color: #607069;
+  font-size: 13px;
+  text-decoration: none;
+}
+.reg-back-link:hover { color: #17201b; }
