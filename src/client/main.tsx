@@ -357,7 +357,12 @@ function PoweredByFooter() {
 }
 
 function BrandWord() {
-  return <span className="brand-word"><span className="brand-uen">UEN</span><span className="brand-ite">ITE</span></span>;
+  return (
+    <span className="brand-word" style={{ display: "inline-flex", flexDirection: "row", flexWrap: "nowrap", whiteSpace: "nowrap" }}>
+      <span className="brand-uen">UEN</span>
+      <span className="brand-ite">ITE</span>
+    </span>
+  );
 }
 
 function AnimatedMoney({ amount }: { amount: string }) {
