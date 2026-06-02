@@ -260,7 +260,17 @@ router.get("/auth", async (req, res) => {
       maxAge: 10 * 60 * 1000
     });
   }
-  res.redirect(`https://${shop}/admin/oauth/authorize?${params.toString()}`);
+
+  const oauthUrl = `https://${shop}/admin/oauth/authorize?${params.toString()}`;
+
+  // When loaded inside the Shopify admin iframe the redirect must happen at
+  // the top level, otherwise the OAuth page is sandboxed inside the frame.
+  if (req.query.host) {
+    return res.send(
+      `<!doctype html><html><head><script>window.top.location.href=${JSON.stringify(oauthUrl)}</script></head><body></body></html>`
+    );
+  }
+  res.redirect(oauthUrl);
 });
 
 router.get("/auth/callback", async (req, res) => {

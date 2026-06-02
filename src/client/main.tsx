@@ -1916,6 +1916,22 @@ function LoginPage() {
 function ShopifyMerchantPortal() {
   const params = new URLSearchParams(window.location.search);
   const shop = params.get("shopDomain") ?? params.get("shop") ?? "";
+  const host = params.get("host") ?? "";
+
+  // Initialize Shopify App Bridge when running inside the Shopify admin frame.
+  // This tells Shopify to keep the app embedded instead of opening a new tab.
+  useEffect(() => {
+    if (!host) return;
+    fetch("/api/public/shopify-config")
+      .then((r) => r.json())
+      .then(({ apiKey }: { apiKey: string }) => {
+        if (!apiKey) return;
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const createApp = require("@shopify/app-bridge").default as (opts: { apiKey: string; host: string }) => unknown;
+        createApp({ apiKey, host });
+      })
+      .catch(() => {});
+  }, [host]);
 
   // Auth state: "loading" | "no-account" | "login" | "dashboard"
   const [authState, setAuthState] = useState<"loading" | "no-account" | "login" | "dashboard">("loading");

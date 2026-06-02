@@ -206,6 +206,10 @@ router.get("/exchange-hubs", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.exchangeHub.findMany({ orderBy: { createdAt: "desc" } }));
 });
 
+router.get("/public/shopify-config", (_req, res) => {
+  res.json({ apiKey: config.shopifyApiKey || "" });
+});
+
 router.get("/public/exchange-hubs", async (_req, res) => {
   const hubs = await prisma.exchangeHub.findMany({
     where: { status: "ACTIVE" },
