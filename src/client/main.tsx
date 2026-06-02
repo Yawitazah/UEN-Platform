@@ -3262,13 +3262,24 @@ function Connections({ user }: { user: any }) {
   const { data } = useData<any[]>(() => api("/api/shopify-connections"));
   const synced = useData<any[]>(() => api("/api/shopify-synced-notes"));
   const [importStatus, setImportStatus] = useState<Record<string, string>>({});
+  const [codePrefixes, setCodePrefixes] = useState<Record<string, string>>({});
 
   const importHistorical = async (shopDomain: string) => {
-    setImportStatus((prev) => ({ ...prev, [shopDomain]: "Importing — this may take a moment…" }));
+    const prefix = (codePrefixes[shopDomain] ?? "").trim();
+    if (!prefix) {
+      setImportStatus((prev) => ({ ...prev, [shopDomain]: "Enter a code prefix first (e.g. LOVE)" }));
+      return;
+    }
+    setImportStatus((prev) => ({ ...prev, [shopDomain]: `Importing ${prefix}* codes — scanning all orders…` }));
     try {
-      const result = await api<any>(`/api/shopify-connections/${encodeURIComponent(shopDomain)}/import-historical`, { method: "POST" });
-      const sampleText = result.sampleCodes?.length ? ` Sample codes: ${result.sampleCodes.slice(0, 5).join(", ")}` : " No discount codes found in orders.";
-      setImportStatus((prev) => ({ ...prev, [shopDomain]: (result.message ?? "Done") + sampleText }));
+      const result = await api<any>(`/api/shopify-connections/${encodeURIComponent(shopDomain)}/import-historical`, {
+        method: "POST",
+        body: JSON.stringify({ codePrefix: prefix })
+      });
+      const codesText = result.matchedCodes?.length
+        ? ` Codes found: ${result.matchedCodes.join(", ")}`
+        : " No matching codes found in orders.";
+      setImportStatus((prev) => ({ ...prev, [shopDomain]: (result.message ?? "Done") + codesText }));
     } catch (err) {
       setImportStatus((prev) => ({ ...prev, [shopDomain]: err instanceof Error ? err.message : "Import failed" }));
     }
@@ -3276,7 +3287,7 @@ function Connections({ user }: { user: any }) {
 
   return (
     <>
-      <Header title="Shopify Connections" subtitle="Review store connections, synced codes, and import historical redemption data." user={user} />
+      <Header title="Shopify Connections" subtitle="Import historical redemption data by specifying the UEN code prefix used in that store." user={user} />
       <DataTable
         rows={data ?? []}
         columns={[
@@ -3284,13 +3295,21 @@ function Connections({ user }: { user: any }) {
           ["Merchant", (r) => r.merchant.businessName],
           ["Status", (r) => <Status value={r.status} />],
           ["Last Sync", (r) => r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : "Never"],
-          ["Historical Data", (r) => (
-            <div className="actions">
-              <button onClick={() => importHistorical(r.shopDomain)}>
-                <Download size={14} /> Import from Shopify
-              </button>
+          ["Import Historical", (r) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="actions">
+                <input
+                  style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #d9e2dd", borderRadius: 4, width: 90 }}
+                  placeholder="Prefix (LOVE)"
+                  value={codePrefixes[r.shopDomain] ?? ""}
+                  onChange={(e) => setCodePrefixes((prev) => ({ ...prev, [r.shopDomain]: e.target.value.toUpperCase() }))}
+                />
+                <button onClick={() => importHistorical(r.shopDomain)}>
+                  <Download size={14} /> Import
+                </button>
+              </div>
               {importStatus[r.shopDomain] && (
-                <span style={{ fontSize: 12, color: "#607069", marginLeft: 8 }}>{importStatus[r.shopDomain]}</span>
+                <span style={{ fontSize: 11, color: "#607069", maxWidth: 340, lineHeight: 1.4 }}>{importStatus[r.shopDomain]}</span>
               )}
             </div>
           )]

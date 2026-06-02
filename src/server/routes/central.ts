@@ -665,14 +665,26 @@ router.get("/shopify-connections", requireRole(adminRoles), async (_req, res) =>
 router.post("/shopify-connections/:shopDomain/import-historical", requireRole(writeRoles), async (req, res) => {
   try {
     const shopDomain = param(req, "shopDomain");
+    // codePrefix filters to only codes starting with this string (case-insensitive).
+    // Required — prevents accidentally importing unrelated store discounts.
+    const codePrefix = String(req.body.codePrefix ?? "").trim().toUpperCase();
+    if (!codePrefix) {
+      return res.status(400).json({ error: "codePrefix is required. Specify the prefix your UEN codes start with (e.g. LOVE)." });
+    }
+
     const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain }, include: { merchant: true } });
     if (!connection) return res.status(404).json({ error: "Connection not found" });
+
+    // Clear any previously imported records for this store+prefix so re-runs are clean.
+    const deleted = await prisma.merchantHistoricalRedemption.deleteMany({
+      where: { shopDomain, merchantId: connection.merchantId }
+    });
 
     let pageUrl = `https://${shopDomain}/admin/api/${config.shopifyApiVersion}/orders.json?status=any&limit=250&fields=id,created_at,total_price,discount_codes`;
     let totalOrders = 0;
     let totalImported = 0;
     let totalSkipped = 0;
-    const sampleCodes: string[] = [];
+    const matchedCodes: string[] = [];
 
     while (pageUrl) {
       const response = await fetch(pageUrl, {
@@ -688,9 +700,11 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
       for (const order of payload.orders) {
         for (const dc of order.discount_codes ?? []) {
           if (!dc.code) continue;
-          // Collect a sample of unique codes for debugging
-          if (sampleCodes.length < 20 && !sampleCodes.includes(dc.code)) {
-            sampleCodes.push(dc.code);
+          // Only import codes that start with the specified prefix
+          if (!dc.code.toUpperCase().startsWith(codePrefix)) continue;
+
+          if (matchedCodes.length < 10 && !matchedCodes.includes(dc.code.toUpperCase())) {
+            matchedCodes.push(dc.code.toUpperCase());
           }
           try {
             await prisma.merchantHistoricalRedemption.upsert({
@@ -719,13 +733,17 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
         }
       }
 
-      // Follow Shopify pagination via Link header
       const linkHeader = response.headers.get("link") ?? "";
       const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
       pageUrl = nextMatch ? nextMatch[1] : "";
     }
 
-    res.json({ shopDomain, totalOrders, totalImported, totalSkipped, sampleCodes, message: `Imported ${totalImported} historical redemptions from ${totalOrders} orders.` });
+    res.json({
+      shopDomain, codePrefix, totalOrders, totalImported, totalSkipped,
+      deletedPrevious: deleted.count,
+      matchedCodes,
+      message: `Imported ${totalImported} LOVE-prefixed codes from ${totalOrders} orders. (Cleared ${deleted.count} previous records.)`
+    });
   } catch (error) {
     handleError(res, error);
   }
