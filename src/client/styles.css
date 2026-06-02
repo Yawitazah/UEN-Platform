@@ -6766,3 +6766,34 @@ html { background: #050e09; }
 .mp-error   { color: #f87171; font-size: 13px; margin: 0 0 10px; }
 .mp-success { color: #34d399; font-size: 13px; margin: 0 0 10px; }
 .mp-link-btn { background: none; border: none; color: #34d399; cursor: pointer; font-size: 13px; padding: 0; text-decoration: underline; }
+
+/* ── Login page signup section ── */
+.login-page-divider {
+  border-top: 1px solid rgba(52,211,153,0.1);
+  margin: 24px 0 20px;
+}
+.login-page-signup {
+  text-align: center;
+}
+.login-page-signup p {
+  color: rgba(226,240,232,0.45);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+.login-page-signup-btn {
+  align-items: center;
+  border: 1px solid rgba(52,211,153,0.3);
+  border-radius: 8px;
+  color: #34d399;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 7px;
+  padding: 10px 24px;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.login-page-signup-btn:hover {
+  background: rgba(52,211,153,0.08);
+  border-color: rgba(52,211,153,0.5);
+}

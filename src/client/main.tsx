@@ -1907,6 +1907,13 @@ function LoginPage() {
       <div className="admin-login-card">
         <a className="admin-login-brand" href="/"><Shield size={24} /><BrandWord /></a>
         <LoginPanel onLogin={() => { window.location.href = "/admin"; }} />
+        <div className="login-page-divider" />
+        <div className="login-page-signup">
+          <p>New to UENITE? Choose how you want to participate.</p>
+          <a className="login-page-signup-btn" href="/signup">
+            <Star size={15} /> Get Started
+          </a>
+        </div>
       </div>
     </main>
   );
