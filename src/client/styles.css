@@ -784,6 +784,7 @@ th {
 
 .brand-word {
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .brand-uen {
@@ -2128,8 +2129,21 @@ th {
   padding-top: 10px;
 }
 
-.public-brand {
+.public-hero-toprow {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 34px;
+}
+.public-hero-back {
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.public-hero-back:hover { color: #fff; }
+.public-brand {
+  margin-bottom: 0;
 }
 
 .public-hero h1 {
