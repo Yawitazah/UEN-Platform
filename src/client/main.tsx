@@ -1913,13 +1913,14 @@ function LoginPage() {
   );
 }
 
+type MpNav = "dashboard" | "offer" | "sync" | "settings" | "help";
+
 function ShopifyMerchantPortal() {
   const params = new URLSearchParams(window.location.search);
   const shop = params.get("shopDomain") ?? params.get("shop") ?? "";
   const host = params.get("host") ?? "";
 
   // Initialize Shopify App Bridge when running inside the Shopify admin frame.
-  // This tells Shopify to keep the app embedded instead of opening a new tab.
   useEffect(() => {
     if (!host) return;
     fetch("/api/public/shopify-config")
@@ -1933,15 +1934,9 @@ function ShopifyMerchantPortal() {
       .catch(() => {});
   }, [host]);
 
-  // Auth state: "loading" | "no-account" | "login" | "dashboard"
+  // Auth
   const [authState, setAuthState] = useState<"loading" | "no-account" | "login" | "dashboard">("loading");
   const [merchant, setMerchant] = useState<any>(null);
-
-  // Exchange Hub application form state
-  const [hubForm, setHubForm] = useState({ displayName: "", hubType: "creator", description: "" });
-  const [hubApplying, setHubApplying] = useState(false);
-  const [hubError, setHubError] = useState("");
-  const [hubMsg, setHubMsg] = useState("");
 
   // Create account form
   const [setupForm, setSetupForm] = useState({ businessName: shop.replace(/\.myshopify\.com$/, "").replace(/-/g, " "), email: "", password: "", confirmPassword: "" });
@@ -1953,20 +1948,40 @@ function ShopifyMerchantPortal() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Dashboard state
-  const dashboard = useData<any>(() => fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))), [shop, authState === "dashboard"]);
+  // Navigation
+  const [nav, setNav] = useState<MpNav>("dashboard");
+
+  // Analytics
+  const [period, setPeriod] = useState("month");
+  const analytics = useData<any>(
+    () => fetch(`/shopify/api/analytics?shopDomain=${encodeURIComponent(shop)}&period=${period}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
+    [shop, period, authState]
+  );
+
+  // Offer
   const [offer, setOffer] = useState({ discountType: "PERCENTAGE", discountValue: "15", minimumOrderAmount: "", usageLimitPerNote: "1" });
   const [saveMsg, setSaveMsg] = useState("");
   const [saveErr, setSaveErr] = useState("");
+  const activeOffer = useData<any>(
+    () => fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
+    [shop, authState]
+  );
+  useEffect(() => {
+    if (activeOffer.data?.activeOffer) {
+      const o = activeOffer.data.activeOffer;
+      setOffer({ discountType: o.discountType ?? "PERCENTAGE", discountValue: String(o.discountValue ?? 15), minimumOrderAmount: String(o.minimumOrderAmount ?? ""), usageLimitPerNote: String(o.usageLimitPerNote ?? 1) });
+    }
+  }, [activeOffer.data]);
+
+  // Sync
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
 
-  useEffect(() => {
-    if (dashboard.data?.activeOffer) {
-      const o = dashboard.data.activeOffer;
-      setOffer({ discountType: o.discountType ?? "PERCENTAGE", discountValue: String(o.discountValue ?? 15), minimumOrderAmount: String(o.minimumOrderAmount ?? ""), usageLimitPerNote: String(o.usageLimitPerNote ?? 1) });
-    }
-  }, [dashboard.data]);
+  // Exchange Hub application
+  const [hubForm, setHubForm] = useState({ displayName: "", hubType: "creator", description: "" });
+  const [hubApplying, setHubApplying] = useState(false);
+  const [hubError, setHubError] = useState("");
+  const [hubApplied, setHubApplied] = useState(false);
 
   // On mount: check session, then account status
   useEffect(() => {
@@ -1975,7 +1990,6 @@ function ShopifyMerchantPortal() {
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.merchant) { setMerchant(data.merchant); setAuthState("dashboard"); return; }
-        // No session — check if they have an account
         return fetch(`/api/merchant/account-status?shopDomain=${encodeURIComponent(shop)}`)
           .then((r) => r.json())
           .then((status) => setAuthState(status.hasAccount ? "login" : "no-account"));
@@ -1988,11 +2002,7 @@ function ShopifyMerchantPortal() {
     if (setupForm.password.length < 8) { setSetupError("Password must be at least 8 characters."); return; }
     setSetupError(""); setSetupLoading(true);
     try {
-      const r = await fetch("/api/merchant/setup", {
-        method: "POST", credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ shopDomain: shop, businessName: setupForm.businessName, email: setupForm.email, password: setupForm.password })
-      });
+      const r = await fetch("/api/merchant/setup", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ shopDomain: shop, businessName: setupForm.businessName, email: setupForm.email, password: setupForm.password }) });
       const data = await r.json();
       if (!r.ok) { setSetupError(data.error ?? "Setup failed."); return; }
       setMerchant(data.merchant); setAuthState("dashboard");
@@ -2003,11 +2013,7 @@ function ShopifyMerchantPortal() {
   const submitLogin = async () => {
     setLoginError(""); setLoginLoading(true);
     try {
-      const r = await fetch("/api/merchant/login", {
-        method: "POST", credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: loginForm.email, password: loginForm.password })
-      });
+      const r = await fetch("/api/merchant/login", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: loginForm.email, password: loginForm.password }) });
       const data = await r.json();
       if (!r.ok) { setLoginError(data.error ?? "Login failed."); return; }
       setMerchant(data.merchant); setAuthState("dashboard");
@@ -2023,14 +2029,10 @@ function ShopifyMerchantPortal() {
   const saveOffer = async () => {
     setSaveMsg(""); setSaveErr("");
     try {
-      const r = await fetch(`/shopify/api/offer-settings?shopDomain=${encodeURIComponent(shop)}`, {
-        method: "POST", credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...offer, discountValue: Number(offer.discountValue), minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined, usageLimitPerNote: Number(offer.usageLimitPerNote) })
-      });
+      const r = await fetch(`/shopify/api/offer-settings?shopDomain=${encodeURIComponent(shop)}`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...offer, discountValue: Number(offer.discountValue), minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined, usageLimitPerNote: Number(offer.usageLimitPerNote) }) });
       if (!r.ok) { setSaveErr("Could not save offer."); return; }
-      setSaveMsg("Offer saved.");
-      await dashboard.reload();
+      setSaveMsg("Offer saved successfully.");
+      activeOffer.reload();
     } catch { setSaveErr("Could not save offer."); }
   };
 
@@ -2040,155 +2042,368 @@ function ShopifyMerchantPortal() {
       const r = await fetch(`/shopify/api/sync?shopDomain=${encodeURIComponent(shop)}`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: "{}" });
       const data = await r.json();
       setSyncMsg(data.message ?? "Sync complete.");
-      await dashboard.reload();
+      analytics.reload();
     } catch { setSyncMsg("Sync failed — try again."); }
     finally { setSyncing(false); }
   };
 
+  const navItems: { id: MpNav; label: string; Icon: React.ElementType }[] = [
+    { id: "dashboard", label: "Dashboard", Icon: BarChart3 },
+    { id: "offer", label: "My Offer", Icon: Tag },
+    { id: "sync", label: "Sync", Icon: RefreshCw },
+    { id: "settings", label: "Settings", Icon: SlidersHorizontal },
+  ];
+
+  // ── Auth screens ──────────────────────────────────────────────────────────
+  if (authState === "loading") {
+    return (
+      <main className="mp-auth-screen">
+        <div className="mp-auth-card"><div className="mp-auth-brand"><Shield size={26} /><BrandWord /></div><p style={{ color: "rgba(226,240,232,0.5)", fontSize: 14 }}>Loading…</p></div>
+      </main>
+    );
+  }
+
+  if (authState === "no-account") {
+    return (
+      <main className="mp-auth-screen">
+        <div className="mp-auth-card">
+          <div className="mp-auth-brand"><Shield size={26} /><BrandWord /></div>
+          <h1>Create your account</h1>
+          <p>Your Shopify store is connected. Set up your merchant account to get started.</p>
+          {setupError && <p className="mp-error">{setupError}</p>}
+          <div className="mp-auth-form">
+            <label>Business name<input value={setupForm.businessName} onChange={(e) => setSetupForm({ ...setupForm, businessName: e.target.value })} placeholder="Your store name" /></label>
+            <label>Email address<input type="email" value={setupForm.email} onChange={(e) => setSetupForm({ ...setupForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
+            <label>Password<input type="password" value={setupForm.password} onChange={(e) => setSetupForm({ ...setupForm, password: e.target.value })} placeholder="At least 8 characters" /></label>
+            <label>Confirm password<input type="password" value={setupForm.confirmPassword} onChange={(e) => setSetupForm({ ...setupForm, confirmPassword: e.target.value })} placeholder="Repeat password" /></label>
+            <button className="mp-btn mp-btn-full" onClick={submitSetup} disabled={setupLoading}>{setupLoading ? "Creating account…" : "Create merchant account"}</button>
+          </div>
+          <p className="mp-auth-switch">Already have an account? <button className="mp-link-btn" onClick={() => setAuthState("login")}>Sign in</button></p>
+        </div>
+      </main>
+    );
+  }
+
+  if (authState === "login") {
+    return (
+      <main className="mp-auth-screen">
+        <div className="mp-auth-card">
+          <div className="mp-auth-brand"><Shield size={26} /><BrandWord /></div>
+          <h1>Merchant sign in</h1>
+          <p>Sign in to manage your UEN offer and store settings.</p>
+          {loginError && <p className="mp-error">{loginError}</p>}
+          <div className="mp-auth-form">
+            <label>Email address<input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
+            <label>Password<input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="Your password" onKeyDown={(e) => { if (e.key === "Enter") submitLogin(); }} /></label>
+            <button className="mp-btn mp-btn-full" onClick={submitLogin} disabled={loginLoading}>{loginLoading ? "Signing in…" : "Sign in"}</button>
+          </div>
+          {shop && <p className="mp-auth-switch">New store? <button className="mp-link-btn" onClick={() => setAuthState("no-account")}>Create account</button></p>}
+        </div>
+      </main>
+    );
+  }
+
+  // ── Authenticated dashboard ───────────────────────────────────────────────
+  const connectionOk = activeOffer.data?.platformConnectionStatus === "ACTIVE";
+  const currentOfferSummary = activeOffer.data?.activeOffer
+    ? `${activeOffer.data.activeOffer.discountValue}${activeOffer.data.activeOffer.discountType === "PERCENTAGE" ? "%" : "$"} off`
+    : "No offer set";
+
   return (
-    <main className="shopify-merchant-portal">
-      <div className="smp-header">
-        <div className="smp-brand"><Shield size={20} /><strong><BrandWord /></strong></div>
-        {merchant && <span className="smp-merchant-name">{merchant.businessName}</span>}
-        {merchant && <button className="smp-logout-btn" onClick={logout}>Sign out</button>}
-        {shop && <span className="smp-shop">{shop}</span>}
-      </div>
-
-      {authState === "loading" && (
-        <div className="smp-auth-wrap"><div className="smp-card"><p>Loading…</p></div></div>
-      )}
-
-      {authState === "no-account" && (
-        <div className="smp-auth-wrap">
-          <div className="smp-auth-card">
-            <div className="smp-auth-brand"><Shield size={28} /><BrandWord /></div>
-            <h1>Create your merchant account</h1>
-            <p>Your Shopify store is connected. Set up your account to manage your UEN offer and view your dashboard.</p>
-            {setupError && <p className="smp-error">{setupError}</p>}
-            <div className="smp-auth-form">
-              <label>Business name<input value={setupForm.businessName} onChange={(e) => setSetupForm({ ...setupForm, businessName: e.target.value })} placeholder="Your store name" /></label>
-              <label>Email address<input type="email" value={setupForm.email} onChange={(e) => setSetupForm({ ...setupForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
-              <label>Password<input type="password" value={setupForm.password} onChange={(e) => setSetupForm({ ...setupForm, password: e.target.value })} placeholder="At least 8 characters" /></label>
-              <label>Confirm password<input type="password" value={setupForm.confirmPassword} onChange={(e) => setSetupForm({ ...setupForm, confirmPassword: e.target.value })} placeholder="Repeat password" /></label>
-              <button className="smp-btn smp-btn-full" onClick={submitSetup} disabled={setupLoading}>{setupLoading ? "Creating account…" : "Create merchant account"}</button>
-            </div>
-            <p className="smp-auth-switch">Already have an account? <button className="smp-link-btn" onClick={() => setAuthState("login")}>Sign in</button></p>
-          </div>
+    <main className="mp-root">
+      {/* ── Sidebar ── */}
+      <aside className="mp-sidebar">
+        <div className="mp-sidebar-brand">
+          <Shield size={20} />
+          <BrandWord />
         </div>
-      )}
 
-      {authState === "login" && (
-        <div className="smp-auth-wrap">
-          <div className="smp-auth-card">
-            <div className="smp-auth-brand"><Shield size={28} /><BrandWord /></div>
-            <h1>Merchant sign in</h1>
-            <p>Sign in to manage your UEN merchant offer and sync settings.</p>
-            {loginError && <p className="smp-error">{loginError}</p>}
-            <div className="smp-auth-form">
-              <label>Email address<input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
-              <label>Password<input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="Your password" onKeyDown={(e) => { if (e.key === "Enter") submitLogin(); }} /></label>
-              <button className="smp-btn smp-btn-full" onClick={submitLogin} disabled={loginLoading}>{loginLoading ? "Signing in…" : "Sign in"}</button>
-            </div>
-            {shop && <p className="smp-auth-switch">New to UEN? <button className="smp-link-btn" onClick={() => setAuthState("no-account")}>Create account</button></p>}
-          </div>
+        <div className="mp-sidebar-store">
+          <span className={`mp-status-dot ${connectionOk ? "mp-dot-green" : "mp-dot-warn"}`} />
+          <span className="mp-store-name">{merchant?.businessName || shop.replace(/\.myshopify\.com$/, "")}</span>
         </div>
-      )}
 
-      {authState === "dashboard" && (
-        <>
-          <div className="smp-card smp-status-row">
-            <div className="smp-status-item"><span>Connection</span><strong className={dashboard.data?.platformConnectionStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data?.platformConnectionStatus ?? "—"}</strong></div>
-            <div className="smp-status-item"><span>Merchant status</span><strong className={dashboard.data?.merchantStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data?.merchantStatus ?? "—"}</strong></div>
-            <div className="smp-status-item"><span>Synced UEN codes</span><strong>{dashboard.data?.totalSyncedUens ?? 0}</strong></div>
-            <div className="smp-status-item"><span>Last sync</span><strong>{dashboard.data?.lastSyncTime ? new Date(dashboard.data.lastSyncTime).toLocaleString() : "Never"}</strong></div>
-          </div>
+        <nav className="mp-nav">
+          {navItems.map(({ id, label, Icon }) => (
+            <button key={id} className={`mp-nav-item ${nav === id ? "mp-nav-active" : ""}`} onClick={() => setNav(id)}>
+              <Icon size={17} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
 
-          <div className="smp-card">
-            <h2>Offer Settings</h2>
-            <p className="smp-subtitle">The discount Holders receive when they use a UEN at your checkout.</p>
-            <div className="smp-form-grid">
-              <label>Type<select value={offer.discountType} onChange={(e) => setOffer({ ...offer, discountType: e.target.value })}><option value="PERCENTAGE">Percentage off</option><option value="FIXED_AMOUNT">Fixed amount off</option></select></label>
-              <label>Value {offer.discountType === "PERCENTAGE" ? "(%)" : "($)"}<input type="number" min="1" value={offer.discountValue} onChange={(e) => setOffer({ ...offer, discountValue: e.target.value })} /></label>
-              <label>Minimum order ($, optional)<input type="number" min="0" value={offer.minimumOrderAmount} onChange={(e) => setOffer({ ...offer, minimumOrderAmount: e.target.value })} /></label>
-              <label>Uses per note<input type="number" min="1" value={offer.usageLimitPerNote} onChange={(e) => setOffer({ ...offer, usageLimitPerNote: e.target.value })} /></label>
-            </div>
-            {saveErr && <p className="smp-error">{saveErr}</p>}
-            {saveMsg && <p className="smp-success">{saveMsg}</p>}
-            <button className="smp-btn" onClick={saveOffer}>Save offer</button>
-          </div>
+        <div className="mp-sidebar-footer">
+          <a className="mp-nav-item mp-nav-help" href="#" onClick={(e) => { e.preventDefault(); setNav("help"); }}>
+            <Globe size={15} />
+            <span>Help</span>
+          </a>
+          <button className="mp-signout" onClick={logout}>Sign out</button>
+          <span className="mp-domain">{shop}</span>
+        </div>
+      </aside>
 
-          <div className="smp-card">
-            <h2>UEN Code Sync</h2>
-            <p className="smp-subtitle">Approved UEN codes are pushed to your Shopify discount list automatically.</p>
-            {syncMsg && <p className="smp-success">{syncMsg}</p>}
-            <button className="smp-btn smp-btn-outline" onClick={syncNow} disabled={syncing}><RefreshCw size={15} /> {syncing ? "Syncing…" : "Sync UEN codes now"}</button>
-          </div>
+      {/* ── Main content ── */}
+      <div className="mp-main">
 
-          <div className="smp-card smp-card-help">
-            <h2>Need help?</h2>
-            <p>Holders with valid UEN codes will be able to use them at your Shopify checkout.</p>
-            <a className="smp-link" href="/merchants/register">Learn more about the merchant network</a>
-          </div>
-
-          {/* ── Exchange Hub section ── */}
-          {merchant?.hubStatus === "APPROVED" && (
-            <div className="smp-card smp-card-hub-active">
-              <div className="smp-hub-badge"><Users size={18} /> Exchange Hub</div>
-              <h2>{merchant.hub?.displayName ?? merchant.businessName}</h2>
-              <p className="smp-subtitle">Your Exchange Hub is active. You can issue Universal Exchange Notes to your supporters and manage your holder network.</p>
-              <div className="smp-hub-status-row">
-                <span className="smp-green" style={{ fontWeight: 600, fontSize: 14 }}>✓ Active and issuing</span>
+        {/* Dashboard */}
+        {nav === "dashboard" && (
+          <div className="mp-section">
+            <div className="mp-section-head">
+              <div>
+                <h1>Dashboard</h1>
+                <p>Your UEN performance at a glance.</p>
+              </div>
+              <div className="mp-period-tabs">
+                {["day", "month", "year"].map((p) => (
+                  <button key={p} className={`mp-period-btn ${period === p ? "active" : ""}`} onClick={() => setPeriod(p)}>
+                    {p === "day" ? "Today" : p === "month" ? "30 days" : "Year"}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          {merchant?.hubStatus === "PENDING" && (
-            <div className="smp-card smp-card-hub-pending">
-              <div className="smp-hub-badge" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}><Users size={18} /> Exchange Hub Application</div>
-              <h2>Application under review</h2>
-              <p className="smp-subtitle">Your Exchange Hub application has been submitted. You'll be notified once it's reviewed.</p>
+            <div className="mp-stat-grid">
+              <div className="mp-stat-card mp-stat-primary">
+                <span className="mp-stat-label">UEN Codes Synced</span>
+                <strong className="mp-stat-value">{analytics.loading ? "—" : analytics.data?.totalSyncedUens ?? 0}</strong>
+                <span className="mp-stat-sub">Ready to use at checkout</span>
+              </div>
+              <div className="mp-stat-card mp-stat-revenue">
+                <span className="mp-stat-label">Revenue from UENs</span>
+                <strong className="mp-stat-value">${analytics.loading ? "—" : (analytics.data?.revenueInPeriod ?? 0).toFixed(2)}</strong>
+                <span className="mp-stat-sub">Orders placed with a UEN code</span>
+              </div>
+              <div className="mp-stat-card">
+                <span className="mp-stat-label">Redemptions this period</span>
+                <strong className="mp-stat-value">{analytics.loading ? "—" : analytics.data?.redemptionsInPeriod ?? 0}</strong>
+                <span className="mp-stat-sub">Codes used at checkout</span>
+              </div>
+              <div className="mp-stat-card">
+                <span className="mp-stat-label">All-time redemptions</span>
+                <strong className="mp-stat-value">{analytics.loading ? "—" : analytics.data?.allTimeRedemptions ?? 0}</strong>
+                <span className="mp-stat-sub">Total codes redeemed ever</span>
+              </div>
             </div>
-          )}
 
-          {merchant?.hubStatus === "NONE" && (
-            <div className="smp-card smp-card-hub-apply">
-              <div className="smp-hub-badge"><Users size={18} /> Become an Exchange Hub</div>
-              <h2>Issue UEN codes to your community</h2>
-              <p className="smp-subtitle">Exchange Hubs issue Universal Exchange Notes to supporters, customers, or community members. Approved by the UENITE team.</p>
-              {hubError && <p className="smp-error">{hubError}</p>}
-              {hubMsg && <p className="smp-success">{hubMsg}</p>}
-              {!hubMsg && (
-                <div className="smp-form-grid">
-                  <label>Organization / Hub name<input value={hubForm.displayName} onChange={(e) => setHubForm({ ...hubForm, displayName: e.target.value })} placeholder="e.g. Hebrew Care" /></label>
-                  <label>Hub type<select value={hubForm.hubType} onChange={(e) => setHubForm({ ...hubForm, hubType: e.target.value })}><option value="creator">Creator</option><option value="ministry">Ministry / Church</option><option value="nonprofit">Nonprofit / Cause</option><option value="community">Community</option><option value="brand">Brand</option><option value="other">Other</option></select></label>
-                  <label style={{ gridColumn: "1 / -1" }}>Why do you want to issue notes? (optional)<input value={hubForm.description} onChange={(e) => setHubForm({ ...hubForm, description: e.target.value })} placeholder="Brief description of your community or cause" /></label>
+            <div className="mp-dash-row">
+              <div className="mp-info-card">
+                <div className="mp-info-label"><Tag size={14} /> Current offer</div>
+                <strong className="mp-info-value">{currentOfferSummary}</strong>
+                <button className="mp-link-btn" onClick={() => setNav("offer")}>Edit offer →</button>
+              </div>
+              <div className="mp-info-card">
+                <div className="mp-info-label"><RefreshCw size={14} /> Last sync</div>
+                <strong className="mp-info-value">{activeOffer.data?.lastSyncTime ? new Date(activeOffer.data.lastSyncTime).toLocaleString() : "Never"}</strong>
+                <button className="mp-link-btn" onClick={() => setNav("sync")}>Sync now →</button>
+              </div>
+              <div className={`mp-info-card ${connectionOk ? "mp-info-ok" : "mp-info-warn"}`}>
+                <div className="mp-info-label"><Shield size={14} /> Connection</div>
+                <strong className="mp-info-value">{activeOffer.data?.platformConnectionStatus ?? "—"}</strong>
+                <span className="mp-info-sub">{activeOffer.data?.merchantStatus ?? ""}</span>
+              </div>
+            </div>
+
+            {analytics.data?.recentSyncLogs?.length > 0 && (
+              <div className="mp-log-section">
+                <h3>Recent sync activity</h3>
+                <div className="mp-log-list">
+                  {analytics.data.recentSyncLogs.map((log: any, i: number) => (
+                    <div key={i} className="mp-log-row">
+                      <span className={`mp-log-status ${log.status === "SUCCESS" ? "mp-green" : "mp-warn"}`}>{log.status}</span>
+                      <span className="mp-log-msg">{log.message ?? `${log.totalCreated} created`}</span>
+                      <span className="mp-log-time">{new Date(log.createdAt).toLocaleString()}</span>
+                    </div>
+                  ))}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* My Offer */}
+        {nav === "offer" && (
+          <div className="mp-section">
+            <div className="mp-section-head">
+              <div>
+                <h1>My Offer</h1>
+                <p>Set what Holders receive when they use a UEN code at your checkout.</p>
+              </div>
+            </div>
+            <div className="mp-form-card">
+              <div className="mp-form-grid">
+                <label>
+                  Discount type
+                  <select value={offer.discountType} onChange={(e) => setOffer({ ...offer, discountType: e.target.value })}>
+                    <option value="PERCENTAGE">Percentage off</option>
+                    <option value="FIXED_AMOUNT">Fixed amount off ($)</option>
+                  </select>
+                </label>
+                <label>
+                  Value {offer.discountType === "PERCENTAGE" ? "(%)" : "($)"}
+                  <input type="number" min="1" value={offer.discountValue} onChange={(e) => setOffer({ ...offer, discountValue: e.target.value })} />
+                </label>
+                <label>
+                  Minimum order amount ($)
+                  <input type="number" min="0" value={offer.minimumOrderAmount} onChange={(e) => setOffer({ ...offer, minimumOrderAmount: e.target.value })} placeholder="No minimum" />
+                </label>
+                <label>
+                  Uses per UEN code
+                  <input type="number" min="1" value={offer.usageLimitPerNote} onChange={(e) => setOffer({ ...offer, usageLimitPerNote: e.target.value })} />
+                </label>
+              </div>
+              {saveErr && <p className="mp-error">{saveErr}</p>}
+              {saveMsg && <p className="mp-success">{saveMsg}</p>}
+              <button className="mp-btn" onClick={saveOffer}>Save offer</button>
+            </div>
+          </div>
+        )}
+
+        {/* Sync */}
+        {nav === "sync" && (
+          <div className="mp-section">
+            <div className="mp-section-head">
+              <div>
+                <h1>UEN Code Sync</h1>
+                <p>Approved UEN codes are pushed to your Shopify discount list automatically. Trigger a manual sync anytime.</p>
+              </div>
+            </div>
+            <div className="mp-form-card">
+              <div className="mp-sync-row">
+                <div>
+                  <strong>Last sync</strong>
+                  <span>{activeOffer.data?.lastSyncTime ? new Date(activeOffer.data.lastSyncTime).toLocaleString() : "Never synced"}</span>
+                </div>
+                <div>
+                  <strong>Total synced codes</strong>
+                  <span>{analytics.data?.totalSyncedUens ?? "—"}</span>
+                </div>
+              </div>
+              {syncMsg && <p className="mp-success">{syncMsg}</p>}
+              <button className="mp-btn" onClick={syncNow} disabled={syncing}>
+                <RefreshCw size={15} /> {syncing ? "Syncing…" : "Sync UEN codes now"}
+              </button>
+            </div>
+
+            {analytics.data?.recentSyncLogs?.length > 0 && (
+              <div className="mp-log-section" style={{ marginTop: 24 }}>
+                <h3>Sync history</h3>
+                <div className="mp-log-list">
+                  {analytics.data.recentSyncLogs.map((log: any, i: number) => (
+                    <div key={i} className="mp-log-row">
+                      <span className={`mp-log-status ${log.status === "SUCCESS" ? "mp-green" : "mp-warn"}`}>{log.status}</span>
+                      <span className="mp-log-msg">{log.message ?? `${log.totalCreated} created`}</span>
+                      <span className="mp-log-time">{new Date(log.createdAt).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings */}
+        {nav === "settings" && (
+          <div className="mp-section">
+            <div className="mp-section-head">
+              <div>
+                <h1>Settings</h1>
+                <p>Account details and network access.</p>
+              </div>
+            </div>
+
+            <div className="mp-form-card">
+              <h2>Account</h2>
+              <div className="mp-account-row"><span>Business name</span><strong>{merchant?.businessName}</strong></div>
+              <div className="mp-account-row"><span>Email</span><strong>{merchant?.contactEmail}</strong></div>
+              <div className="mp-account-row"><span>Shopify store</span><strong>{shop}</strong></div>
+            </div>
+
+            <div className={`mp-form-card mp-hub-card ${merchant?.hubStatus === "APPROVED" ? "mp-hub-active" : merchant?.hubStatus === "PENDING" ? "mp-hub-pending" : "mp-hub-apply"}`}>
+              {merchant?.hubStatus === "APPROVED" && (
+                <>
+                  <div className="mp-hub-badge"><Users size={16} /> Exchange Hub — Active</div>
+                  <h2>{merchant.hub?.displayName ?? merchant.businessName}</h2>
+                  <p>Your Exchange Hub is active. You can now issue Universal Exchange Notes to your supporters and build your holder network.</p>
+                </>
               )}
-              {!hubMsg && (
-                <button className="smp-btn smp-btn-outline" disabled={hubApplying || !hubForm.displayName} onClick={async () => {
-                  setHubApplying(true); setHubError("");
-                  try {
-                    const r = await fetch("/api/merchant/apply-hub", {
-                      method: "POST", credentials: "include",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify(hubForm)
-                    });
-                    const data = await r.json();
-                    if (!r.ok) { setHubError(data.error ?? "Could not submit application."); }
-                    else {
-                      setHubMsg("Application submitted! We'll review it and update your dashboard when approved.");
-                      setMerchant((prev: any) => ({ ...prev, hubStatus: "PENDING" }));
-                    }
-                  } catch { setHubError("Could not connect. Try again."); }
-                  finally { setHubApplying(false); }
-                }}>
-                  <Users size={15} /> {hubApplying ? "Submitting…" : "Apply as Exchange Hub"}
-                </button>
+              {merchant?.hubStatus === "PENDING" && (
+                <>
+                  <div className="mp-hub-badge" style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}><Users size={16} /> Exchange Hub Application — Pending</div>
+                  <h2>Under review</h2>
+                  <p>Your application has been submitted. Your dashboard will update automatically once it's approved — no reinstall needed.</p>
+                </>
+              )}
+              {(!merchant?.hubStatus || merchant?.hubStatus === "NONE") && !hubApplied && (
+                <>
+                  <div className="mp-hub-badge" style={{ background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}><Users size={16} /> Become an Exchange Hub</div>
+                  <h2>Issue UEN notes to your community</h2>
+                  <p>Exchange Hubs issue Universal Exchange Notes to supporters, customers, or community members. Applications are reviewed and approved by the UENITE team.</p>
+                  {hubError && <p className="mp-error">{hubError}</p>}
+                  <div className="mp-form-grid" style={{ marginTop: 16 }}>
+                    <label>Organization name<input value={hubForm.displayName} onChange={(e) => setHubForm({ ...hubForm, displayName: e.target.value })} placeholder="e.g. Hebrew Care" /></label>
+                    <label>Hub type
+                      <select value={hubForm.hubType} onChange={(e) => setHubForm({ ...hubForm, hubType: e.target.value })}>
+                        <option value="creator">Creator</option>
+                        <option value="ministry">Ministry / Church</option>
+                        <option value="nonprofit">Nonprofit / Cause</option>
+                        <option value="community">Community</option>
+                        <option value="brand">Brand</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </label>
+                    <label style={{ gridColumn: "1 / -1" }}>Tell us about your community (optional)<input value={hubForm.description} onChange={(e) => setHubForm({ ...hubForm, description: e.target.value })} placeholder="Brief description of your cause or audience" /></label>
+                  </div>
+                  <button className="mp-btn" style={{ marginTop: 16 }} disabled={hubApplying || !hubForm.displayName} onClick={async () => {
+                    setHubApplying(true); setHubError("");
+                    try {
+                      const r = await fetch("/api/merchant/apply-hub", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(hubForm) });
+                      const data = await r.json();
+                      if (!r.ok) { setHubError(data.error ?? "Could not submit."); }
+                      else { setHubApplied(true); setMerchant((prev: any) => ({ ...prev, hubStatus: "PENDING" })); }
+                    } catch { setHubError("Could not connect. Try again."); }
+                    finally { setHubApplying(false); }
+                  }}>
+                    <Users size={15} /> {hubApplying ? "Submitting…" : "Apply as Exchange Hub"}
+                  </button>
+                </>
+              )}
+              {hubApplied && (
+                <>
+                  <div className="mp-hub-badge" style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24" }}><Users size={16} /> Application Submitted</div>
+                  <p>Your application is under review. This dashboard will update automatically once approved.</p>
+                </>
               )}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+
+        {/* Help */}
+        {nav === "help" && (
+          <div className="mp-section">
+            <div className="mp-section-head"><div><h1>Help</h1><p>How the UENITE merchant network works.</p></div></div>
+            <div className="mp-form-card">
+              <h2>How UEN codes work at checkout</h2>
+              <p>When a Holder purchases through an Exchange Hub, they receive a Universal Exchange Note (UEN) code. That code gets synced to your Shopify store as a discount code. When they shop with you and enter the code at checkout, they receive the offer you set.</p>
+            </div>
+            <div className="mp-form-card">
+              <h2>Your offer</h2>
+              <p>You control what Holders receive — a percentage off, a fixed dollar amount off, with or without a minimum order, and how many times each code can be used. Change it anytime under My Offer.</p>
+            </div>
+            <div className="mp-form-card">
+              <h2>Sync</h2>
+              <p>Codes sync automatically when a new note is issued. You can also trigger a manual sync from the Sync section if you ever need to force an update.</p>
+            </div>
+            <div className="mp-form-card">
+              <h2>Exchange Hub</h2>
+              <p>If you want to issue UEN codes to your own community — not just accept them — apply to become an Exchange Hub under Settings. Applications are reviewed by the UENITE team.</p>
+            </div>
+            <div className="mp-form-card">
+              <a className="mp-link-btn" href="/">Learn more at uenite.com</a>
+            </div>
+          </div>
+        )}
+
+      </div>
     </main>
   );
 }

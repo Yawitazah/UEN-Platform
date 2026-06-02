@@ -814,4 +814,43 @@ router.get("/sync-logs", requireMerchantSession, async (req, res) => {
   );
 });
 
+router.get("/analytics", requireMerchantSession, async (req, res) => {
+  try {
+    const connection = await connectionFromRequest(req, res);
+    if (!connection) return;
+    const merchantId = connection.merchantId;
+    const period = String(req.query.period ?? "month");
+    const now = new Date();
+    const since =
+      period === "day" ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      : period === "year" ? new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+      : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [totalSynced, redemptionsInPeriod, allTimeRedemptions, syncLogs] = await Promise.all([
+      prisma.shopifySyncedNote.count({ where: { merchantId, syncStatus: "SYNCED" } }),
+      prisma.shopifySyncedNote.findMany({
+        where: { merchantId, redeemedAt: { gte: since } },
+        select: { redeemedOrderAmount: true }
+      }),
+      prisma.shopifySyncedNote.count({ where: { merchantId, redeemedAt: { not: null } } }),
+      prisma.syncLog.findMany({
+        where: { merchantId },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { status: true, totalCreated: true, totalErrors: true, message: true, createdAt: true }
+      })
+    ]);
+
+    res.json({
+      totalSyncedUens: totalSynced,
+      allTimeRedemptions,
+      redemptionsInPeriod: redemptionsInPeriod.length,
+      revenueInPeriod: redemptionsInPeriod.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0),
+      recentSyncLogs: syncLogs
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 export default router;
