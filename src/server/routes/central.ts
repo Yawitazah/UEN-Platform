@@ -659,6 +659,37 @@ router.get("/merchants", requireRole(adminRoles), async (_req, res) => {
   res.json(await prisma.merchant.findMany({ orderBy: { createdAt: "desc" }, include: { linkedExchangeHub: true } }));
 });
 
+// Hard-delete a merchant and every record that references it.
+router.delete("/merchants/:merchantId", requireRole(writeRoles), async (req, res) => {
+  try {
+    const merchantId = param(req, "merchantId");
+    const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
+    if (!merchant) return res.status(404).json({ error: "Merchant not found" });
+
+    await prisma.shopifyInventorySyncedCode.deleteMany({ where: { merchantId } });
+    await prisma.shopifySyncedNote.deleteMany({ where: { merchantId } });
+    await prisma.shopifyDiscountGroup.deleteMany({ where: { merchantId } });
+    await prisma.syncLog.deleteMany({ where: { merchantId } });
+    await prisma.merchantOffer.deleteMany({ where: { merchantId } });
+    await prisma.merchantAccessRule.deleteMany({ where: { merchantId } });
+    await prisma.merchantApiKey.deleteMany({ where: { merchantId } });
+    await prisma.merchantOnboarding.deleteMany({ where: { merchantId } });
+    await prisma.merchantHistoricalRedemption.deleteMany({ where: { merchantId } });
+    await prisma.shopifyConnection.deleteMany({ where: { merchantId } });
+
+    // Also remove any pending hub applications this merchant submitted
+    await prisma.exchangeHub.deleteMany({
+      where: { applicantMerchantId: merchantId, status: "PENDING_REVIEW" }
+    });
+
+    await prisma.merchant.delete({ where: { id: merchantId } });
+
+    res.json({ deleted: true, businessName: merchant.businessName });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.post("/merchants", requireRole(writeRoles), async (req, res) => {
   try {
     const data = createMerchantSchema.parse(req.body);

@@ -3128,7 +3128,24 @@ function Merchants({ user }: { user: any }) {
         <Select label="Linked hub" value={form.linkedExchangeHubId} options={hubs.data ?? []} onChange={(linkedExchangeHubId) => setForm({ ...form, linkedExchangeHubId, isExchangeHub: Boolean(linkedExchangeHubId) })} />
         <button onClick={create}><UploadCloud size={16} /> Create Merchant</button>
       </FormGrid>
-      <DataTable rows={merchants.data ?? []} columns={[["Business", (r) => r.businessName], ["Platform", (r) => r.platformType], ["Email", (r) => r.contactEmail ?? "—"], ["Status", (r) => <Status value={r.status} />], ["Exchange Hub Merchant", (r) => r.isExchangeHub ? "Yes" : "No"]]} />
+      <DataTable rows={merchants.data ?? []} columns={[
+        ["Business", (r) => r.businessName],
+        ["Platform", (r) => r.platformType],
+        ["Email", (r) => r.contactEmail ?? "—"],
+        ["Status", (r) => <Status value={r.status} />],
+        ["Exchange Hub Merchant", (r) => r.isExchangeHub ? "Yes" : "No"],
+        ["Actions", (r) => (
+          <button className="ghost danger" onClick={async () => {
+            if (!window.confirm(`Delete ${r.businessName} and all associated records? This cannot be undone.`)) return;
+            try {
+              await api(`/api/merchants/${r.id}`, { method: "DELETE" });
+              await merchants.reload();
+            } catch (err) {
+              alert(err instanceof Error ? err.message : "Delete failed");
+            }
+          }}>Delete</button>
+        )]
+      ]} />
       <section className="panel" style={{ marginTop: 24 }}>
         <h2>Reset Merchant Login Credentials</h2>
         {credMsg && <Notice tone={credMsg.startsWith("Done") ? "neutral" : "bad"}>{credMsg}</Notice>}
