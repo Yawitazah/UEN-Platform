@@ -66,7 +66,40 @@ export function verifyAdminSession(value?: string) {
   }
 }
 
+export function createMerchantSession(input: { id: string; merchantId: string }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      id: input.id,
+      merchantId: input.merchantId,
+      exp: Date.now() + 1000 * 60 * 60 * 24 * 30
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyMerchantSession(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { id: string; merchantId: string; exp: number };
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
+  const merchantSession = verifyMerchantSession(req.cookies?.uen_merchant_session);
+  if (merchantSession) {
+    req.auth = { actorId: merchantSession.id, actorType: "merchant", role: AdminRole.MERCHANT, merchantId: merchantSession.merchantId };
+    return next();
+  }
+
   const token = bearer(req);
   const session = verifyAdminSession(sessionCookie(req));
   if (session) {

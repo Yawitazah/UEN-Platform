@@ -6402,3 +6402,93 @@ html { background: #050e09; }
 .smp-error   { color: #f87171; font-size: 13px; margin: 0 0 10px; }
 .smp-success { color: #34d399; font-size: 13px; margin: 0 0 10px; }
 .smp-link { color: #34d399; font-size: 13px; text-decoration: underline; }
+
+/* ── Merchant auth forms (create account / login) ── */
+.smp-auth-wrap {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+  padding: 32px 16px;
+}
+.smp-auth-card {
+  background: #0f1f18;
+  border: 1px solid rgba(52,211,153,0.18);
+  border-radius: 16px;
+  max-width: 440px;
+  padding: 36px 32px;
+  width: 100%;
+}
+.smp-auth-brand {
+  align-items: center;
+  color: #75e3ad;
+  display: flex;
+  font-size: 22px;
+  font-weight: 700;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.smp-auth-card h1 {
+  color: #e2f0e8;
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+.smp-auth-card > p {
+  color: rgba(226,240,232,0.55);
+  font-size: 14px;
+  margin: 0 0 24px;
+}
+.smp-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.smp-auth-form label {
+  color: rgba(226,240,232,0.7);
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  gap: 6px;
+}
+.smp-auth-form input {
+  background: #0a1510;
+  border: 1px solid rgba(52,211,153,0.2);
+  border-radius: 8px;
+  color: #e2f0e8;
+  font-size: 15px;
+  padding: 10px 12px;
+  outline: none;
+}
+.smp-auth-form input:focus { border-color: #34d399; }
+.smp-btn-full { justify-content: center; margin-top: 4px; width: 100%; }
+.smp-auth-switch {
+  color: rgba(226,240,232,0.45);
+  font-size: 13px;
+  margin: 16px 0 0;
+  text-align: center;
+}
+.smp-link-btn {
+  background: none;
+  border: none;
+  color: #34d399;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: underline;
+}
+.smp-merchant-name {
+  color: rgba(226,240,232,0.8);
+  font-size: 14px;
+  font-weight: 600;
+}
+.smp-logout-btn {
+  background: none;
+  border: 1px solid rgba(52,211,153,0.2);
+  border-radius: 6px;
+  color: rgba(226,240,232,0.5);
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: auto;
+  padding: 4px 10px;
+}
+.smp-logout-btn:hover { border-color: rgba(52,211,153,0.4); color: #e2f0e8; }

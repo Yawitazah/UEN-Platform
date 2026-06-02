@@ -89,6 +89,8 @@ model Merchant {
   status              String                @default("ACTIVE")
   isExchangeHub       Boolean               @default(false)
   linkedExchangeHubId String?
+  contactEmail        String?               @unique
+  passwordHash        String?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   linkedExchangeHub   ExchangeHub?          @relation("LinkedExchangeHub", fields: [linkedExchangeHubId], references: [id])

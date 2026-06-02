@@ -1916,7 +1916,23 @@ function LoginPage() {
 function ShopifyMerchantPortal() {
   const params = new URLSearchParams(window.location.search);
   const shop = params.get("shopDomain") ?? params.get("shop") ?? "";
-  const dashboard = useData<any>(() => fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`).then((r) => (r.ok ? r.json() : Promise.reject(r))), [shop]);
+
+  // Auth state: "loading" | "no-account" | "login" | "dashboard"
+  const [authState, setAuthState] = useState<"loading" | "no-account" | "login" | "dashboard">("loading");
+  const [merchant, setMerchant] = useState<any>(null);
+
+  // Create account form
+  const [setupForm, setSetupForm] = useState({ businessName: shop.replace(/\.myshopify\.com$/, "").replace(/-/g, " "), email: "", password: "", confirmPassword: "" });
+  const [setupError, setSetupError] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+
+  // Login form
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Dashboard state
+  const dashboard = useData<any>(() => fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))), [shop, authState === "dashboard"]);
   const [offer, setOffer] = useState({ discountType: "PERCENTAGE", discountValue: "15", minimumOrderAmount: "", usageLimitPerNote: "1" });
   const [saveMsg, setSaveMsg] = useState("");
   const [saveErr, setSaveErr] = useState("");
@@ -1926,111 +1942,153 @@ function ShopifyMerchantPortal() {
   useEffect(() => {
     if (dashboard.data?.activeOffer) {
       const o = dashboard.data.activeOffer;
-      setOffer({
-        discountType: o.discountType ?? "PERCENTAGE",
-        discountValue: String(o.discountValue ?? 15),
-        minimumOrderAmount: String(o.minimumOrderAmount ?? ""),
-        usageLimitPerNote: String(o.usageLimitPerNote ?? 1)
-      });
+      setOffer({ discountType: o.discountType ?? "PERCENTAGE", discountValue: String(o.discountValue ?? 15), minimumOrderAmount: String(o.minimumOrderAmount ?? ""), usageLimitPerNote: String(o.usageLimitPerNote ?? 1) });
     }
   }, [dashboard.data]);
+
+  // On mount: check session, then account status
+  useEffect(() => {
+    if (!shop) { setAuthState("login"); return; }
+    fetch("/api/merchant/me", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.merchant) { setMerchant(data.merchant); setAuthState("dashboard"); return; }
+        // No session — check if they have an account
+        return fetch(`/api/merchant/account-status?shopDomain=${encodeURIComponent(shop)}`)
+          .then((r) => r.json())
+          .then((status) => setAuthState(status.hasAccount ? "login" : "no-account"));
+      })
+      .catch(() => setAuthState("login"));
+  }, [shop]);
+
+  const submitSetup = async () => {
+    if (setupForm.password !== setupForm.confirmPassword) { setSetupError("Passwords do not match."); return; }
+    if (setupForm.password.length < 8) { setSetupError("Password must be at least 8 characters."); return; }
+    setSetupError(""); setSetupLoading(true);
+    try {
+      const r = await fetch("/api/merchant/setup", {
+        method: "POST", credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ shopDomain: shop, businessName: setupForm.businessName, email: setupForm.email, password: setupForm.password })
+      });
+      const data = await r.json();
+      if (!r.ok) { setSetupError(data.error ?? "Setup failed."); return; }
+      setMerchant(data.merchant); setAuthState("dashboard");
+    } catch { setSetupError("Could not connect. Try again."); }
+    finally { setSetupLoading(false); }
+  };
+
+  const submitLogin = async () => {
+    setLoginError(""); setLoginLoading(true);
+    try {
+      const r = await fetch("/api/merchant/login", {
+        method: "POST", credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: loginForm.email, password: loginForm.password })
+      });
+      const data = await r.json();
+      if (!r.ok) { setLoginError(data.error ?? "Login failed."); return; }
+      setMerchant(data.merchant); setAuthState("dashboard");
+    } catch { setLoginError("Could not connect. Try again."); }
+    finally { setLoginLoading(false); }
+  };
+
+  const logout = async () => {
+    await fetch("/api/merchant/logout", { method: "POST", credentials: "include" });
+    setMerchant(null); setAuthState("login");
+  };
 
   const saveOffer = async () => {
     setSaveMsg(""); setSaveErr("");
     try {
-      await fetch(`/shopify/api/offer-settings?shopDomain=${encodeURIComponent(shop)}`, {
-        method: "POST",
+      const r = await fetch(`/shopify/api/offer-settings?shopDomain=${encodeURIComponent(shop)}`, {
+        method: "POST", credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...offer, discountValue: Number(offer.discountValue), minimumOrderAmount: offer.minimumOrderAmount ? Number(offer.minimumOrderAmount) : undefined, usageLimitPerNote: Number(offer.usageLimitPerNote) })
       });
+      if (!r.ok) { setSaveErr("Could not save offer."); return; }
       setSaveMsg("Offer saved.");
       await dashboard.reload();
-    } catch {
-      setSaveErr("Could not save offer.");
-    }
+    } catch { setSaveErr("Could not save offer."); }
   };
 
   const syncNow = async () => {
     setSyncing(true); setSyncMsg("");
     try {
-      const r = await fetch(`/shopify/api/sync?shopDomain=${encodeURIComponent(shop)}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const r = await fetch(`/shopify/api/sync?shopDomain=${encodeURIComponent(shop)}`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: "{}" });
       const data = await r.json();
       setSyncMsg(data.message ?? "Sync complete.");
       await dashboard.reload();
-    } catch {
-      setSyncMsg("Sync failed — try again.");
-    } finally {
-      setSyncing(false);
-    }
+    } catch { setSyncMsg("Sync failed — try again."); }
+    finally { setSyncing(false); }
   };
 
   return (
     <main className="shopify-merchant-portal">
       <div className="smp-header">
         <div className="smp-brand"><Shield size={20} /><strong><BrandWord /></strong></div>
-        <span className="smp-shop">{shop}</span>
+        {merchant && <span className="smp-merchant-name">{merchant.businessName}</span>}
+        {merchant && <button className="smp-logout-btn" onClick={logout}>Sign out</button>}
+        {shop && <span className="smp-shop">{shop}</span>}
       </div>
 
-      {!shop && (
-        <div className="smp-card">
-          <p>No store domain found. Open this page from your Shopify admin app.</p>
+      {authState === "loading" && (
+        <div className="smp-auth-wrap"><div className="smp-card"><p>Loading…</p></div></div>
+      )}
+
+      {authState === "no-account" && (
+        <div className="smp-auth-wrap">
+          <div className="smp-auth-card">
+            <div className="smp-auth-brand"><Shield size={28} /><BrandWord /></div>
+            <h1>Create your merchant account</h1>
+            <p>Your Shopify store is connected. Set up your account to manage your UEN offer and view your dashboard.</p>
+            {setupError && <p className="smp-error">{setupError}</p>}
+            <div className="smp-auth-form">
+              <label>Business name<input value={setupForm.businessName} onChange={(e) => setSetupForm({ ...setupForm, businessName: e.target.value })} placeholder="Your store name" /></label>
+              <label>Email address<input type="email" value={setupForm.email} onChange={(e) => setSetupForm({ ...setupForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
+              <label>Password<input type="password" value={setupForm.password} onChange={(e) => setSetupForm({ ...setupForm, password: e.target.value })} placeholder="At least 8 characters" /></label>
+              <label>Confirm password<input type="password" value={setupForm.confirmPassword} onChange={(e) => setSetupForm({ ...setupForm, confirmPassword: e.target.value })} placeholder="Repeat password" /></label>
+              <button className="smp-btn smp-btn-full" onClick={submitSetup} disabled={setupLoading}>{setupLoading ? "Creating account…" : "Create merchant account"}</button>
+            </div>
+            <p className="smp-auth-switch">Already have an account? <button className="smp-link-btn" onClick={() => setAuthState("login")}>Sign in</button></p>
+          </div>
         </div>
       )}
 
-      {shop && dashboard.loading && <div className="smp-card"><p>Loading your merchant dashboard…</p></div>}
-
-      {shop && dashboard.error && (
-        <div className="smp-card smp-card-warn">
-          <h2>Store not connected</h2>
-          <p>Your Shopify store isn't linked to a UEN merchant account yet.</p>
-          <a className="smp-btn" href={`/shopify/auth?shop=${encodeURIComponent(shop)}`}>Connect this store</a>
+      {authState === "login" && (
+        <div className="smp-auth-wrap">
+          <div className="smp-auth-card">
+            <div className="smp-auth-brand"><Shield size={28} /><BrandWord /></div>
+            <h1>Merchant sign in</h1>
+            <p>Sign in to manage your UEN merchant offer and sync settings.</p>
+            {loginError && <p className="smp-error">{loginError}</p>}
+            <div className="smp-auth-form">
+              <label>Email address<input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
+              <label>Password<input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="Your password" onKeyDown={(e) => { if (e.key === "Enter") submitLogin(); }} /></label>
+              <button className="smp-btn smp-btn-full" onClick={submitLogin} disabled={loginLoading}>{loginLoading ? "Signing in…" : "Sign in"}</button>
+            </div>
+            {shop && <p className="smp-auth-switch">New to UEN? <button className="smp-link-btn" onClick={() => setAuthState("no-account")}>Create account</button></p>}
+          </div>
         </div>
       )}
 
-      {dashboard.data && (
+      {authState === "dashboard" && (
         <>
           <div className="smp-card smp-status-row">
-            <div className="smp-status-item">
-              <span>Connection</span>
-              <strong className={dashboard.data.platformConnectionStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data.platformConnectionStatus}</strong>
-            </div>
-            <div className="smp-status-item">
-              <span>Merchant status</span>
-              <strong className={dashboard.data.merchantStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data.merchantStatus}</strong>
-            </div>
-            <div className="smp-status-item">
-              <span>Synced UEN codes</span>
-              <strong>{dashboard.data.totalSyncedUens}</strong>
-            </div>
-            <div className="smp-status-item">
-              <span>Last sync</span>
-              <strong>{dashboard.data.lastSyncTime ? new Date(dashboard.data.lastSyncTime).toLocaleString() : "Never"}</strong>
-            </div>
+            <div className="smp-status-item"><span>Connection</span><strong className={dashboard.data?.platformConnectionStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data?.platformConnectionStatus ?? "—"}</strong></div>
+            <div className="smp-status-item"><span>Merchant status</span><strong className={dashboard.data?.merchantStatus === "ACTIVE" ? "smp-green" : "smp-warn"}>{dashboard.data?.merchantStatus ?? "—"}</strong></div>
+            <div className="smp-status-item"><span>Synced UEN codes</span><strong>{dashboard.data?.totalSyncedUens ?? 0}</strong></div>
+            <div className="smp-status-item"><span>Last sync</span><strong>{dashboard.data?.lastSyncTime ? new Date(dashboard.data.lastSyncTime).toLocaleString() : "Never"}</strong></div>
           </div>
 
           <div className="smp-card">
             <h2>Offer Settings</h2>
-            <p className="smp-subtitle">This is the discount Holders receive when they use a UEN at your store checkout.</p>
+            <p className="smp-subtitle">The discount Holders receive when they use a UEN at your checkout.</p>
             <div className="smp-form-grid">
-              <label>
-                Type
-                <select value={offer.discountType} onChange={(e) => setOffer({ ...offer, discountType: e.target.value })}>
-                  <option value="PERCENTAGE">Percentage off</option>
-                  <option value="FIXED_AMOUNT">Fixed amount off</option>
-                </select>
-              </label>
-              <label>
-                Value {offer.discountType === "PERCENTAGE" ? "(%)" : "($)"}
-                <input type="number" min="1" value={offer.discountValue} onChange={(e) => setOffer({ ...offer, discountValue: e.target.value })} />
-              </label>
-              <label>
-                Minimum order ($, optional)
-                <input type="number" min="0" value={offer.minimumOrderAmount} onChange={(e) => setOffer({ ...offer, minimumOrderAmount: e.target.value })} />
-              </label>
-              <label>
-                Uses per note
-                <input type="number" min="1" value={offer.usageLimitPerNote} onChange={(e) => setOffer({ ...offer, usageLimitPerNote: e.target.value })} />
-              </label>
+              <label>Type<select value={offer.discountType} onChange={(e) => setOffer({ ...offer, discountType: e.target.value })}><option value="PERCENTAGE">Percentage off</option><option value="FIXED_AMOUNT">Fixed amount off</option></select></label>
+              <label>Value {offer.discountType === "PERCENTAGE" ? "(%)" : "($)"}<input type="number" min="1" value={offer.discountValue} onChange={(e) => setOffer({ ...offer, discountValue: e.target.value })} /></label>
+              <label>Minimum order ($, optional)<input type="number" min="0" value={offer.minimumOrderAmount} onChange={(e) => setOffer({ ...offer, minimumOrderAmount: e.target.value })} /></label>
+              <label>Uses per note<input type="number" min="1" value={offer.usageLimitPerNote} onChange={(e) => setOffer({ ...offer, usageLimitPerNote: e.target.value })} /></label>
             </div>
             {saveErr && <p className="smp-error">{saveErr}</p>}
             {saveMsg && <p className="smp-success">{saveMsg}</p>}
@@ -2039,16 +2097,14 @@ function ShopifyMerchantPortal() {
 
           <div className="smp-card">
             <h2>UEN Code Sync</h2>
-            <p className="smp-subtitle">Approved UEN codes are pushed to your Shopify discount list automatically. You can also trigger a manual sync.</p>
+            <p className="smp-subtitle">Approved UEN codes are pushed to your Shopify discount list automatically.</p>
             {syncMsg && <p className="smp-success">{syncMsg}</p>}
-            <button className="smp-btn smp-btn-outline" onClick={syncNow} disabled={syncing}>
-              <RefreshCw size={15} /> {syncing ? "Syncing…" : "Sync UEN codes now"}
-            </button>
+            <button className="smp-btn smp-btn-outline" onClick={syncNow} disabled={syncing}><RefreshCw size={15} /> {syncing ? "Syncing…" : "Sync UEN codes now"}</button>
           </div>
 
           <div className="smp-card smp-card-help">
             <h2>Need help?</h2>
-            <p>Holders with valid UEN codes will be able to use them at your Shopify checkout. Make sure your store is accepting discount codes and your offer is active.</p>
+            <p>Holders with valid UEN codes will be able to use them at your Shopify checkout.</p>
             <a className="smp-link" href="/merchants/register">Learn more about the merchant network</a>
           </div>
         </>

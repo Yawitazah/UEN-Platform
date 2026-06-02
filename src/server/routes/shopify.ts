@@ -11,6 +11,13 @@ import { createOfferSchema, platformConnectionSchema } from "../validators";
 
 const router = express.Router();
 
+function requireMerchantSession(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!req.auth || req.auth.actorType !== "merchant") {
+    return res.status(401).json({ error: "Merchant login required" });
+  }
+  next();
+}
+
 function normalizeShop(value: unknown) {
   const shop = String(value ?? "").trim().toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop)) return null;
@@ -667,7 +674,7 @@ router.post("/platform-connection", async (req, res) => {
   }
 });
 
-router.get("/dashboard", async (req, res) => {
+router.get("/dashboard", requireMerchantSession, async (req, res) => {
   const connection = await connectionFromRequest(req, res);
   if (!connection) return;
   await ensureShopMerchantAccess(connection.shopDomain, connection.merchantId);
@@ -686,7 +693,7 @@ router.get("/dashboard", async (req, res) => {
   });
 });
 
-router.get("/products", async (req, res) => {
+router.get("/products", requireMerchantSession, async (req, res) => {
   try {
     const connection = await connectionFromRequest(req, res);
     if (!connection) return;
@@ -734,7 +741,7 @@ router.get("/products", async (req, res) => {
   }
 });
 
-router.post("/offer-settings", async (req, res) => {
+router.post("/offer-settings", requireMerchantSession, async (req, res) => {
   try {
     const connection = await connectionFromRequest(req, res);
     if (!connection) return;
@@ -760,7 +767,7 @@ router.post("/offer-settings", async (req, res) => {
   }
 });
 
-router.post("/pause", async (req, res) => {
+router.post("/pause", requireMerchantSession, async (req, res) => {
   try {
     const connection = await connectionFromRequest(req, res);
     if (!connection) return;
@@ -774,7 +781,7 @@ router.post("/pause", async (req, res) => {
   }
 });
 
-router.post("/sync", async (req, res) => {
+router.post("/sync", requireMerchantSession, async (req, res) => {
   try {
     const connection = await connectionFromRequest(req, res);
     if (!connection) return;
@@ -786,7 +793,7 @@ router.post("/sync", async (req, res) => {
   }
 });
 
-router.get("/sync-logs", async (req, res) => {
+router.get("/sync-logs", requireMerchantSession, async (req, res) => {
   const connection = await connectionFromRequest(req, res);
   if (!connection) return;
   res.json(

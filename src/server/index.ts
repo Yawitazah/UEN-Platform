@@ -7,6 +7,7 @@ import { ensureFirstBuildTarget } from "./bootstrap";
 import { config } from "./config";
 import { authenticate } from "./security";
 import authRoutes from "./routes/auth";
+import merchantAuthRoutes from "./routes/merchant-auth";
 import centralRoutes from "./routes/central";
 import digitalRoutes from "./routes/digital";
 import holderRoutes from "./routes/holder";
@@ -41,6 +42,7 @@ app.use(authenticate);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
+app.use("/api/merchant", merchantAuthRoutes);
 app.use("/api", holderRoutes);
 app.use("/api", digitalRoutes);
 app.use("/api", centralRoutes);
