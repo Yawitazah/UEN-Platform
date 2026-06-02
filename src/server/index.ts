@@ -77,6 +77,11 @@ const uploadDir = path.resolve(process.cwd(), "uploads");
 app.use("/uploads", express.static(uploadDir));
 app.use(express.static(clientDir));
 app.get("*", (_req, res) => {
+  // Never cache index.html — browser must always fetch fresh so it gets
+  // the latest hashed JS/CSS bundle references after each deploy.
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   res.sendFile(path.join(clientDir, "index.html"));
 });
 
