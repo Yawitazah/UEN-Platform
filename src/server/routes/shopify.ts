@@ -831,7 +831,19 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
       ? { merchantId, redeemedAt: { gte: since } }
       : { merchantId, redeemedAt: { not: null } };
 
-    const [totalSynced, redemptionsInPeriod, allTimeRedemptions, allTimeRevenue, syncLogs] = await Promise.all([
+    const historicalFilter = since
+      ? { merchantId, redeemedAt: { gte: since } }
+      : { merchantId };
+
+    const [
+      totalSynced,
+      redemptionsInPeriod,
+      allTimeRedemptions,
+      allTimeRevenue,
+      historicalInPeriod,
+      allTimeHistorical,
+      syncLogs
+    ] = await Promise.all([
       prisma.shopifySyncedNote.count({ where: { merchantId, syncStatus: "SYNCED" } }),
       prisma.shopifySyncedNote.findMany({
         where: redemptionFilter,
@@ -842,6 +854,14 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
         where: { merchantId, redeemedAt: { not: null } },
         select: { redeemedOrderAmount: true }
       }),
+      prisma.merchantHistoricalRedemption.findMany({
+        where: historicalFilter,
+        select: { orderAmount: true }
+      }),
+      prisma.merchantHistoricalRedemption.findMany({
+        where: { merchantId },
+        select: { orderAmount: true }
+      }),
       prisma.syncLog.findMany({
         where: { merchantId },
         orderBy: { createdAt: "desc" },
@@ -850,12 +870,21 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
       })
     ]);
 
+    const liveRevenueInPeriod = redemptionsInPeriod.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0);
+    const liveAllTimeRevenue = allTimeRevenue.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0);
+    const histRevenueInPeriod = historicalInPeriod.reduce((sum, r) => sum + (r.orderAmount ? Number(r.orderAmount) : 0), 0);
+    const histAllTimeRevenue = allTimeHistorical.reduce((sum, r) => sum + (r.orderAmount ? Number(r.orderAmount) : 0), 0);
+
     res.json({
       totalSyncedUens: totalSynced,
-      allTimeRedemptions,
-      allTimeRevenue: allTimeRevenue.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0),
-      redemptionsInPeriod: redemptionsInPeriod.length,
-      revenueInPeriod: redemptionsInPeriod.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0),
+      // Live + historical combined
+      allTimeRedemptions: allTimeRedemptions + allTimeHistorical.length,
+      allTimeRevenue: liveAllTimeRevenue + histAllTimeRevenue,
+      redemptionsInPeriod: redemptionsInPeriod.length + historicalInPeriod.length,
+      revenueInPeriod: liveRevenueInPeriod + histRevenueInPeriod,
+      // Breakdown for transparency
+      historicalRedemptions: allTimeHistorical.length,
+      historicalRevenue: histAllTimeRevenue,
       recentSyncLogs: syncLogs
     });
   } catch (error) {

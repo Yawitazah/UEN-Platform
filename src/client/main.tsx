@@ -3267,10 +3267,40 @@ function AccessRules({ user }: { user: any }) {
 function Connections({ user }: { user: any }) {
   const { data } = useData<any[]>(() => api("/api/shopify-connections"));
   const synced = useData<any[]>(() => api("/api/shopify-synced-notes"));
+  const [importStatus, setImportStatus] = useState<Record<string, string>>({});
+
+  const importHistorical = async (shopDomain: string) => {
+    setImportStatus((prev) => ({ ...prev, [shopDomain]: "Importing — this may take a moment…" }));
+    try {
+      const result = await api<any>(`/api/shopify-connections/${encodeURIComponent(shopDomain)}/import-historical`, { method: "POST" });
+      setImportStatus((prev) => ({ ...prev, [shopDomain]: result.message ?? "Done" }));
+    } catch (err) {
+      setImportStatus((prev) => ({ ...prev, [shopDomain]: err instanceof Error ? err.message : "Import failed" }));
+    }
+  };
+
   return (
     <>
-      <Header title="Shopify Connections" subtitle="Review server-side store connections and synced UEN codes." user={user} />
-      <DataTable rows={data ?? []} columns={[["Shop", (r) => r.shopDomain], ["Merchant", (r) => r.merchant.businessName], ["Status", (r) => <Status value={r.status} />], ["Last Sync", (r) => r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : "Never"]]} />
+      <Header title="Shopify Connections" subtitle="Review store connections, synced codes, and import historical redemption data." user={user} />
+      <DataTable
+        rows={data ?? []}
+        columns={[
+          ["Shop", (r) => r.shopDomain],
+          ["Merchant", (r) => r.merchant.businessName],
+          ["Status", (r) => <Status value={r.status} />],
+          ["Last Sync", (r) => r.lastSyncAt ? new Date(r.lastSyncAt).toLocaleString() : "Never"],
+          ["Historical Data", (r) => (
+            <div className="actions">
+              <button onClick={() => importHistorical(r.shopDomain)}>
+                <Download size={14} /> Import from Shopify
+              </button>
+              {importStatus[r.shopDomain] && (
+                <span style={{ fontSize: 12, color: "#607069", marginLeft: 8 }}>{importStatus[r.shopDomain]}</span>
+              )}
+            </div>
+          )]
+        ]}
+      />
       <h2>Synced Notes</h2>
       <DataTable rows={synced.data ?? []} columns={[["Code", (r) => r.uenCode], ["Merchant", (r) => r.merchant.businessName], ["Status", (r) => <Status value={r.syncStatus} />], ["Discount ID", (r) => r.shopifyDiscountId ?? "-"]]} />
     </>

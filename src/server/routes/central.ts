@@ -658,6 +658,75 @@ router.get("/shopify-connections", requireRole(adminRoles), async (_req, res) =>
   res.json(rows.map(publicConnection));
 });
 
+// Import historical UEN redemptions from Shopify order history.
+// Paginates through all orders on the store, finds discount codes matching
+// the UEN pattern (ending in UEN), and saves them as MerchantHistoricalRedemption
+// records. Safe to run multiple times — upserts by (shopDomain, orderId, code).
+router.post("/shopify-connections/:shopDomain/import-historical", requireRole(writeRoles), async (req, res) => {
+  try {
+    const shopDomain = param(req, "shopDomain");
+    const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain }, include: { merchant: true } });
+    if (!connection) return res.status(404).json({ error: "Connection not found" });
+
+    const uenPattern = /[A-Z0-9]+UEN$/i;
+    let pageUrl = `https://${shopDomain}/admin/api/${config.shopifyApiVersion}/orders.json?status=any&limit=250&fields=id,created_at,total_price,discount_codes`;
+    let totalOrders = 0;
+    let totalImported = 0;
+    let totalSkipped = 0;
+
+    while (pageUrl) {
+      const response = await fetch(pageUrl, {
+        headers: { "x-shopify-access-token": connection.accessToken, "content-type": "application/json" }
+      });
+      if (!response.ok) {
+        return res.status(502).json({ error: `Shopify API error: ${response.status}` });
+      }
+
+      const payload = await response.json() as { orders: Array<{ id: number; created_at: string; total_price: string; discount_codes: Array<{ code: string; amount: string }> }> };
+      totalOrders += payload.orders.length;
+
+      for (const order of payload.orders) {
+        for (const dc of order.discount_codes ?? []) {
+          if (!uenPattern.test(dc.code)) continue;
+          try {
+            await prisma.merchantHistoricalRedemption.upsert({
+              where: {
+                shopDomain_shopifyOrderId_uenCode: {
+                  shopDomain,
+                  shopifyOrderId: String(order.id),
+                  uenCode: dc.code.toUpperCase()
+                }
+              },
+              update: {},
+              create: {
+                merchantId: connection.merchantId,
+                shopDomain,
+                uenCode: dc.code.toUpperCase(),
+                shopifyOrderId: String(order.id),
+                orderAmount: order.total_price ? Number(order.total_price) : null,
+                redeemedAt: new Date(order.created_at),
+                source: "SHOPIFY_BACKFILL"
+              }
+            });
+            totalImported++;
+          } catch {
+            totalSkipped++;
+          }
+        }
+      }
+
+      // Follow Shopify pagination via Link header
+      const linkHeader = response.headers.get("link") ?? "";
+      const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+      pageUrl = nextMatch ? nextMatch[1] : "";
+    }
+
+    res.json({ shopDomain, totalOrders, totalImported, totalSkipped, message: `Imported ${totalImported} historical redemptions from ${totalOrders} orders.` });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.get("/shopify-synced-notes", requireRole(adminRoles), async (_req, res) => {
   res.json(
     await prisma.shopifySyncedNote.findMany({

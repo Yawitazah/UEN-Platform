@@ -103,7 +103,24 @@ model Merchant {
   apiKeys             MerchantApiKey[]
   inventorySyncs      ShopifyInventorySyncedCode[]
   discountGroups      ShopifyDiscountGroup[]
-  onboardingRequests  MerchantOnboarding[]
+  onboardingRequests       MerchantOnboarding[]
+  historicalRedemptions    MerchantHistoricalRedemption[]
+}
+
+model MerchantHistoricalRedemption {
+  id              String    @id @default(cuid())
+  merchantId      String
+  shopDomain      String
+  uenCode         String
+  shopifyOrderId  String
+  orderAmount     Decimal?
+  redeemedAt      DateTime
+  source          String    @default("SHOPIFY_BACKFILL")
+  createdAt       DateTime  @default(now())
+  merchant        Merchant  @relation(fields: [merchantId], references: [id])
+
+  @@unique([shopDomain, shopifyOrderId, uenCode])
+  @@index([merchantId])
 }
 
 model MerchantOffer {
