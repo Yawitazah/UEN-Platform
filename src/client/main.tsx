@@ -2002,11 +2002,14 @@ function ShopifyMerchantPortal() {
 
   // On mount: check session, then account status
   useEffect(() => {
-    if (!shop) { setAuthState("login"); return; }
+    // Always check for an existing merchant session first. A self-registered
+    // creator / Exchange Hub merchant has no Shopify shop param but is still a
+    // valid login, so we must not bounce them to a login screen on sight.
     fetch("/api/merchant/me", { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.merchant) { setMerchant(data.merchant); setAuthState("dashboard"); return; }
+        if (!shop) { setAuthState("login"); return; }
         return fetch(`/api/merchant/account-status?shopDomain=${encodeURIComponent(shop)}`)
           .then((r) => r.json())
           .then((status) => setAuthState(status.hasAccount ? "login" : "no-account"));
@@ -2666,6 +2669,13 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
         return;
       }
       if (loginData.token) localStorage.setItem("uen_admin_token", loginData.token);
+      // Merchants / creators authenticate against the merchant directory and
+      // belong in the merchant portal, not the admin dashboard. Honor the
+      // destination the server picked for this account type.
+      if (loginData.actorType === "merchant" && loginData.redirect) {
+        window.location.href = loginData.redirect;
+        return;
+      }
       onLogin();
     } catch (_error) {
       setError("Could not reach the app server. Refresh the page and try again.");
