@@ -540,20 +540,50 @@ router.delete("/exchange-hubs/:exchangeHubId", requireRole(writeRoles), async (r
     const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
     if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
 
-    // Cascade through every table that references this hub
+    // Collect IDs needed for child-table cleanup
     const uens = await prisma.universalExchangeNote.findMany({ where: { exchangeHubId }, select: { id: true } });
     const uenIds = uens.map((u) => u.id);
 
+    const inventory = await prisma.uenCodeInventory.findMany({ where: { exchangeHubId }, select: { id: true } });
+    const inventoryIds = inventory.map((c) => c.id);
+
+    const holders = await prisma.holder.findMany({ where: { exchangeHubId }, select: { id: true } });
+    const holderIds = holders.map((h) => h.id);
+
+    // Delete strictly leaf-to-root so every foreign key is satisfied before
+    // its parent row is removed.
+
+    // ShopifyInventorySyncedCode -> UenCodeInventory (must clear before inventory)
+    await prisma.shopifyInventorySyncedCode.deleteMany({ where: { inventoryCodeId: { in: inventoryIds } } });
+
+    // ShopifySyncedNote -> UniversalExchangeNote
     await prisma.shopifySyncedNote.deleteMany({ where: { universalExchangeNoteId: { in: uenIds } } });
+
+    // HolderNotification -> Holder (this was the missing link causing the 500)
+    await prisma.holderNotification.deleteMany({ where: { holderId: { in: holderIds } } });
+
+    // Unlink inventory from the UENs about to be deleted, then delete UENs
     await prisma.uenCodeInventory.updateMany({ where: { universalExchangeNoteId: { in: uenIds } }, data: { universalExchangeNoteId: null, status: "REMOVED" } });
     await prisma.universalExchangeNote.deleteMany({ where: { exchangeHubId } });
 
+    // UenIssuanceLog -> ShopifyIssuanceProduct
     await prisma.uenIssuanceLog.deleteMany({ where: { issuanceProduct: { exchangeHubId } } });
+
+    // Inventory and issuance products
     await prisma.uenCodeInventory.deleteMany({ where: { exchangeHubId } });
     await prisma.shopifyIssuanceProduct.deleteMany({ where: { exchangeHubId } });
+
+    // Holders and access rules
     await prisma.holder.deleteMany({ where: { exchangeHubId } });
     await prisma.merchantAccessRule.deleteMany({ where: { exchangeHubId } });
-    await prisma.digitalProduct.deleteMany({ where: { exchangeHubId } });
+
+    // DigitalProduct has no database table yet (model exists in schema but no
+    // migration). Guard the delete so a missing table can't abort the cascade.
+    try {
+      await prisma.digitalProduct.deleteMany({ where: { exchangeHubId } });
+    } catch (digitalProductError) {
+      // Table doesn't exist / nothing to delete — safe to ignore.
+    }
 
     // Unlink any merchants that were linked to this hub
     await prisma.merchant.updateMany({ where: { linkedExchangeHubId: exchangeHubId }, data: { linkedExchangeHubId: null, isExchangeHub: false } });
