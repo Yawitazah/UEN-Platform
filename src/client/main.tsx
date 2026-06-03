@@ -1932,10 +1932,37 @@ function LoginPage() {
 
 type MpNav = "dashboard" | "offer" | "sync" | "settings" | "help";
 
+// Preview/demo data so the Public Page Studio can render the real merchant and
+// Exchange Hub dashboards without a login. Driven by ?preview=merchant|hub.
+const MP_PREVIEW_ANALYTICS = {
+  totalSyncedUens: 128,
+  revenueInPeriod: 4820.5,
+  allTimeRevenue: 18640.25,
+  redemptionsInPeriod: 64,
+  allTimeRedemptions: 212,
+  recentSyncLogs: [
+    { status: "SUCCESS", message: "12 codes created", totalCreated: 12, createdAt: "2026-05-30T15:04:00Z" },
+    { status: "SUCCESS", message: "8 codes created", totalCreated: 8, createdAt: "2026-05-28T11:20:00Z" },
+    { status: "PARTIAL", message: "1 code skipped (already exists)", totalCreated: 5, createdAt: "2026-05-25T09:10:00Z" },
+  ],
+};
+const MP_PREVIEW_OFFER = {
+  activeOffer: { discountType: "PERCENTAGE", discountValue: 15, minimumOrderAmount: 25, usageLimitPerNote: 1 },
+  platformConnectionStatus: "ACTIVE",
+  lastSyncTime: "2026-05-30T15:04:00Z",
+  merchantStatus: "ACTIVE",
+};
+const MP_PREVIEW_MERCHANT = { id: "preview-merchant", businessName: "Riverside Goods", contactEmail: "owner@riversidegoods.co", shopDomain: "riverside-goods.myshopify.com", isExchangeHub: false, hubStatus: "NONE", hub: null };
+const MP_PREVIEW_HUB = { id: "preview-hub", businessName: "Nu Breed Collective", contactEmail: "team@nubreed.co", shopDomain: "nubreed-love.myshopify.com", isExchangeHub: true, hubStatus: "APPROVED", hub: { id: "preview-hub-id", displayName: "Nu Breed Collective" } };
+
 function ShopifyMerchantPortal() {
   const params = new URLSearchParams(window.location.search);
   const shop = params.get("shopDomain") ?? params.get("shop") ?? "";
   const host = params.get("host") ?? "";
+
+  // Studio preview mode: render the real dashboard with demo data, no login.
+  const previewRole = params.get("preview"); // "merchant" | "hub" | null
+  const isPreview = previewRole === "merchant" || previewRole === "hub";
 
   // Initialize Shopify App Bridge when running inside the Shopify admin frame.
   useEffect(() => {
@@ -1971,7 +1998,9 @@ function ShopifyMerchantPortal() {
   // Analytics
   const [period, setPeriod] = useState("month");
   const analytics = useData<any>(
-    () => fetch(`/shopify/api/analytics?shopDomain=${encodeURIComponent(shop)}&period=${period}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
+    () => isPreview
+      ? Promise.resolve(MP_PREVIEW_ANALYTICS)
+      : fetch(`/shopify/api/analytics?shopDomain=${encodeURIComponent(shop)}&period=${period}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
     [shop, period, authState]
   );
 
@@ -1980,7 +2009,9 @@ function ShopifyMerchantPortal() {
   const [saveMsg, setSaveMsg] = useState("");
   const [saveErr, setSaveErr] = useState("");
   const activeOffer = useData<any>(
-    () => fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
+    () => isPreview
+      ? Promise.resolve(MP_PREVIEW_OFFER)
+      : fetch(`/shopify/api/dashboard?shopDomain=${encodeURIComponent(shop)}`, { credentials: "include" }).then((r) => (r.ok ? r.json() : Promise.reject(r))),
     [shop, authState]
   );
   useEffect(() => {
@@ -2002,6 +2033,12 @@ function ShopifyMerchantPortal() {
 
   // On mount: check session, then account status
   useEffect(() => {
+    // Studio preview: load demo merchant/hub and jump straight to the dashboard.
+    if (isPreview) {
+      setMerchant(previewRole === "hub" ? MP_PREVIEW_HUB : MP_PREVIEW_MERCHANT);
+      setAuthState("dashboard");
+      return;
+    }
     // Always check for an existing merchant session first. A self-registered
     // creator / Exchange Hub merchant has no Shopify shop param but is still a
     // valid login, so we must not bounce them to a login screen on sight.
@@ -2129,8 +2166,14 @@ function ShopifyMerchantPortal() {
     ? `${activeOffer.data.activeOffer.discountValue}${activeOffer.data.activeOffer.discountType === "PERCENTAGE" ? "%" : "$"} off`
     : "No offer set";
 
+  // Approved Exchange Hubs get a visually distinct (violet) workspace so they
+  // always know they're in the Hub, not the standard merchant view.
+  const isHub = merchant?.hubStatus === "APPROVED";
+  const workspaceName = isHub ? (merchant?.hub?.displayName ?? merchant?.businessName) : merchant?.businessName;
+  const shopDisplay = merchant?.shopDomain ?? shop;
+
   return (
-    <main className="mp-root">
+    <main className={`mp-root ${isHub ? "mp-hub" : ""}`}>
       {/* ── Sidebar ── */}
       <aside className="mp-sidebar">
         <div className="mp-sidebar-brand">
@@ -2138,9 +2181,14 @@ function ShopifyMerchantPortal() {
           <BrandWord />
         </div>
 
+        <div className={`mp-workspace-tag ${isHub ? "mp-workspace-tag-hub" : "mp-workspace-tag-merchant"}`}>
+          {isHub ? <Users size={13} /> : <ShoppingBag size={13} />}
+          <span>{isHub ? "Exchange Hub" : "Merchant"}</span>
+        </div>
+
         <div className="mp-sidebar-store">
           <span className={`mp-status-dot ${connectionOk ? "mp-dot-green" : "mp-dot-warn"}`} />
-          <span className="mp-store-name">{merchant?.businessName || shop.replace(/\.myshopify\.com$/, "")}</span>
+          <span className="mp-store-name">{workspaceName || shop.replace(/\.myshopify\.com$/, "")}</span>
         </div>
 
         <nav className="mp-nav">
@@ -2158,12 +2206,22 @@ function ShopifyMerchantPortal() {
             <span>Help</span>
           </a>
           <button className="mp-signout" onClick={logout}>Sign out</button>
-          <span className="mp-domain">{shop}</span>
+          <span className="mp-domain">{shopDisplay}</span>
         </div>
       </aside>
 
       {/* ── Main content ── */}
       <div className="mp-main">
+
+        {/* Workspace identity — tells merchants vs. Exchange Hubs where they are */}
+        <div className={`mp-workspace-banner ${isHub ? "mp-workspace-banner-hub" : "mp-workspace-banner-merchant"}`}>
+          <div className="mp-workspace-mark">{isHub ? <Users size={18} /> : <ShoppingBag size={18} />}</div>
+          <div className="mp-workspace-copy">
+            <span>{isHub ? "Exchange Hub workspace" : "Merchant workspace"}</span>
+            <strong>{workspaceName}</strong>
+          </div>
+          <span className="mp-workspace-pill">{isHub ? "Issues UEN notes" : "Accepts UEN notes"}</span>
+        </div>
 
         {/* Dashboard */}
         {nav === "dashboard" && (
@@ -2343,7 +2401,7 @@ function ShopifyMerchantPortal() {
               <h2>Account</h2>
               <div className="mp-account-row"><span>Business name</span><strong>{merchant?.businessName}</strong></div>
               <div className="mp-account-row"><span>Email</span><strong>{merchant?.contactEmail}</strong></div>
-              <div className="mp-account-row"><span>Shopify store</span><strong>{shop}</strong></div>
+              <div className="mp-account-row"><span>Shopify store</span><strong>{shopDisplay}</strong></div>
             </div>
 
             <div className={`mp-form-card mp-hub-card ${merchant?.hubStatus === "APPROVED" ? "mp-hub-active" : merchant?.hubStatus === "PENDING" ? "mp-hub-pending" : "mp-hub-apply"}`}>
@@ -2831,6 +2889,7 @@ function PublicPreviews() {
     Merchant: {
       summary: "Merchant onboarding, Shopify tools, offers, and redemption setup.",
       pages: [
+        { label: "Merchant Dashboard (live)", path: "/shopify/merchant?preview=merchant", description: "The real logged-in merchant portal with demo data — exactly what a merchant sees.", access: "Live preview" },
         { label: "Merchant Signup", path: "/merchants/register", description: "Public merchant network registration.", access: "Public" },
         { label: "Shopify App", path: "/shopify", description: "Installed merchant app dashboard and sync controls.", access: "Login required" },
         { label: "Merchant Offers", path: "/offers", description: "Admin offer management for participating stores.", access: "Admin" }
@@ -2839,6 +2898,7 @@ function PublicPreviews() {
     Hub: {
       summary: "Exchange Hub setup, Holders, UEN generation, and campaign operations.",
       pages: [
+        { label: "Exchange Hub Dashboard (live)", path: "/shopify/merchant?preview=hub", description: "The real logged-in Exchange Hub portal with demo data — compare it side by side with the merchant dashboard.", access: "Live preview" },
         { label: "Exchange Hub Signup", path: "/exchange-hub/register", description: "Public application path for creators and organizations.", access: "Public" },
         { label: "Exchange Hubs Admin", path: "/exchange-hubs", description: "Create, edit, and suspend Exchange Hubs.", access: "Admin" },
         { label: "Universal Exchange Notes", path: "/uens", description: "Generate, disable, remove, or delete Notes.", access: "Admin" }

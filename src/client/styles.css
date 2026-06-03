@@ -6798,6 +6798,79 @@ html { background: #050e09; }
 .mp-success { color: #34d399; font-size: 13px; margin: 0 0 10px; }
 .mp-link-btn { background: none; border: none; color: #34d399; cursor: pointer; font-size: 13px; padding: 0; text-decoration: underline; }
 
+/* ── Workspace identity (Merchant vs. Exchange Hub) ── */
+.mp-workspace-tag {
+  align-items: center;
+  border-bottom: 1px solid rgba(52,211,153,0.08);
+  display: flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.06em;
+  padding: 8px 18px;
+  text-transform: uppercase;
+}
+.mp-workspace-tag-merchant { color: #34d399; }
+.mp-workspace-tag-hub { color: #a78bfa; }
+
+.mp-workspace-banner {
+  align-items: center;
+  border: 1px solid rgba(52,211,153,0.18);
+  border-radius: 12px;
+  display: flex;
+  gap: 14px;
+  margin: 24px 32px 0;
+  padding: 14px 18px;
+}
+.mp-workspace-banner-merchant { background: linear-gradient(100deg, rgba(52,211,153,0.10), rgba(52,211,153,0.02)); }
+.mp-workspace-banner-hub { background: linear-gradient(100deg, rgba(167,139,250,0.14), rgba(167,139,250,0.03)); border-color: rgba(167,139,250,0.3); }
+.mp-workspace-mark {
+  align-items: center;
+  border-radius: 10px;
+  display: flex;
+  flex-shrink: 0;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+.mp-workspace-banner-merchant .mp-workspace-mark { background: rgba(52,211,153,0.14); color: #34d399; }
+.mp-workspace-banner-hub .mp-workspace-mark { background: rgba(167,139,250,0.18); color: #c4b5fd; }
+.mp-workspace-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.mp-workspace-copy span { color: rgba(226,240,232,0.5); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.mp-workspace-copy strong { color: #e2f0e8; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-workspace-pill {
+  border-radius: 20px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+}
+.mp-workspace-banner-merchant .mp-workspace-pill { background: rgba(52,211,153,0.12); color: #34d399; }
+.mp-workspace-banner-hub .mp-workspace-pill { background: rgba(167,139,250,0.16); color: #c4b5fd; }
+@media (max-width: 600px) {
+  .mp-workspace-banner { margin: 16px 16px 0; }
+  .mp-workspace-pill { display: none; }
+}
+
+/* ── Exchange Hub theme — recolors the portal's emerald accents to violet ── */
+.mp-hub .mp-sidebar { border-right-color: rgba(167,139,250,0.18); }
+.mp-hub .mp-sidebar-brand { color: #c4b5fd; }
+.mp-hub .mp-nav-item:hover { background: rgba(167,139,250,0.08); color: #e6def8; }
+.mp-hub .mp-nav-active { background: rgba(167,139,250,0.14) !important; color: #c4b5fd !important; }
+.mp-hub .mp-dot-green { background: #a78bfa; box-shadow: 0 0 6px rgba(167,139,250,0.6); }
+.mp-hub .mp-stat-primary { border-color: rgba(167,139,250,0.3); }
+.mp-hub .mp-stat-primary .mp-stat-value { color: #c4b5fd; }
+.mp-hub .mp-period-btn.active { background: rgba(167,139,250,0.14); border-color: rgba(167,139,250,0.3); color: #c4b5fd; }
+.mp-hub .mp-period-btn:hover:not(.active) { border-color: rgba(167,139,250,0.25); }
+.mp-hub .mp-info-ok { border-color: rgba(167,139,250,0.25); }
+.mp-hub .mp-form-grid input:focus,
+.mp-hub .mp-form-grid select:focus { border-color: #a78bfa; }
+.mp-hub .mp-btn { background: #a78bfa; color: #140a2e; }
+.mp-hub .mp-btn:hover:not(:disabled) { background: #c4b5fd; }
+.mp-hub .mp-link-btn { color: #c4b5fd; }
+.mp-hub .mp-success { color: #c4b5fd; }
+.mp-hub .mp-signout:hover { border-color: rgba(167,139,250,0.35); }
+
 /* ── Login page signup section ── */
 .login-page-divider {
   border-top: 1px solid rgba(52,211,153,0.1);
