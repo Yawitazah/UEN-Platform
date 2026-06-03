@@ -95,18 +95,28 @@ export function verifyMerchantSession(value?: string) {
 
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
   const merchantSession = verifyMerchantSession(req.cookies?.uen_merchant_session);
-  if (merchantSession) {
+  const adminSession = verifyAdminSession(sessionCookie(req));
+
+  // A leftover merchant-portal cookie must never block admin access. Both
+  // sessions can legitimately coexist in one browser (e.g. the platform owner
+  // who has also signed into the merchant portal). Treat the request as a
+  // merchant only when it targets the merchant-portal API (/api/merchant/...)
+  // or when there is no admin session to fall back on. Otherwise the admin
+  // session always wins, so the admin dashboard never gets bounced into a login
+  // loop by a stale merchant cookie. Note the trailing slash: "/api/merchant/"
+  // intentionally excludes the admin "/api/merchants/..." management routes.
+  const isMerchantPortalRoute = req.path.startsWith("/api/merchant/");
+  if (merchantSession && (isMerchantPortalRoute || !adminSession)) {
     req.auth = { actorId: merchantSession.id, actorType: "merchant", role: AdminRole.MERCHANT, merchantId: merchantSession.merchantId };
     return next();
   }
 
-  const token = bearer(req);
-  const session = verifyAdminSession(sessionCookie(req));
-  if (session) {
-    req.auth = { actorId: session.id, actorType: "admin", role: session.role };
+  if (adminSession) {
+    req.auth = { actorId: adminSession.id, actorType: "admin", role: adminSession.role };
     return next();
   }
 
+  const token = bearer(req);
   if (!token) return next();
 
   if (safeEqual(token, config.adminToken)) {
