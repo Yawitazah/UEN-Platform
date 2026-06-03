@@ -5,7 +5,7 @@
   },
   "deploy": {
     "preDeployCommand": "prisma migrate deploy --schema prisma/schema.postgres.prisma",
-    "startCommand": "node dist/server/index.js",
+    "startCommand": "echo 'START_ATTEMPT' && node dist/server/index.js; echo 'NODE_EXITED_'$?",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
