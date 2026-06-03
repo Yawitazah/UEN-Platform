@@ -747,7 +747,7 @@ th {
   z-index: 3;
 }
 
-.uenite-nav > div {
+.uenite-nav-links {
   align-items: center;
   display: flex;
   gap: 8px;
@@ -763,6 +763,70 @@ th {
 .uenite-nav a:hover {
   background: rgba(255, 255, 255, 0.1);
   color: white;
+}
+
+/* Hamburger toggle — hidden on desktop, shown on mobile via media query */
+.uenite-nav-toggle {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(133, 226, 184, 0.35);
+  border-radius: 12px;
+  color: #d9efe4;
+  cursor: pointer;
+  display: none;
+  height: 44px;
+  justify-content: center;
+  padding: 0;
+  width: 44px;
+}
+
+.uenite-nav-toggle:hover {
+  background: rgba(133, 226, 184, 0.18);
+  color: white;
+}
+
+/* Mobile hamburger nav — collapse links into a slide-down dropdown */
+@media (max-width: 768px) {
+  .uenite-nav {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+  }
+
+  .uenite-nav-toggle {
+    display: inline-flex;
+  }
+
+  .uenite-nav-links {
+    background: rgba(8, 26, 20, 0.96);
+    border: 1px solid rgba(133, 226, 184, 0.22);
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 12px;
+    width: 100%;
+  }
+
+  .uenite-nav-links.is-open {
+    display: flex;
+  }
+
+  .uenite-nav-links a {
+    border-radius: 12px;
+    font-size: 17px;
+    padding: 14px 16px;
+    width: 100%;
+  }
+
+  .uenite-nav-links .uenite-nav-cta {
+    margin-top: 4px;
+    text-align: center;
+  }
 }
 
 .uenite-logo {
@@ -3484,18 +3548,6 @@ th {
 
   .network-stats strong {
     font-size: 28px;
-  }
-
-  .uenite-nav {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .uenite-nav > div {
-    max-width: 100%;
-    overflow-x: auto;
-    padding-bottom: 4px;
   }
 
   .uenite-hero {

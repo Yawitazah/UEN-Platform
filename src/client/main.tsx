@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Menu, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
 import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
@@ -519,6 +519,41 @@ function PublicShell({ children, compact = false, backTo }: { children: React.Re
   );
 }
 
+type UeniteNavLink = { href: string; label: string; cta?: boolean };
+
+function UeniteNav({ links, className = "" }: { links: UeniteNavLink[]; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <nav className={`uenite-nav ${className}`.trim()}>
+      <a className="uenite-logo" href="/">
+        <Shield size={24} />
+        <BrandWord />
+      </a>
+      <button
+        type="button"
+        className="uenite-nav-toggle"
+        aria-label={open ? "Close navigation" : "Open navigation"}
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        {open ? <X size={24} /> : <Menu size={24} />}
+      </button>
+      <div className={`uenite-nav-links ${open ? "is-open" : ""}`.trim()}>
+        {links.map((link) => (
+          <a
+            key={`${link.href}-${link.label}`}
+            href={link.href}
+            className={link.cta ? "uenite-nav-cta" : undefined}
+            onClick={() => setOpen(false)}
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 function UeniteHome() {
   const siteContent = useData<Record<string, Partial<HomeSiteContent>>>(() => api("/api/public/site-content"));
   const [publicAdmin, setPublicAdmin] = useState<any | null>(null);
@@ -623,19 +658,15 @@ function UeniteHome() {
             <span key={index} style={{ left: particle.left, top: particle.top, animationDelay: particle.delay, width: particle.size, height: particle.size }} />
           ))}
         </div>
-        <nav className="uenite-nav">
-          <a className="uenite-logo" href="/">
-            <Shield size={24} />
-            <BrandWord />
-          </a>
-          <div>
-            <a href="#audiences">Who it is for</a>
-            <a href="#featured-network">Network</a>
-            <a href="/about">About</a>
-            <a href="/signup" className="uenite-nav-cta">Get Started</a>
-            <a href="/login">Sign in</a>
-          </div>
-        </nav>
+        <UeniteNav
+          links={[
+            { href: "#audiences", label: "Who it is for" },
+            { href: "#featured-network", label: "Network" },
+            { href: "/about", label: "About" },
+            { href: "/signup", label: "Get Started", cta: true },
+            { href: "/login", label: "Sign in" },
+          ]}
+        />
         <div className="uenite-hero-grid">
           <div className="uenite-copy">
             <span className={`eyebrow ${editableClass("heroEyebrow")}`} onClick={selectField("heroEyebrow")}><Star size={16} /> {content.heroEyebrow}</span>
@@ -863,14 +894,14 @@ function UeniteHome() {
 function AboutPage() {
   return (
     <main className="about-page">
-      <nav className="uenite-nav about-nav">
-        <a className="uenite-logo" href="/"><Shield size={24} /><BrandWord /></a>
-        <div>
-          <a href="/">Home</a>
-          <a href="/signup" className="uenite-nav-cta">Get Started</a>
-          <a href="/login">Sign in</a>
-        </div>
-      </nav>
+      <UeniteNav
+        className="about-nav"
+        links={[
+          { href: "/", label: "Home" },
+          { href: "/signup", label: "Get Started", cta: true },
+          { href: "/login", label: "Sign in" },
+        ]}
+      />
       <section className="about-hero">
         <span className="eyebrow dark"><Star size={16} /> About UENITE</span>
         <h1>Support with memory, value, and momentum.</h1>
@@ -1556,14 +1587,14 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
 function HolderCollectionDemo() {
   return (
     <main className="collection-demo-page">
-      <nav className="uenite-nav about-nav">
-        <a className="uenite-logo" href="/"><Shield size={24} /><BrandWord /></a>
-        <div>
-          <a href="/">Home</a>
-          <a href="/about">About</a>
-          <a href="/signup" className="uenite-nav-cta">Get Started</a>
-        </div>
-      </nav>
+      <UeniteNav
+        className="about-nav"
+        links={[
+          { href: "/", label: "Home" },
+          { href: "/about", label: "About" },
+          { href: "/signup", label: "Get Started", cta: true },
+        ]}
+      />
       <HolderCollectionExperience holderName="Raquel" />
       <PoweredByFooter />
     </main>
