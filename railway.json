@@ -4,11 +4,10 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "preDeployCommand": "prisma migrate deploy --schema prisma/schema.postgres.prisma",
-    "startCommand": "echo 'START_ATTEMPT' && node dist/server/index.js; echo 'NODE_EXITED_'$?",
+    "startCommand": "npm start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 3
+    "restartPolicyMaxRetries": 10
   }
 }
