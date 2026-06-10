@@ -441,13 +441,20 @@ router.post("/holder/widget-login", async (req, res) => {
       return res.status(404).json({ error: "This store is not connected to any Exchange Hub yet" });
     }
 
-    // 1. Existing holder account in a hub this merchant accepts.
-    const existingHolder = await prisma.holder.findFirst({
-      where: { email: normalizedEmail, exchangeHubId: { in: candidateHubIds }, status: "ACTIVE" },
+    // 1. A holder account in a candidate hub that actually holds active notes.
+    const holderWithNotes = await prisma.holder.findFirst({
+      where: {
+        email: normalizedEmail,
+        exchangeHubId: { in: candidateHubIds },
+        status: "ACTIVE",
+        universalExchangeNotes: { some: { status: "ACTIVE" } }
+      },
       orderBy: { createdAt: "asc" }
     });
-    // 2. A grandfathered code reserved for this email in one of those hubs.
-    const reservation = existingHolder
+    // 2. A hub holding a grandfathered code reserved for this email — beats an
+    //    empty account in another hub, so legacy purchasers land where their
+    //    codes are even if they once registered elsewhere.
+    const reservation = holderWithNotes
       ? null
       : await prisma.uenCodeInventory.findFirst({
           where: {
@@ -457,9 +464,20 @@ router.post("/holder/widget-login", async (req, res) => {
             issuedToEmail: normalizedEmail
           }
         });
-    // 3. Unambiguous fallback: the merchant accepts exactly one hub.
+    // 3. Any existing (possibly empty) holder account in a candidate hub.
+    const existingHolder =
+      holderWithNotes || reservation
+        ? null
+        : await prisma.holder.findFirst({
+            where: { email: normalizedEmail, exchangeHubId: { in: candidateHubIds }, status: "ACTIVE" },
+            orderBy: { createdAt: "asc" }
+          });
+    // 4. Unambiguous fallback: the merchant accepts exactly one hub.
     const exchangeHubId =
-      existingHolder?.exchangeHubId ?? reservation?.exchangeHubId ?? (candidateHubIds.length === 1 ? candidateHubIds[0] : null);
+      holderWithNotes?.exchangeHubId ??
+      reservation?.exchangeHubId ??
+      existingHolder?.exchangeHubId ??
+      (candidateHubIds.length === 1 ? candidateHubIds[0] : null);
     if (!exchangeHubId) {
       return res.status(404).json({ error: "No UEN account or reserved notes found for this email" });
     }

@@ -946,13 +946,21 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
 
 // Admin trigger for the grandfathered-code store load. Needed for merchants
 // that connected before the feature existed (new installs run it automatically).
+// Fire-and-forget: the full load takes minutes (thousands of tracking rows),
+// far beyond proxy timeouts — completion lands in the sync logs.
 router.post("/shopify-connections/:shopDomain/sync-grandfathered", requireRole(writeRoles), async (req, res) => {
   try {
     const shopDomain = param(req, "shopDomain");
     const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain } });
     if (!connection) return res.status(404).json({ error: "Connection not found" });
-    const result = await syncGrandfatheredCodesToMerchant(connection.merchantId, shopDomain, "ADMIN");
-    res.json(result);
+    setImmediate(async () => {
+      try {
+        await syncGrandfatheredCodesToMerchant(connection.merchantId, shopDomain, "ADMIN");
+      } catch (error) {
+        console.warn("Admin grandfather sync failed:", error);
+      }
+    });
+    res.status(202).json({ started: true, shopDomain, note: "Running in background; check sync logs for the result" });
   } catch (error) {
     handleError(res, error);
   }
