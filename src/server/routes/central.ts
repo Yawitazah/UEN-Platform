@@ -10,7 +10,7 @@ import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import bcrypt from "bcryptjs";
 import { createMerchantSession, requireMerchantAccess, requireRole } from "../security";
-import { syncCodesToGroupedShopifyDiscount, syncNewUensToEligibleShopifyStores } from "../services/sync";
+import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
   createAccessRuleSchema,
@@ -939,6 +939,20 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
       matchedCodes,
       message: `Imported ${totalImported} LOVE-prefixed codes from ${totalOrders} orders. (Cleared ${deleted.count} previous records.)`
     });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Admin trigger for the grandfathered-code store load. Needed for merchants
+// that connected before the feature existed (new installs run it automatically).
+router.post("/shopify-connections/:shopDomain/sync-grandfathered", requireRole(writeRoles), async (req, res) => {
+  try {
+    const shopDomain = param(req, "shopDomain");
+    const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain } });
+    if (!connection) return res.status(404).json({ error: "Connection not found" });
+    const result = await syncGrandfatheredCodesToMerchant(connection.merchantId, shopDomain, "ADMIN");
+    res.json(result);
   } catch (error) {
     handleError(res, error);
   }
