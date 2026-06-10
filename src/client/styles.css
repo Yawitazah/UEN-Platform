@@ -6898,6 +6898,7 @@ html { background: #050e09; }
 .mp-green { color: #34d399; }
 .mp-warn  { color: #fbbf24; }
 .mp-error   { color: #f87171; font-size: 13px; margin: 0 0 10px; }
+.mp-notice  { color: #75e3ad; font-size: 13px; margin: 0 0 10px; }
 .mp-success { color: #34d399; font-size: 13px; margin: 0 0 10px; }
 .mp-link-btn { background: none; border: none; color: #34d399; cursor: pointer; font-size: 13px; padding: 0; text-decoration: underline; }
 

@@ -2029,6 +2029,38 @@ function ShopifyMerchantPortal() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // Self-service password reset — only offered inside the Shopify admin,
+  // where the App Bridge session token proves store ownership (no emails).
+  const [resetMode, setResetMode] = useState(false);
+  const [resetForm, setResetForm] = useState({ email: "", password: "", confirm: "" });
+  const [resetError, setResetError] = useState("");
+  const [resetNotice, setResetNotice] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const submitReset = async () => {
+    setResetError("");
+    if (resetForm.password.length < 8) { setResetError("Password must be at least 8 characters."); return; }
+    if (resetForm.password !== resetForm.confirm) { setResetError("Passwords do not match."); return; }
+    setResetLoading(true);
+    try {
+      const idToken = await (window as any).shopify?.idToken?.();
+      if (!idToken) throw new Error("Could not verify store ownership. Open this app from your Shopify admin.");
+      const r = await fetch("/shopify/api/merchant/reset-credentials", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ newPassword: resetForm.password, newEmail: resetForm.email.trim() || undefined })
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error ?? "Reset failed");
+      setResetNotice(`Password updated${body.contactEmail ? ` for ${body.contactEmail}` : ""}. Sign in with your new password.`);
+      setLoginForm({ email: body.contactEmail ?? resetForm.email, password: "" });
+      setResetForm({ email: "", password: "", confirm: "" });
+      setResetMode(false);
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Reset failed");
+    }
+    setResetLoading(false);
+  };
+
   // Navigation
   const [nav, setNav] = useState<MpNav>("dashboard");
 
@@ -2179,18 +2211,39 @@ function ShopifyMerchantPortal() {
   }
 
   if (authState === "login") {
+    if (resetMode) {
+      return (
+        <main className="mp-auth-screen">
+          <div className="mp-auth-card">
+            <div className="mp-auth-brand"><Shield size={26} /><BrandWord /></div>
+            <h1>Reset your password</h1>
+            <p>You're signed into this store's Shopify admin, which verifies you own it — no reset email needed.</p>
+            {resetError && <p className="mp-error">{resetError}</p>}
+            <div className="mp-auth-form">
+              <label>Login email (optional — leave blank to keep current)<input type="email" value={resetForm.email} onChange={(e) => setResetForm({ ...resetForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
+              <label>New password<input type="password" value={resetForm.password} onChange={(e) => setResetForm({ ...resetForm, password: e.target.value })} placeholder="At least 8 characters" /></label>
+              <label>Confirm new password<input type="password" value={resetForm.confirm} onChange={(e) => setResetForm({ ...resetForm, confirm: e.target.value })} placeholder="Repeat the new password" onKeyDown={(e) => { if (e.key === "Enter") submitReset(); }} /></label>
+              <button className="mp-btn mp-btn-full" onClick={submitReset} disabled={resetLoading}>{resetLoading ? "Updating…" : "Update password"}</button>
+            </div>
+            <p className="mp-auth-switch"><button className="mp-link-btn" onClick={() => { setResetMode(false); setResetError(""); }}>Back to sign in</button></p>
+          </div>
+        </main>
+      );
+    }
     return (
       <main className="mp-auth-screen">
         <div className="mp-auth-card">
           <div className="mp-auth-brand"><Shield size={26} /><BrandWord /></div>
           <h1>Merchant sign in</h1>
           <p>Sign in to manage your UEN offer and store settings.</p>
+          {resetNotice && <p className="mp-notice">{resetNotice}</p>}
           {loginError && <p className="mp-error">{loginError}</p>}
           <div className="mp-auth-form">
             <label>Email address<input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="you@yourbusiness.com" /></label>
             <label>Password<input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="Your password" onKeyDown={(e) => { if (e.key === "Enter") submitLogin(); }} /></label>
             <button className="mp-btn mp-btn-full" onClick={submitLogin} disabled={loginLoading}>{loginLoading ? "Signing in…" : "Sign in"}</button>
           </div>
+          {host && <p className="mp-auth-switch"><button className="mp-link-btn" onClick={() => { setResetMode(true); setResetNotice(""); }}>Forgot password? Reset it here</button></p>}
           {shop && <p className="mp-auth-switch">New store? <button className="mp-link-btn" onClick={() => setAuthState("no-account")}>Create account</button></p>}
         </div>
       </main>

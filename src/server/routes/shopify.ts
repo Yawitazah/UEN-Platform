@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import express from "express";
 import { ZodError } from "zod";
 import { audit } from "../audit";
@@ -41,6 +42,32 @@ function verifyShopifyWebhook(req: express.Request) {
   if (!config.shopifyApiSecret || !req.rawBody || !hmac) return false;
   const digest = crypto.createHmac("sha256", config.shopifyApiSecret).update(req.rawBody).digest("base64");
   return hmac.length === digest.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
+}
+
+// Verifies an App Bridge session token (JWT signed by Shopify with the app
+// secret). A valid token is proof the caller is logged into the shop's admin
+// with this app open — the ownership check behind self-service resets.
+function verifyShopifySessionToken(token: string): { shop: string } | null {
+  try {
+    if (!config.shopifyApiSecret || !config.shopifyApiKey) return null;
+    const [headerB64, payloadB64, signatureB64] = token.split(".");
+    if (!headerB64 || !payloadB64 || !signatureB64) return null;
+    const expected = crypto.createHmac("sha256", config.shopifyApiSecret).update(`${headerB64}.${payloadB64}`).digest("base64url");
+    if (signatureB64.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signatureB64), Buffer.from(expected))) {
+      return null;
+    }
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as {
+      exp?: number;
+      aud?: string;
+      dest?: string;
+    };
+    if (!payload.exp || payload.exp * 1000 < Date.now()) return null;
+    if (payload.aud !== config.shopifyApiKey) return null;
+    const shop = normalizeShop(String(payload.dest ?? "").replace(/^https:\/\//, ""));
+    return shop ? { shop } : null;
+  } catch {
+    return null;
+  }
 }
 
 function shopifyScopes(value: string) {
@@ -803,6 +830,54 @@ router.post("/pause", requireMerchantSession, async (req, res) => {
       data: { status: MerchantStatus.PAUSED }
     });
     res.json({ merchantId: merchant.id, status: merchant.status });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Self-service credential reset from inside the Shopify admin. No emails:
+// a valid App Bridge session token proves the caller owns the store, which
+// is stronger proof of identity than any email round trip.
+router.post("/merchant/reset-credentials", async (req, res) => {
+  try {
+    const authHeader = String(req.header("authorization") ?? "");
+    const sessionToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const session = sessionToken ? verifyShopifySessionToken(sessionToken) : null;
+    if (!session) {
+      return res.status(401).json({ error: "Could not verify store ownership. Open this app from your Shopify admin and try again." });
+    }
+
+    const { newEmail, newPassword } = req.body as { newEmail?: string; newPassword?: string };
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    }
+
+    const connection = await prisma.shopifyConnection.findUnique({
+      where: { shopDomain: session.shop },
+      include: { merchant: true }
+    });
+    if (!connection) return res.status(404).json({ error: "This store is not connected to the UEN platform yet" });
+
+    const updates: Record<string, unknown> = { passwordHash: await bcrypt.hash(newPassword, 12) };
+    if (newEmail) updates.contactEmail = newEmail.trim().toLowerCase();
+    try {
+      await prisma.merchant.update({ where: { id: connection.merchantId }, data: updates });
+    } catch (updateError) {
+      if ((updateError as { code?: string }).code === "P2002") {
+        return res.status(409).json({ error: "That email is already used by another merchant account" });
+      }
+      throw updateError;
+    }
+
+    await audit({
+      action: AuditAction.SHOPIFY_CONNECTION_CHANGED,
+      actorType: "merchant",
+      entityType: "Merchant",
+      entityId: connection.merchantId,
+      message: `Merchant credentials reset from embedded app (${session.shop})`
+    });
+
+    res.json({ ok: true, contactEmail: newEmail?.trim().toLowerCase() ?? connection.merchant.contactEmail ?? null });
   } catch (error) {
     handleError(res, error);
   }
