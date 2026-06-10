@@ -817,7 +817,7 @@ function UeniteHome() {
 
       <section className={`collection-section ${editableClass("collectionBackground")}`} style={backgroundStyle("collectionBackground")} onClick={selectField("collectionBackground")}>
         <div className="collection-copy">
-          <span {...editableText("collectionEyebrow", "eyebrow")}><Wallet size={16} /> {content.collectionEyebrow}</span>
+          <span {...editableText("collectionEyebrow", "eyebrow dark")}><Wallet size={16} /> {content.collectionEyebrow}</span>
           <h2 {...editableText("collectionTitle")}>{content.collectionTitle}</h2>
           <p {...editableText("collectionBody")}>{content.collectionBody}</p>
           <div className="collection-filter-row">
