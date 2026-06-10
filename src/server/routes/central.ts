@@ -16,6 +16,7 @@ import {
   createAccessRuleSchema,
   bulkGenerateCodesSchema,
   bulkImportCodesSchema,
+  importGrandfatheredCodesSchema,
   createHolderSchema,
   createHubSchema,
   createIssuanceProductSchema,
@@ -869,8 +870,9 @@ router.post("/shopify-connections/:shopDomain/import-historical", requireRole(wr
     if (!connection) return res.status(404).json({ error: "Connection not found" });
 
     // Clear any previously imported records for this store+prefix so re-runs are clean.
+    // Scoped to the prefix so importing LOVE then UNLIMITEDLOVE doesn't wipe the first run.
     const deleted = await prisma.merchantHistoricalRedemption.deleteMany({
-      where: { shopDomain, merchantId: connection.merchantId }
+      where: { shopDomain, merchantId: connection.merchantId, uenCode: { startsWith: codePrefix } }
     });
 
     let pageUrl = `https://${shopDomain}/admin/api/${config.shopifyApiVersion}/orders.json?status=any&limit=250&fields=id,created_at,total_price,discount_codes`;
@@ -1056,6 +1058,62 @@ router.post("/exchange-hubs/:exchangeHubId/code-inventory/import", requireRole(w
     }
     const sync = await syncInventoryCodesToMerchantStores(exchangeHubId, created);
     res.status(201).json({ created: created.length, sync });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Grandfathered legacy codes (2022 Love Notes): imported as RESERVED with an
+// email reservation from the original purchase. RESERVED (not AVAILABLE) keeps
+// them out of nextCodeForIssuance, so new Shopify purchases can never be handed
+// someone else's grandfathered code. Claiming happens when a holder registers
+// or loads their wallet with the reserved email. Store sync is a separate step.
+router.post("/exchange-hubs/:exchangeHubId/code-inventory/import-grandfathered", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const data = importGrandfatheredCodesSchema.parse(req.body);
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+
+    let created = 0;
+    let updated = 0;
+    let skippedIssued = 0;
+    let conflicts = 0;
+    for (const entry of data.entries) {
+      const code = entry.code.toUpperCase();
+      const email = entry.email ? entry.email.trim().toLowerCase() : null;
+      const existing = await prisma.uenCodeInventory.findUnique({ where: { code } });
+      if (!existing) {
+        await prisma.uenCodeInventory.create({
+          data: {
+            exchangeHubId,
+            code,
+            status: "RESERVED",
+            source: "GRANDFATHERED",
+            issuedToEmail: email,
+            ...(entry.purchasedAt ? { createdAt: new Date(entry.purchasedAt) } : {})
+          }
+        });
+        created += 1;
+      } else if (existing.source !== "GRANDFATHERED") {
+        conflicts += 1;
+      } else if (existing.status === "RESERVED") {
+        await prisma.uenCodeInventory.update({ where: { id: existing.id }, data: { issuedToEmail: email } });
+        updated += 1;
+      } else {
+        // Already claimed by a holder — never re-reserve to a different email.
+        skippedIssued += 1;
+      }
+    }
+
+    await audit({
+      action: AuditAction.SYNC_EVENT,
+      actorType: "admin",
+      entityType: "ExchangeHub",
+      entityId: exchangeHubId,
+      message: `Grandfathered code import (${data.campaignId}): ${created} created, ${updated} updated, ${skippedIssued} already claimed, ${conflicts} conflicts`
+    });
+    res.status(201).json({ created, updated, skippedIssued, conflicts });
   } catch (error) {
     handleError(res, error);
   }

@@ -2,7 +2,7 @@ import { AuditAction } from "../constants";
 import { audit } from "../audit";
 import { prisma } from "../db";
 import { getValidUensForMerchant } from "./uens";
-import { addShopifyDiscountCodes, createShopifyDiscountCode } from "./shopifyGraphql";
+import { addShopifyDiscountCodes, createShopifyDiscountCode, findShopifyDiscountNodeByCode } from "./shopifyGraphql";
 
 type GroupedDiscountOffer = {
   discountType: string;
@@ -332,6 +332,215 @@ export async function syncMerchantUensToShopify(merchantId: string, shopDomain: 
   });
 
   return log;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Loads the grandfathered (2022 Love Note) code list onto a merchant's Shopify
+ * store. If the store already carries the codes (e.g. the original Nubreed
+ * store with its "5000k Love Notes 2022" discount), they are recorded as
+ * present instead of recreated — Shopify rejects duplicate code values
+ * shop-wide anyway. Otherwise the full list is bulk-added to the merchant's
+ * offer-keyed discount group in chunks, honoring the merchant's UEN offer.
+ */
+export async function syncGrandfatheredCodesToMerchant(merchantId: string, shopDomain: string, syncType = "AUTO_INSTALL") {
+  const connection = await prisma.shopifyConnection.findFirst({
+    where: { merchantId, shopDomain, status: "ACTIVE" },
+    include: {
+      merchant: {
+        include: {
+          offers: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 1 },
+          accessRules: { where: { status: "ACTIVE" } }
+        }
+      }
+    }
+  });
+  if (!connection) throw new Error("Active Shopify connection not found");
+
+  const offer = connection.merchant.offers[0];
+  if (!offer || (offer.discountType !== "PERCENTAGE" && offer.discountType !== "FIXED_AMOUNT")) {
+    return { status: "SKIPPED", created: 0, markedPresent: 0, errors: 0, message: "No PERCENTAGE/FIXED_AMOUNT offer configured" };
+  }
+
+  const hubIds = connection.merchant.accessRules.map((rule) => rule.exchangeHubId);
+  if (!hubIds.length) {
+    return { status: "SKIPPED", created: 0, markedPresent: 0, errors: 0, message: "Merchant has no active hub access rules" };
+  }
+
+  // Both RESERVED (unclaimed) and ISSUED codes must work at the store — the
+  // codes were sold in 2022 and are honored whether or not the purchaser ever
+  // registers a UEN dashboard account.
+  const allCodes = await prisma.uenCodeInventory.findMany({
+    where: { exchangeHubId: { in: hubIds }, source: "GRANDFATHERED" },
+    orderBy: { createdAt: "asc" }
+  });
+  if (!allCodes.length) {
+    return { status: "SKIPPED", created: 0, markedPresent: 0, errors: 0, message: "No grandfathered codes in connected hubs" };
+  }
+
+  const alreadySynced = await prisma.shopifyInventorySyncedCode.findMany({
+    where: { merchantId, inventoryCodeId: { in: allCodes.map((code) => code.id) }, syncStatus: "SYNCED" },
+    select: { inventoryCodeId: true }
+  });
+  const syncedIds = new Set(alreadySynced.map((row) => row.inventoryCodeId));
+  const pending = allCodes.filter((code) => !syncedIds.has(code.id));
+  if (!pending.length) {
+    return { status: "SUCCESS", created: 0, markedPresent: 0, errors: 0, message: "All grandfathered codes already synced" };
+  }
+
+  const connectionInput = {
+    merchantId,
+    shopDomain,
+    accessToken: connection.accessToken,
+    merchantName: connection.merchant.businessName
+  };
+
+  let created = 0;
+  let markedPresent = 0;
+  let errors = 0;
+  let message = "";
+
+  // Detection: if sample codes already resolve on the store, the legacy
+  // discount list is present — record, don't recreate.
+  const samples = pending.filter((code) => /^LOVE\d+$/.test(code.code)).slice(0, 5);
+  let preExistingDiscountId: string | null = null;
+  if (samples.length) {
+    try {
+      const probes = await Promise.all(
+        samples.map((sample) =>
+          findShopifyDiscountNodeByCode({ shopDomain, accessToken: connection.accessToken, code: sample.code })
+        )
+      );
+      if (probes.length && probes.every((probe) => probe !== null)) {
+        preExistingDiscountId = probes[0]!.shopifyDiscountId;
+      }
+    } catch (probeError) {
+      console.warn("Grandfather code probe failed; falling back to creation path:", probeError);
+    }
+  }
+
+  if (preExistingDiscountId) {
+    for (const code of pending) {
+      await recordGroupedCodeSync({
+        connection: connectionInput,
+        code: { id: code.id, code: code.code, kind: "inventory" },
+        syncStatus: "SYNCED",
+        shopifyDiscountId: preExistingDiscountId,
+        errorMessage: "Pre-existing store discount (5000k Love Notes 2022)"
+      });
+      // Claimed codes also need their note-path rows so the note auto-sync
+      // doesn't re-push the same code string.
+      if (code.universalExchangeNoteId) {
+        const historical = await prisma.merchantHistoricalRedemption.findFirst({
+          where: { merchantId, uenCode: code.code }
+        });
+        await prisma.shopifySyncedNote.upsert({
+          where: { merchantId_universalExchangeNoteId: { merchantId, universalExchangeNoteId: code.universalExchangeNoteId } },
+          update: { shopifyDiscountId: preExistingDiscountId, syncStatus: "SYNCED", lastSyncedAt: new Date() },
+          create: {
+            merchantId,
+            universalExchangeNoteId: code.universalExchangeNoteId,
+            shopDomain,
+            uenCode: code.code,
+            shopifyDiscountId: preExistingDiscountId,
+            shopifyDiscountCodeId: preExistingDiscountId,
+            syncStatus: "SYNCED",
+            lastSyncedAt: new Date(),
+            redeemedAt: historical?.redeemedAt ?? null,
+            redeemedOrderId: historical?.shopifyOrderId ?? null,
+            redeemedOrderAmount: historical?.orderAmount ?? null
+          }
+        });
+      }
+      markedPresent += 1;
+    }
+    message = `Detected existing grandfather discount on store; marked ${markedPresent} codes present`;
+  } else {
+    // Creation path: seed/reuse the merchant's offer-keyed discount group with
+    // the first code, then bulk-add the rest in chunks of 100 (Shopify's
+    // discountRedeemCodeBulkAdd limit) with a small pause between calls.
+    const group = await syncCodesToGroupedShopifyDiscount({
+      connection: connectionInput,
+      offer,
+      codes: [{ id: pending[0].id, code: pending[0].code, kind: "inventory" }]
+    });
+    created += group.created;
+    errors += group.errors;
+
+    const activeGroupRow = await prisma.shopifyDiscountGroup.findUnique({
+      where: { merchantId_shopDomain_discountKey: { merchantId, shopDomain, discountKey: discountKey(offer) } }
+    });
+    const activeGroup = activeGroupRow?.status === "ACTIVE" ? activeGroupRow : null;
+    if (!activeGroup) {
+      errors += pending.length - 1;
+      message = "Could not create or reuse a Shopify discount group";
+    } else {
+      const rest = pending.slice(1);
+      for (let offset = 0; offset < rest.length; offset += 100) {
+        const chunk = rest.slice(offset, offset + 100);
+        try {
+          await addShopifyDiscountCodes({
+            shopDomain,
+            accessToken: connection.accessToken,
+            shopifyDiscountId: activeGroup.shopifyDiscountId,
+            codes: chunk.map((code) => code.code)
+          });
+          for (const code of chunk) {
+            await recordGroupedCodeSync({
+              connection: connectionInput,
+              code: { id: code.id, code: code.code, kind: "inventory" },
+              syncStatus: "SYNCED",
+              shopifyDiscountId: activeGroup.shopifyDiscountId
+            });
+            created += 1;
+          }
+        } catch (chunkError) {
+          const errorMessage = chunkError instanceof Error ? chunkError.message : "Bulk add failed";
+          for (const code of chunk) {
+            await recordGroupedCodeSync({
+              connection: connectionInput,
+              code: { id: code.id, code: code.code, kind: "inventory" },
+              syncStatus: "ERROR",
+              shopifyDiscountId: activeGroup.shopifyDiscountId,
+              errorMessage
+            });
+            errors += 1;
+          }
+        }
+        if (offset + 100 < rest.length) await sleep(600);
+      }
+      message = `Loaded ${created} grandfathered codes onto store, ${errors} errors`;
+    }
+  }
+
+  const status = errors === 0 ? "SUCCESS" : created + markedPresent > 0 ? "PARTIAL" : "FAILED";
+  const log = await prisma.syncLog.create({
+    data: {
+      merchantId,
+      shopDomain,
+      syncType: `${syncType}_GRANDFATHER`,
+      status,
+      totalFetched: pending.length,
+      totalCreated: created,
+      totalUpdated: markedPresent,
+      totalSkipped: 0,
+      totalErrors: errors,
+      message
+    }
+  });
+
+  await audit({
+    action: AuditAction.SYNC_EVENT,
+    entityType: "SyncLog",
+    entityId: log.id,
+    message,
+    metadata: { merchantId, shopDomain, status, grandfathered: true }
+  });
+
+  return { status, created, markedPresent, errors, message };
 }
 
 export async function syncNewUensToEligibleShopifyStores(exchangeHubId: string, notes: Array<{ id: string; code: string }>, syncType = "WEBHOOK") {

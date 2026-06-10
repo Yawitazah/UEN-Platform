@@ -4,11 +4,22 @@
  * The widget detects logged-in UEN holders via localStorage and lets them redeem at checkout.
  */
 
-const UEN_API_BASE = (window as any).__UEN_API_BASE__ || "";
+// The widget runs on the merchant's domain, so API calls must target the UEN
+// platform origin — derived from this script's own src.
+const widgetScript =
+  (document.currentScript as HTMLScriptElement | null) ??
+  document.querySelector<HTMLScriptElement>('script[src*="widget.js"]');
+const UEN_API_BASE: string =
+  (window as any).__UEN_API_BASE__ || (widgetScript?.src ? new URL(widgetScript.src).origin : "");
 const UEN_TOKEN_KEY = "uen_portal_token";
 
 function getToken(): string {
   return localStorage.getItem(UEN_TOKEN_KEY) ?? "";
+}
+
+function setToken(token: string) {
+  if (token) localStorage.setItem(UEN_TOKEN_KEY, token);
+  else localStorage.removeItem(UEN_TOKEN_KEY);
 }
 
 function getShopDomain(): string {
@@ -63,6 +74,20 @@ async function redeem(token: string, merchantId: string, mode: "AUTO" | "MANUAL"
     throw new Error((body as any).error ?? "Redemption failed");
   }
   return response.json();
+}
+
+async function widgetLogin(merchantId: string, email: string): Promise<string> {
+  const response = await fetch(`${UEN_API_BASE}/api/holder/widget-login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ merchantId, email })
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error((body as any).error ?? "Login failed");
+  }
+  const payload = (await response.json()) as { portalToken: string };
+  return payload.portalToken;
 }
 
 function formatOffer(merchant: WalletMerchant): string {
@@ -142,12 +167,16 @@ function injectStyles() {
     .uen-msg-info { background: rgba(117,227,173,0.08); color: #7fa898; }
     .uen-login-prompt { color: #7fa898; font-size: 13px; text-align: center; padding: 8px 0; }
     .uen-login-prompt a { color: #75e3ad; }
+    .uen-login-form { display: flex; flex-direction: column; gap: 8px; }
+    .uen-login-form p { color: #7fa898; font-size: 13px; line-height: 1.4; margin: 0 0 4px; text-align: center; }
+    .uen-login-input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; box-sizing: border-box; color: #fff; font-family: inherit; font-size: 14px; padding: 12px; width: 100%; }
+    .uen-login-input:focus { border-color: #75e3ad; outline: none; }
   `;
   document.head.appendChild(style);
 }
 
 function buildWidget() {
-  const token = getToken();
+  let token = getToken();
   const merchantId = getMerchantId();
   if (!merchantId) return; // Widget requires data-merchant-id attribute
 
@@ -168,7 +197,7 @@ function buildWidget() {
   let merchantInfo: WalletMerchant | null = null;
   let generatedCode: string | null = null;
 
-  function renderPanel(state: "loading" | "no-token" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string } = {}) {
+  function renderPanel(state: "loading" | "login" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string } = {}) {
     const offerText = merchantInfo ? formatOffer(merchantInfo) : "";
     const available = merchantInfo?.availableUens ?? 0;
 
@@ -178,7 +207,14 @@ function buildWidget() {
         <button class="uen-panel-close" id="uen-close-btn">&times;</button>
       </div>
       ${state === "loading" ? `<p class="uen-msg uen-msg-info">Loading your UEN wallet...</p>` : ""}
-      ${state === "no-token" ? `<p class="uen-login-prompt">Sign in to your <a href="/holder/portal" target="_blank">UEN portal</a> to use your notes here.</p>` : ""}
+      ${state === "login" ? `
+        <div class="uen-login-form">
+          <p>Enter the email you used for your UEN account or original Love Note purchase.</p>
+          <input class="uen-login-input" id="uen-login-email" type="email" placeholder="you@example.com" autocomplete="email" />
+          <button class="uen-btn uen-btn-primary" id="uen-login-btn">Access My Notes</button>
+          ${opts.error ? `<p class="uen-msg uen-msg-error">${opts.error}</p>` : ""}
+        </div>
+      ` : ""}
       ${state === "no-uens" ? `<p class="uen-msg uen-msg-info">You have no available UENs for this merchant.</p>` : ""}
       ${state === "error" ? `<p class="uen-msg uen-msg-error">${opts.error ?? "Something went wrong."}</p>` : ""}
       ${state === "ready" || state === "code-shown" ? `
@@ -205,6 +241,28 @@ function buildWidget() {
     `;
 
     document.getElementById("uen-close-btn")?.addEventListener("click", closePanel);
+
+    const loginSubmit = async () => {
+      const input = document.getElementById("uen-login-email") as HTMLInputElement | null;
+      const email = input?.value.trim() ?? "";
+      if (!email) return;
+      const btn = document.getElementById("uen-login-btn") as HTMLButtonElement | null;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Checking...";
+      }
+      try {
+        token = await widgetLogin(merchantId, email);
+        setToken(token);
+        await openPanel();
+      } catch (err) {
+        renderPanel("login", { error: err instanceof Error ? err.message : "Login failed." });
+      }
+    };
+    document.getElementById("uen-login-btn")?.addEventListener("click", loginSubmit);
+    document.getElementById("uen-login-email")?.addEventListener("keydown", (e) => {
+      if ((e as KeyboardEvent).key === "Enter") loginSubmit();
+    });
 
     document.getElementById("uen-auto-btn")?.addEventListener("click", async () => {
       const btn = document.getElementById("uen-auto-btn") as HTMLButtonElement;
@@ -247,8 +305,9 @@ function buildWidget() {
     panelOpen = true;
     panel.classList.add("open");
 
+    token = getToken();
     if (!token) {
-      renderPanel("no-token");
+      renderPanel("login");
       return;
     }
 
@@ -256,7 +315,10 @@ function buildWidget() {
     merchantInfo = await fetchMerchantInfo(token, merchantId);
 
     if (!merchantInfo) {
-      renderPanel("error", { error: "Could not load merchant info. Make sure you are logged into your UEN portal." });
+      // Token is stale or this merchant isn't visible to it — clear and re-login.
+      setToken("");
+      token = "";
+      renderPanel("login", { error: "Your session expired. Enter your email to sign back in." });
       return;
     }
 

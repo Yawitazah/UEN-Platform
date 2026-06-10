@@ -11,11 +11,11 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "shopify:connect": "tsx scripts/connect-shopify.ts"
+    "shopify:connect": "tsx scripts/connect-shopify.ts",
+    "import:love-notes": "tsx scripts/import-love-notes.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "@shopify/app-bridge": "^3.7.11",
     "@vitejs/plugin-react": "^4.3.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

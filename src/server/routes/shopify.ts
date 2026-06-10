@@ -6,7 +6,7 @@ import { config } from "../config";
 import { AuditAction, MerchantStatus } from "../constants";
 import { prisma } from "../db";
 import { hashSecret } from "../security";
-import { syncCodesToGroupedShopifyDiscount, syncMerchantUensToShopify } from "../services/sync";
+import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncMerchantUensToShopify } from "../services/sync";
 import { createOfferSchema, platformConnectionSchema } from "../validators";
 
 const router = express.Router();
@@ -224,17 +224,22 @@ router.get("/auth", async (req, res) => {
   if (!shop) return res.status(400).send("Missing or invalid shop parameter");
   if (onboardingToken && !onboarding) return res.status(404).send("Merchant onboarding link not found");
   if (onboarding && onboarding.shopDomain !== shop) return res.status(400).send("Onboarding link does not match this Shopify store");
-  if (!config.shopifyApiKey || !config.shopifyApiSecret) {
-    return res.status(500).send("SHOPIFY_API_KEY and SHOPIFY_API_SECRET must be configured");
-  }
-
   // If the store is already connected and this isn't a fresh onboarding flow,
-  // skip OAuth and send the merchant straight to their portal.
+  // skip OAuth and send the merchant straight to their portal. Forward the
+  // host/embedded params so App Bridge can initialize inside the admin iframe.
+  // Runs before the credential check because no OAuth is needed on this path.
   if (!onboardingToken) {
     const existingConn = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
     if (existingConn?.status === "ACTIVE") {
-      return res.redirect(`/shopify/merchant?shopDomain=${encodeURIComponent(shop)}`);
+      const portalParams = new URLSearchParams({ shopDomain: shop, shop });
+      if (typeof req.query.host === "string" && req.query.host) portalParams.set("host", req.query.host);
+      if (typeof req.query.embedded === "string" && req.query.embedded) portalParams.set("embedded", req.query.embedded);
+      return res.redirect(`/shopify/merchant?${portalParams.toString()}`);
     }
+  }
+
+  if (!config.shopifyApiKey || !config.shopifyApiSecret) {
+    return res.status(500).send("SHOPIFY_API_KEY and SHOPIFY_API_SECRET must be configured");
   }
 
   const state = crypto.randomBytes(16).toString("hex");
@@ -393,12 +398,22 @@ router.get("/auth/callback", async (req, res) => {
 
     await subscribeOrdersPaidWebhook(shop, tokenPayload.access_token);
 
-    // Grandfather existing UEN codes into the newly connected merchant store
-    try {
-      await syncMerchantUensToShopify(merchant.id, shop, "AUTO_INSTALL");
-    } catch (syncError) {
-      console.warn("Auto-sync on merchant install failed (non-fatal):", syncError);
-    }
+    // Load existing UEN codes and the grandfathered legacy code list into the
+    // newly connected store. Runs after the response so the OAuth redirect
+    // isn't held up by ~30 bulk-add calls; progress lands in the sync logs.
+    const merchantIdForSync = merchant.id;
+    setImmediate(async () => {
+      try {
+        await syncMerchantUensToShopify(merchantIdForSync, shop, "AUTO_INSTALL");
+      } catch (syncError) {
+        console.warn("Auto-sync on merchant install failed (non-fatal):", syncError);
+      }
+      try {
+        await syncGrandfatheredCodesToMerchant(merchantIdForSync, shop, "AUTO_INSTALL");
+      } catch (syncError) {
+        console.warn("Grandfather sync on merchant install failed (non-fatal):", syncError);
+      }
+    });
 
     // Notify all holders in the linked hub about the new merchant
     try {
@@ -458,7 +473,9 @@ router.post("/webhooks/orders-paid", async (req, res) => {
       discount_codes?: Array<{ code?: string; amount?: string; type?: string }>;
     };
     const orderId = String(order.id ?? "");
-    const customerEmail = order.email ?? order.customer?.email;
+    // Lowercased so holder records line up with self-registration and the
+    // grandfathered-code email reservations.
+    const customerEmail = (order.email ?? order.customer?.email)?.trim().toLowerCase();
     if (!orderId || !customerEmail) return res.status(200).send("Order missing id or customer email");
 
     for (const lineItem of order.line_items ?? []) {
@@ -797,7 +814,8 @@ router.post("/sync", requireMerchantSession, async (req, res) => {
     if (!connection) return;
     await ensureShopMerchantAccess(connection.shopDomain, connection.merchantId);
     const log = await syncMerchantUensToShopify(connection.merchantId, connection.shopDomain, "MANUAL");
-    res.json(log);
+    const grandfather = await syncGrandfatheredCodesToMerchant(connection.merchantId, connection.shopDomain, "MANUAL");
+    res.json({ ...log, grandfather });
   } catch (error) {
     handleError(res, error);
   }

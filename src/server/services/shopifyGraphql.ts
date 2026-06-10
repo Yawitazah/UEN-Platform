@@ -122,6 +122,49 @@ export async function createShopifyDiscountCode(input: DiscountInput): Promise<S
   return { shopifyDiscountId: node.id, shopifyDiscountCodeId: codeNode.id };
 }
 
+export async function findShopifyDiscountNodeByCode(input: {
+  shopDomain: string;
+  accessToken: string;
+  code: string;
+}): Promise<{ shopifyDiscountId: string } | null> {
+  if (config.shopifySyncMode === "mock" || input.accessToken.startsWith("shpat_placeholder")) {
+    // Test fixture: codes prefixed MOCKEXISTING simulate a pre-existing store discount.
+    return input.code.toUpperCase().startsWith("MOCKEXISTING")
+      ? { shopifyDiscountId: `gid://shopify/DiscountCodeNode/mock-existing-${input.code}` }
+      : null;
+  }
+
+  const response = await fetch(`https://${input.shopDomain}/admin/api/${config.shopifyApiVersion}/graphql.json`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-shopify-access-token": input.accessToken
+    },
+    body: JSON.stringify({
+      query: `
+        query codeDiscountNodeByCode($code: String!) {
+          codeDiscountNodeByCode(code: $code) {
+            id
+          }
+        }
+      `,
+      variables: { code: input.code }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shopify GraphQL request failed with ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (payload.errors?.length) {
+    throw new Error(payload.errors.map((error: { message: string }) => error.message).join("; "));
+  }
+
+  const id = payload.data?.codeDiscountNodeByCode?.id;
+  return id ? { shopifyDiscountId: id } : null;
+}
+
 export async function addShopifyDiscountCodes(input: {
   shopDomain: string;
   accessToken: string;

@@ -3,9 +3,6 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  optimizeDeps: {
-    include: ["@shopify/app-bridge"]
-  },
   build: {
     outDir: "dist/client",
     emptyOutDir: false,

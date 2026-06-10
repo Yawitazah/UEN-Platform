@@ -81,6 +81,23 @@ export const bulkImportCodesSchema = z.object({
   issuanceProductId: z.string().optional()
 });
 
+// Grandfathered legacy codes (e.g. 2022 Love Notes) don't follow the UEN
+// suffix convention and carry an email reservation from the original purchase.
+export const importGrandfatheredCodesSchema = z.object({
+  campaignId: z.string().min(1).max(64).default("LOVE-NOTES-2022"),
+  entries: z
+    .array(
+      z.object({
+        code: z.string().min(4).max(64).regex(/^[A-Za-z0-9]+$/),
+        email: z.string().email().nullable().optional(),
+        purchasedAt: z.string().datetime({ offset: true }).optional(),
+        orderName: z.string().max(32).optional()
+      })
+    )
+    .min(1)
+    .max(500)
+});
+
 export const merchantOnboardingSchema = z.object({
   businessName: z.string().min(2).max(120),
   contactName: z.string().max(120).optional(),

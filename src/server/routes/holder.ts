@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import express from "express";
 import { prisma } from "../db";
+import { claimReservedCodesForHolder } from "../services/grandfather";
 import { syncCodesToGroupedShopifyDiscount } from "../services/sync";
 
 const router = express.Router();
@@ -33,6 +34,20 @@ async function holderFromToken(token: string) {
 router.get("/holder/wallet", async (req, res) => {
   try {
     const token = String(req.query.token ?? "");
+
+    // Claim any grandfathered codes reserved for this holder's email before the
+    // heavy wallet query, so legacy purchases appear the moment they log in.
+    // No-op cost is a single indexed lookup.
+    const lightHolder = token
+      ? await prisma.holder.findUnique({
+          where: { portalToken: token },
+          select: { id: true, email: true, exchangeHubId: true }
+        })
+      : null;
+    if (lightHolder) {
+      await claimReservedCodesForHolder(lightHolder);
+    }
+
     const holder = await holderFromToken(token);
     if (!holder) return res.status(404).json({ error: "Holder not found or invalid portal token" });
 
@@ -297,6 +312,40 @@ router.post("/holder/redeem", async (req, res) => {
   }
 });
 
+// Upserts a holder by (exchangeHubId + email), ensures a portal token exists,
+// and claims any grandfathered codes reserved for the email so they're already
+// in the wallet on the first dashboard render. Shared by register + widget login.
+async function findOrCreateHolderWithToken(exchangeHubId: string, email: string, firstName?: string, lastName?: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const holder = await prisma.holder.upsert({
+    where: { exchangeHubId_email: { exchangeHubId, email: normalizedEmail } },
+    update: {
+      // Only update name if provided and the existing record has placeholder values
+      ...(firstName ? { firstName } : {}),
+      ...(lastName ? { lastName } : {})
+    },
+    create: {
+      exchangeHubId,
+      email: normalizedEmail,
+      firstName: firstName?.trim() || "Holder",
+      lastName: lastName?.trim() || "",
+      status: "ACTIVE"
+    }
+  });
+
+  const token = holder.portalToken ?? crypto.randomBytes(24).toString("base64url");
+  if (!holder.portalToken) {
+    await prisma.holder.update({
+      where: { id: holder.id },
+      data: { portalToken: token }
+    });
+  }
+
+  await claimReservedCodesForHolder({ id: holder.id, email: normalizedEmail, exchangeHubId });
+
+  return { holder, token };
+}
+
 // POST /api/holder/register  — self-registration
 // Finds or creates a holder by (exchangeHubId + email), generates a portal token, returns the portal URL.
 router.post("/holder/register", async (req, res) => {
@@ -312,37 +361,12 @@ router.post("/holder/register", async (req, res) => {
       return res.status(400).json({ error: "exchangeHubId and email are required" });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
     const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
     if (!hub || hub.status !== "ACTIVE") {
       return res.status(404).json({ error: "Exchange Hub not found or inactive" });
     }
 
-    // Find or create the holder
-    const holder = await prisma.holder.upsert({
-      where: { exchangeHubId_email: { exchangeHubId, email: normalizedEmail } },
-      update: {
-        // Only update name if provided and the existing record has placeholder values
-        ...(firstName ? { firstName } : {}),
-        ...(lastName ? { lastName } : {})
-      },
-      create: {
-        exchangeHubId,
-        email: normalizedEmail,
-        firstName: firstName?.trim() || "Holder",
-        lastName: lastName?.trim() || "",
-        status: "ACTIVE"
-      }
-    });
-
-    // Generate portal token if missing
-    const token = holder.portalToken ?? crypto.randomBytes(24).toString("base64url");
-    if (!holder.portalToken) {
-      await prisma.holder.update({
-        where: { id: holder.id },
-        data: { portalToken: token }
-      });
-    }
+    const { holder, token } = await findOrCreateHolderWithToken(exchangeHubId, email, firstName, lastName);
 
     const portalUrl = `/holder/portal?token=${token}`;
     res.status(201).json({
@@ -359,6 +383,85 @@ router.post("/holder/register", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not complete registration" });
+  }
+});
+
+// POST /api/holder/widget-login — email login from the merchant-site widget.
+// The widget only knows the merchant, so the hub is resolved server-side:
+// an existing holder account wins, then a grandfathered code reservation,
+// then the merchant's only connected hub. Unknown emails get nothing —
+// that's what keeps grandfathered codes locked to the original purchaser.
+router.post("/holder/widget-login", async (req, res) => {
+  try {
+    const { merchantId, email, firstName } = req.body as { merchantId?: string; email?: string; firstName?: string };
+    if (!merchantId || !email) {
+      return res.status(400).json({ error: "merchantId and email are required" });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: "A valid email address is required" });
+    }
+
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: merchantId },
+      include: { accessRules: { where: { status: "ACTIVE" } } }
+    });
+    if (!merchant || merchant.status !== "ACTIVE") {
+      return res.status(404).json({ error: "Merchant not found" });
+    }
+    const candidateHubIds = [
+      ...new Set([
+        ...merchant.accessRules.map((rule) => rule.exchangeHubId),
+        ...(merchant.linkedExchangeHubId ? [merchant.linkedExchangeHubId] : [])
+      ])
+    ];
+    if (!candidateHubIds.length) {
+      return res.status(404).json({ error: "This store is not connected to any Exchange Hub yet" });
+    }
+
+    // 1. Existing holder account in a hub this merchant accepts.
+    const existingHolder = await prisma.holder.findFirst({
+      where: { email: normalizedEmail, exchangeHubId: { in: candidateHubIds }, status: "ACTIVE" },
+      orderBy: { createdAt: "asc" }
+    });
+    // 2. A grandfathered code reserved for this email in one of those hubs.
+    const reservation = existingHolder
+      ? null
+      : await prisma.uenCodeInventory.findFirst({
+          where: {
+            exchangeHubId: { in: candidateHubIds },
+            status: "RESERVED",
+            source: "GRANDFATHERED",
+            issuedToEmail: normalizedEmail
+          }
+        });
+    // 3. Unambiguous fallback: the merchant accepts exactly one hub.
+    const exchangeHubId =
+      existingHolder?.exchangeHubId ?? reservation?.exchangeHubId ?? (candidateHubIds.length === 1 ? candidateHubIds[0] : null);
+    if (!exchangeHubId) {
+      return res.status(404).json({ error: "No UEN account or reserved notes found for this email" });
+    }
+
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub || hub.status !== "ACTIVE") {
+      return res.status(404).json({ error: "Exchange Hub not found or inactive" });
+    }
+
+    const { holder, token } = await findOrCreateHolderWithToken(exchangeHubId, normalizedEmail, firstName);
+
+    res.json({
+      portalToken: token,
+      holder: {
+        id: holder.id,
+        firstName: holder.firstName,
+        lastName: holder.lastName,
+        email: holder.email,
+        exchangeHub: hub.displayName
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not complete login" });
   }
 });
 

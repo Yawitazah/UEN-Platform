@@ -1996,15 +1996,21 @@ function ShopifyMerchantPortal() {
   const isPreview = previewRole === "merchant" || previewRole === "hub";
 
   // Initialize Shopify App Bridge when running inside the Shopify admin frame.
+  // Uses the CDN script (Shopify's current requirement for embedded apps); it
+  // auto-initializes from the shopify-api-key meta tag.
   useEffect(() => {
     if (!host) return;
     fetch("/api/public/shopify-config")
       .then((r) => r.json())
       .then(({ apiKey }: { apiKey: string }) => {
-        if (!apiKey) return;
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const createApp = require("@shopify/app-bridge").default as (opts: { apiKey: string; host: string }) => unknown;
-        createApp({ apiKey, host });
+        if (!apiKey || document.querySelector('meta[name="shopify-api-key"]')) return;
+        const meta = document.createElement("meta");
+        meta.name = "shopify-api-key";
+        meta.content = apiKey;
+        document.head.appendChild(meta);
+        const script = document.createElement("script");
+        script.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
+        document.head.appendChild(script);
       })
       .catch(() => {});
   }, [host]);

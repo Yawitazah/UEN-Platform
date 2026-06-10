@@ -20,7 +20,21 @@ const app = express();
 // wrong SameSite/Secure values.
 app.set("trust proxy", true);
 
-app.use(helmet({ contentSecurityPolicy: false, xFrameOptions: false }));
+// crossOriginResourcePolicy must allow cross-origin: merchant storefronts on
+// other domains load /widget.js from this server, and helmet's same-origin
+// default makes the browser block that response outright.
+app.use(helmet({ contentSecurityPolicy: false, xFrameOptions: false, crossOriginResourcePolicy: { policy: "cross-origin" } }));
+
+// Shopify embedded apps must send a frame-ancestors CSP scoped to the shop's
+// admin. Applied whenever a request identifies its shop via query param;
+// everything else (public site, portals) sends no frame header at all.
+app.use((req, res, next) => {
+  const rawShop = String(req.query.shop ?? req.query.shopDomain ?? "").trim().toLowerCase();
+  if (/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(rawShop)) {
+    res.setHeader("Content-Security-Policy", `frame-ancestors https://${rawShop} https://admin.shopify.com`);
+  }
+  next();
+});
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({
   limit: "10mb",
