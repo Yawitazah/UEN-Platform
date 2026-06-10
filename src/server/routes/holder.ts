@@ -386,6 +386,28 @@ router.post("/holder/register", async (req, res) => {
   }
 });
 
+// GET /api/public/widget-config?shop=store.myshopify.com — resolves the
+// merchant for the theme app extension, which only knows the shop domain.
+router.get("/public/widget-config", async (req, res) => {
+  try {
+    const shop = String(req.query.shop ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop)) {
+      return res.status(400).json({ error: "A valid shop domain is required" });
+    }
+    const connection = await prisma.shopifyConnection.findUnique({
+      where: { shopDomain: shop },
+      include: { merchant: true }
+    });
+    if (!connection || connection.status !== "ACTIVE" || connection.merchant.status !== "ACTIVE") {
+      return res.status(404).json({ error: "Store is not connected to the UEN network" });
+    }
+    res.json({ merchantId: connection.merchantId, businessName: connection.merchant.businessName });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not load widget configuration" });
+  }
+});
+
 // POST /api/holder/widget-login — email login from the merchant-site widget.
 // The widget only knows the merchant, so the hub is resolved server-side:
 // an existing holder account wins, then a grandfathered code reservation,

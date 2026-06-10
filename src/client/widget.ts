@@ -23,14 +23,54 @@ function setToken(token: string) {
 }
 
 function getShopDomain(): string {
-  const el = document.querySelector<HTMLScriptElement>('script[data-shop]');
+  const el = widgetScript?.dataset.shop ? widgetScript : document.querySelector<HTMLScriptElement>("script[data-shop]");
   if (el?.dataset.shop) return el.dataset.shop;
   return window.location.hostname;
 }
 
 function getMerchantId(): string {
-  const el = document.querySelector<HTMLScriptElement>('script[data-merchant-id]');
+  const el = widgetScript?.dataset.merchantId ? widgetScript : document.querySelector<HTMLScriptElement>("script[data-merchant-id]");
   return el?.dataset.merchantId ?? "";
+}
+
+// Placement/branding settings — provided by the theme app extension's app
+// embed block (Online Store > Customize > App embeds) or as data attributes
+// on a manual script install. Defaults match the original widget.
+type WidgetConfig = {
+  position: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+  offsetSide: number;
+  offsetBottom: number;
+  label: string;
+  accent: string;
+};
+
+function getConfig(): WidgetConfig {
+  const data = widgetScript?.dataset ?? {};
+  const positions = ["bottom-right", "bottom-left", "top-right", "top-left"];
+  const position = positions.includes(data.position ?? "") ? (data.position as WidgetConfig["position"]) : "bottom-right";
+  const offsetSide = Math.max(0, parseInt(data.offsetSide ?? "", 10) || 24);
+  const offsetBottom = Math.max(0, parseInt(data.offsetBottom ?? "", 10) || 24);
+  const label = (data.label ?? "").trim() || "UEN Discount";
+  const accent = /^#[0-9a-f]{3,8}$/i.test(data.accent ?? "") ? (data.accent as string) : "#75e3ad";
+  return { position, offsetSide, offsetBottom, label, accent };
+}
+
+// Resolve the merchant: explicit data-merchant-id wins (legacy installs),
+// otherwise look the store up by its myshopify domain. Stores that aren't
+// connected to the UEN network render nothing.
+async function resolveMerchantId(): Promise<string> {
+  const explicit = getMerchantId();
+  if (explicit) return explicit;
+  const shop = getShopDomain();
+  if (!shop || !UEN_API_BASE) return "";
+  try {
+    const response = await fetch(`${UEN_API_BASE}/api/public/widget-config?shop=${encodeURIComponent(shop)}`);
+    if (!response.ok) return "";
+    const payload = (await response.json()) as { merchantId?: string };
+    return payload.merchantId ?? "";
+  } catch {
+    return "";
+  }
 }
 
 type RedeemResult = {
@@ -102,13 +142,15 @@ function injectStyles() {
   if (document.getElementById("uen-widget-styles")) return;
   const style = document.createElement("style");
   style.id = "uen-widget-styles";
+  // Accent color flows through --uen-accent (set inline on the fab/panel from
+  // the embed settings); placement edges are set inline too, so the stylesheet
+  // carries no corner assumptions.
   style.textContent = `
     #uen-widget-fab {
       align-items: center;
       background: linear-gradient(135deg, #1a4a36, #0f2d20);
-      border: 1px solid rgba(117,227,173,0.35);
+      border: 1px solid color-mix(in srgb, var(--uen-accent, #75e3ad) 35%, transparent);
       border-radius: 50px;
-      bottom: 24px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.35);
       color: #fff;
       cursor: pointer;
@@ -119,17 +161,15 @@ function injectStyles() {
       gap: 8px;
       padding: 10px 18px;
       position: fixed;
-      right: 24px;
       transition: transform 0.15s, box-shadow 0.15s;
       z-index: 99998;
     }
     #uen-widget-fab:hover { box-shadow: 0 6px 32px rgba(0,0,0,0.45); transform: translateY(-2px); }
-    #uen-widget-fab .uen-fab-dot { background: #75e3ad; border-radius: 50%; height: 8px; width: 8px; }
+    #uen-widget-fab .uen-fab-dot { background: var(--uen-accent, #75e3ad); border-radius: 50%; height: 8px; width: 8px; }
     #uen-widget-panel {
       background: #0f1f18;
-      border: 1px solid rgba(117,227,173,0.25);
+      border: 1px solid color-mix(in srgb, var(--uen-accent, #75e3ad) 25%, transparent);
       border-radius: 20px;
-      bottom: 80px;
       box-shadow: 0 8px 48px rgba(0,0,0,0.55);
       color: #fff;
       display: none;
@@ -137,60 +177,70 @@ function injectStyles() {
       max-width: 320px;
       padding: 24px;
       position: fixed;
-      right: 24px;
       width: calc(100vw - 48px);
       z-index: 99999;
     }
     #uen-widget-panel.open { display: block; }
     .uen-panel-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 16px; }
-    .uen-panel-title { color: #75e3ad; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+    .uen-panel-title { color: var(--uen-accent, #75e3ad); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .uen-panel-close { background: none; border: none; color: #7fa898; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; }
     .uen-count-display { text-align: center; padding: 12px 0 16px; }
     .uen-count-display strong { color: #fff; display: block; font-size: 56px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
-    .uen-count-display .uen-label { color: #75e3ad; display: block; font-size: 14px; font-weight: 700; letter-spacing: 0.18em; margin-top: 2px; text-transform: uppercase; }
+    .uen-count-display .uen-label { color: var(--uen-accent, #75e3ad); display: block; font-size: 14px; font-weight: 700; letter-spacing: 0.18em; margin-top: 2px; text-transform: uppercase; }
     .uen-count-display .uen-value { color: #7fa898; font-size: 13px; margin-top: 6px; }
-    .uen-panel-offer { background: rgba(117,227,173,0.08); border-radius: 10px; font-size: 13px; margin-bottom: 16px; padding: 10px 14px; text-align: center; }
-    .uen-panel-offer strong { color: #75e3ad; }
+    .uen-panel-offer { background: color-mix(in srgb, var(--uen-accent, #75e3ad) 8%, transparent); border-radius: 10px; font-size: 13px; margin-bottom: 16px; padding: 10px 14px; text-align: center; }
+    .uen-panel-offer strong { color: var(--uen-accent, #75e3ad); }
     .uen-panel-actions { display: flex; flex-direction: column; gap: 8px; }
     .uen-btn { border: none; border-radius: 10px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600; padding: 12px; transition: opacity 0.15s; width: 100%; }
-    .uen-btn-primary { background: #75e3ad; color: #0a1f16; }
+    .uen-btn-primary { background: var(--uen-accent, #75e3ad); color: #0a1f16; }
     .uen-btn-secondary { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; }
     .uen-btn:hover { opacity: 0.88; }
     .uen-btn:disabled { cursor: default; opacity: 0.45; }
-    .uen-code-result { background: rgba(117,227,173,0.08); border-radius: 10px; margin-top: 12px; padding: 14px; }
+    .uen-code-result { background: color-mix(in srgb, var(--uen-accent, #75e3ad) 8%, transparent); border-radius: 10px; margin-top: 12px; padding: 14px; }
     .uen-code-result p { color: #7fa898; font-size: 11px; margin: 0 0 6px; }
     .uen-code-value { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
-    .uen-code-value code { color: #75e3ad; font-family: monospace; font-size: 14px; font-weight: 700; word-break: break-all; }
-    .uen-copy-btn { background: rgba(117,227,173,0.15); border: none; border-radius: 6px; color: #75e3ad; cursor: pointer; font-size: 12px; padding: 4px 10px; white-space: nowrap; }
+    .uen-code-value code { color: var(--uen-accent, #75e3ad); font-family: monospace; font-size: 14px; font-weight: 700; word-break: break-all; }
+    .uen-copy-btn { background: color-mix(in srgb, var(--uen-accent, #75e3ad) 15%, transparent); border: none; border-radius: 6px; color: var(--uen-accent, #75e3ad); cursor: pointer; font-size: 12px; padding: 4px 10px; white-space: nowrap; }
     .uen-msg { border-radius: 8px; font-size: 12px; margin-top: 10px; padding: 10px 12px; }
     .uen-msg-error { background: rgba(255,80,80,0.12); color: #ff9999; }
-    .uen-msg-info { background: rgba(117,227,173,0.08); color: #7fa898; }
+    .uen-msg-info { background: color-mix(in srgb, var(--uen-accent, #75e3ad) 8%, transparent); color: #7fa898; }
     .uen-login-prompt { color: #7fa898; font-size: 13px; text-align: center; padding: 8px 0; }
-    .uen-login-prompt a { color: #75e3ad; }
+    .uen-login-prompt a { color: var(--uen-accent, #75e3ad); }
     .uen-login-form { display: flex; flex-direction: column; gap: 8px; }
     .uen-login-form p { color: #7fa898; font-size: 13px; line-height: 1.4; margin: 0 0 4px; text-align: center; }
     .uen-login-input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; box-sizing: border-box; color: #fff; font-family: inherit; font-size: 14px; padding: 12px; width: 100%; }
-    .uen-login-input:focus { border-color: #75e3ad; outline: none; }
+    .uen-login-input:focus { border-color: var(--uen-accent, #75e3ad); outline: none; }
   `;
   document.head.appendChild(style);
 }
 
-function buildWidget() {
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildWidget(merchantId: string) {
   let token = getToken();
-  const merchantId = getMerchantId();
-  if (!merchantId) return; // Widget requires data-merchant-id attribute
+  const config = getConfig();
+  const verticalEdge = config.position.startsWith("top") ? "top" : "bottom";
+  const horizontalEdge = config.position.endsWith("left") ? "left" : "right";
 
   injectStyles();
 
   // FAB button
   const fab = document.createElement("button");
   fab.id = "uen-widget-fab";
-  fab.innerHTML = `<span class="uen-fab-dot"></span> UEN Discount`;
+  fab.innerHTML = `<span class="uen-fab-dot"></span> ${escapeHtml(config.label)}`;
+  fab.style[verticalEdge] = `${config.offsetBottom}px`;
+  fab.style[horizontalEdge] = `${config.offsetSide}px`;
+  fab.style.setProperty("--uen-accent", config.accent);
   document.body.appendChild(fab);
 
-  // Panel
+  // Panel — opens off the same corner, clear of the FAB
   const panel = document.createElement("div");
   panel.id = "uen-widget-panel";
+  panel.style[verticalEdge] = `${config.offsetBottom + 56}px`;
+  panel.style[horizontalEdge] = `${config.offsetSide}px`;
+  panel.style.setProperty("--uen-accent", config.accent);
   document.body.appendChild(panel);
 
   let panelOpen = false;
@@ -221,7 +271,7 @@ function buildWidget() {
         <div class="uen-count-display">
           <strong>${available}</strong>
           <span class="uen-label">UEN</span>
-          ${offerText ? `<p class="uen-value">Each worth <strong style="color:#75e3ad">${offerText}</strong> here</p>` : ""}
+          ${offerText ? `<p class="uen-value">Each worth <strong style="color:var(--uen-accent, #75e3ad)">${offerText}</strong> here</p>` : ""}
         </div>
         ${offerText ? `<div class="uen-panel-offer">Use 1 UEN → <strong>${offerText}</strong> at checkout</div>` : ""}
         <div class="uen-panel-actions">
@@ -347,8 +397,14 @@ function buildWidget() {
   });
 }
 
+async function init() {
+  const merchantId = await resolveMerchantId();
+  if (!merchantId) return; // Store not connected to the UEN network — render nothing
+  buildWidget(merchantId);
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", buildWidget);
+  document.addEventListener("DOMContentLoaded", () => void init());
 } else {
-  buildWidget();
+  void init();
 }

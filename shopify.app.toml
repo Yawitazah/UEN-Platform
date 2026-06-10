@@ -1,0 +1,28 @@
+# Links this repo to the UEN Platform app in the Shopify Dev Dashboard.
+# Used by the Shopify CLI to deploy the theme app extension (extensions/).
+# Config mirrors the dashboard settings — keep them in sync if either changes.
+
+client_id = "7a960874850e6cfd7ca95d07b1415249"
+name = "UEN Platform"
+application_url = "https://uenite.com/shopify"
+embedded = true
+
+[access_scopes]
+scopes = "read_discounts,write_discounts,read_orders,read_products"
+
+[auth]
+redirect_urls = ["https://uenite.com/shopify/auth/callback"]
+
+[webhooks]
+api_version = "2026-01"
+
+  [webhooks.privacy_compliance]
+  customer_data_request_url = "https://uenite.com/shopify/webhooks/privacy"
+  customer_deletion_url = "https://uenite.com/shopify/webhooks/privacy"
+  shop_deletion_url = "https://uenite.com/shopify/webhooks/privacy"
+
+[pos]
+embedded = false
+
+[build]
+include_config_on_deploy = false

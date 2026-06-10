@@ -1,0 +1,73 @@
+{% comment %}
+  UEN Discount Widget — app embed block.
+  Merchants enable this under Online Store > Customize > App embeds and
+  configure placement so it never collides with other floating widgets.
+  The script resolves the merchant from the shop domain server-side.
+{% endcomment %}
+<script
+  src="https://uenite.com/widget.js"
+  defer
+  data-shop="{{ shop.permanent_domain }}"
+  data-position="{{ block.settings.position }}"
+  data-offset-side="{{ block.settings.offset_side }}"
+  data-offset-bottom="{{ block.settings.offset_bottom }}"
+  data-label="{{ block.settings.label | escape }}"
+  data-accent="{{ block.settings.accent }}"
+></script>
+
+{% schema %}
+{
+  "name": "UEN Discount Widget",
+  "target": "body",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Lets UEN holders sign in and redeem their notes as discounts on your store. Pick a corner that doesn't overlap your other floating buttons."
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Position",
+      "options": [
+        { "value": "bottom-right", "label": "Bottom right" },
+        { "value": "bottom-left", "label": "Bottom left" },
+        { "value": "top-right", "label": "Top right" },
+        { "value": "top-left", "label": "Top left" }
+      ],
+      "default": "bottom-right"
+    },
+    {
+      "type": "range",
+      "id": "offset_side",
+      "label": "Distance from side edge",
+      "min": 8,
+      "max": 200,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "offset_bottom",
+      "label": "Distance from top/bottom edge",
+      "min": 8,
+      "max": 300,
+      "step": 4,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "text",
+      "id": "label",
+      "label": "Button label",
+      "default": "UEN Discount"
+    },
+    {
+      "type": "color",
+      "id": "accent",
+      "label": "Accent color",
+      "default": "#75e3ad"
+    }
+  ]
+}
+{% endschema %}
