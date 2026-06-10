@@ -764,6 +764,43 @@ router.post("/merchants", requireRole(writeRoles), async (req, res) => {
   }
 });
 
+// Issue a Shopify install link bound to an EXISTING merchant (admin only).
+// Needed when the store's myshopify domain doesn't resemble the hub/merchant
+// name (e.g. a renamed brand), where the self-serve install's name matcher
+// would otherwise create a duplicate merchant.
+router.post("/merchants/:merchantId/onboarding-link", requireRole(writeRoles), async (req, res) => {
+  try {
+    const merchantId = param(req, "merchantId");
+    const data = z.object({
+      shopDomain: z.string().regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
+      requestedExchangeHubId: z.string().optional()
+    }).parse(req.body);
+    const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
+    if (!merchant) return res.status(404).json({ error: "Merchant not found" });
+
+    const token = crypto.randomBytes(24).toString("base64url");
+    const onboarding = await prisma.merchantOnboarding.create({
+      data: {
+        merchantId,
+        token,
+        businessName: merchant.businessName,
+        contactEmail: merchant.contactEmail ?? "unknown@uenite.com",
+        shopDomain: data.shopDomain.toLowerCase(),
+        requestedExchangeHubId: data.requestedExchangeHubId ?? merchant.linkedExchangeHubId ?? undefined
+      }
+    });
+
+    const shopifyInstallPath = `/shopify/auth?shop=${encodeURIComponent(onboarding.shopDomain)}&onboardingToken=${encodeURIComponent(onboarding.token)}`;
+    res.status(201).json({
+      merchantId,
+      shopDomain: onboarding.shopDomain,
+      installUrl: absoluteAppUrl(req, shopifyInstallPath)
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 // Reset a merchant's login credentials (admin only).
 router.patch("/merchants/:merchantId/credentials", requireRole(writeRoles), async (req, res) => {
   try {
