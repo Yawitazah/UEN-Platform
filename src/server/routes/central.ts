@@ -9,7 +9,7 @@ import { config } from "../config";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import bcrypt from "bcryptjs";
-import { createMerchantSession, requireMerchantAccess, requireRole } from "../security";
+import { createMerchantSession, hashSecret, requireMerchantAccess, requireRole } from "../security";
 import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
@@ -759,6 +759,27 @@ router.post("/merchants", requireRole(writeRoles), async (req, res) => {
     const data = createMerchantSchema.parse(req.body);
     const merchant = await prisma.merchant.create({ data });
     res.status(201).json(merchant);
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Mint a platform connection token for a merchant (admin only). Used with
+// POST /shopify/api/platform-connection to link a store via a direct Admin
+// API access token — the path for stores that can't install the OAuth app
+// (custom distribution is locked to a single store).
+router.post("/merchants/:merchantId/api-keys", requireRole(writeRoles), async (req, res) => {
+  try {
+    const merchantId = param(req, "merchantId");
+    const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
+    if (!merchant) return res.status(404).json({ error: "Merchant not found" });
+    const label = typeof req.body?.label === "string" && req.body.label.trim() ? req.body.label.trim() : "Platform connection";
+    const rawToken = `uen_connect_${crypto.randomBytes(24).toString("base64url")}`;
+    await prisma.merchantApiKey.create({
+      data: { merchantId, keyHash: hashSecret(rawToken), label }
+    });
+    // The raw token is returned exactly once; only its hash is stored.
+    res.status(201).json({ merchantId, businessName: merchant.businessName, label, connectionToken: rawToken });
   } catch (error) {
     handleError(res, error);
   }

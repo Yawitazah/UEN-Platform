@@ -733,6 +733,32 @@ router.post("/platform-connection", async (req, res) => {
       entityId: connection.id,
       message: "Shopify store linked to merchant"
     });
+
+    // Manual token connections get the same automation as OAuth installs:
+    // redemption webhook plus the UEN and grandfathered-code store loads.
+    const hasRealToken = Boolean(data.accessToken) && !String(data.accessToken).startsWith("shpat_placeholder");
+    if (hasRealToken) {
+      try {
+        await subscribeOrdersPaidWebhook(data.shopDomain, String(data.accessToken));
+      } catch (webhookError) {
+        console.warn("Webhook subscription on platform connection failed (non-fatal):", webhookError);
+      }
+      const merchantIdForSync = apiKey.merchantId;
+      const shopForSync = data.shopDomain;
+      setImmediate(async () => {
+        try {
+          await syncMerchantUensToShopify(merchantIdForSync, shopForSync, "AUTO_INSTALL");
+        } catch (syncError) {
+          console.warn("Auto note-sync on platform connection failed (non-fatal):", syncError);
+        }
+        try {
+          await syncGrandfatheredCodesToMerchant(merchantIdForSync, shopForSync, "AUTO_INSTALL");
+        } catch (syncError) {
+          console.warn("Grandfather sync on platform connection failed (non-fatal):", syncError);
+        }
+      });
+    }
+
     res.status(201).json({ id: connection.id, merchantId: connection.merchantId, shopDomain: connection.shopDomain, status: connection.status });
   } catch (error) {
     handleError(res, error);
