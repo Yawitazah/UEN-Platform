@@ -25,7 +25,9 @@ const ordersCsvPath = process.env.ORDERS_CSV ?? "D:\\downloads\\orders_export_1.
 const keysCsvPath = process.env.KEYS_CSV ?? "D:\\downloads\\export_orders_1781112136.csv";
 const dryRun = process.env.DRY_RUN === "1";
 
-const BATCH_SIZE = 500;
+// Keep batches small enough that one request stays under Cloudflare's ~100s
+// origin timeout (each entry costs a couple of DB round trips server-side).
+const BATCH_SIZE = Math.min(500, Math.max(1, parseInt(process.env.BATCH_SIZE ?? "", 10) || 100));
 
 type Entry = { code: string; email: string | null; purchasedAt?: string; orderName?: string };
 

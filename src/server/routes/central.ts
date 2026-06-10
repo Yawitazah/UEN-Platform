@@ -1089,36 +1089,54 @@ router.post("/exchange-hubs/:exchangeHubId/code-inventory/import-grandfathered",
     const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
     if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
 
-    let created = 0;
+    // Bulk-shaped: one read + one createMany per request. Per-row round trips
+    // were slow enough that batches tripped Cloudflare's origin timeout.
+    const prepared = new Map<string, { email: string | null; purchasedAt?: Date }>();
+    for (const entry of data.entries) {
+      prepared.set(entry.code.toUpperCase(), {
+        email: entry.email ? entry.email.trim().toLowerCase() : null,
+        ...(entry.purchasedAt ? { purchasedAt: new Date(entry.purchasedAt) } : {})
+      });
+    }
+
+    const existingRows = await prisma.uenCodeInventory.findMany({
+      where: { code: { in: [...prepared.keys()] } },
+      select: { id: true, code: true, status: true, source: true, issuedToEmail: true }
+    });
+    const existingByCode = new Map(existingRows.map((row) => [row.code, row]));
+
     let updated = 0;
     let skippedIssued = 0;
     let conflicts = 0;
-    for (const entry of data.entries) {
-      const code = entry.code.toUpperCase();
-      const email = entry.email ? entry.email.trim().toLowerCase() : null;
-      const existing = await prisma.uenCodeInventory.findUnique({ where: { code } });
+    const toCreate: Array<{ exchangeHubId: string; code: string; status: string; source: string; issuedToEmail: string | null; createdAt?: Date }> = [];
+    const emailUpdates: Array<{ id: string; email: string | null }> = [];
+    for (const [code, entry] of prepared) {
+      const existing = existingByCode.get(code);
       if (!existing) {
-        await prisma.uenCodeInventory.create({
-          data: {
-            exchangeHubId,
-            code,
-            status: "RESERVED",
-            source: "GRANDFATHERED",
-            issuedToEmail: email,
-            ...(entry.purchasedAt ? { createdAt: new Date(entry.purchasedAt) } : {})
-          }
+        toCreate.push({
+          exchangeHubId,
+          code,
+          status: "RESERVED",
+          source: "GRANDFATHERED",
+          issuedToEmail: entry.email,
+          ...(entry.purchasedAt ? { createdAt: entry.purchasedAt } : {})
         });
-        created += 1;
       } else if (existing.source !== "GRANDFATHERED") {
         conflicts += 1;
       } else if (existing.status === "RESERVED") {
-        await prisma.uenCodeInventory.update({ where: { id: existing.id }, data: { issuedToEmail: email } });
+        if (existing.issuedToEmail !== entry.email) emailUpdates.push({ id: existing.id, email: entry.email });
         updated += 1;
       } else {
         // Already claimed by a holder — never re-reserve to a different email.
         skippedIssued += 1;
       }
     }
+
+    if (toCreate.length) await prisma.uenCodeInventory.createMany({ data: toCreate });
+    for (const update of emailUpdates) {
+      await prisma.uenCodeInventory.update({ where: { id: update.id }, data: { issuedToEmail: update.email } });
+    }
+    const created = toCreate.length;
 
     await audit({
       action: AuditAction.SYNC_EVENT,
@@ -1127,7 +1145,7 @@ router.post("/exchange-hubs/:exchangeHubId/code-inventory/import-grandfathered",
       entityId: exchangeHubId,
       message: `Grandfathered code import (${data.campaignId}): ${created} created, ${updated} updated, ${skippedIssued} already claimed, ${conflicts} conflicts`
     });
-    res.status(201).json({ created, updated, skippedIssued, conflicts });
+    res.status(201).json({ created, updated, skippedIssued, conflicts, mode: "bulk" });
   } catch (error) {
     handleError(res, error);
   }
