@@ -335,9 +335,20 @@ router.get("/auth/callback", async (req, res) => {
     }
 
     const onboardingToken = String(req.cookies?.shopify_onboarding_token ?? "");
-    const onboarding = onboardingToken
-      ? await prisma.merchantOnboarding.findUnique({ where: { token: onboardingToken }, include: { merchant: true } })
-      : null;
+    const onboarding =
+      (onboardingToken
+        ? await prisma.merchantOnboarding.findUnique({ where: { token: onboardingToken }, include: { merchant: true } })
+        : null) ??
+      // Custom-distribution installs arrive via Shopify-generated links that
+      // never pass through our onboarding URL, so the cookie is absent. A
+      // pending onboarding record for this exact shop domain still identifies
+      // the intended merchant — without it the name matcher below could
+      // create a duplicate (e.g. renamed brands).
+      (await prisma.merchantOnboarding.findFirst({
+        where: { shopDomain: shop, status: { not: "INSTALLED" } },
+        orderBy: { createdAt: "desc" },
+        include: { merchant: true }
+      }));
     if (onboarding && onboarding.shopDomain !== shop) return res.status(400).send("Onboarding link does not match this Shopify store");
     const existingConnection = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
     const matchedHub = await hubForShopDomain(shop);
