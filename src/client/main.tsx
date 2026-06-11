@@ -1455,8 +1455,17 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
           <p>Notes, downloads, badges, rewards, and future assets live together as proof of what a Holder supported and what value they unlocked.</p>
         </div>
         <div className="collection-total">
-          <span>Total collection value</span>
-          <strong><AnimatedNumber value={totalValue} prefix="$" suffix=".00" /></strong>
+          {totalValue > 0 ? (
+            <>
+              <span>Total collection value</span>
+              <strong><AnimatedNumber value={totalValue} prefix="$" suffix=".00" /></strong>
+            </>
+          ) : (
+            <>
+              <span>Your collection</span>
+              <strong>{items.length}</strong>
+            </>
+          )}
           <small>{items.length} collection item{items.length !== 1 ? "s" : ""}</small>
           {typeSummary && <span className="collection-type-summary">{typeSummary}</span>}
         </div>
@@ -4063,6 +4072,35 @@ function HolderPortal() {
   return <LiveHolderPortal token={token} />;
 }
 
+function HolderProfilePrompt({ onSaved }: { onSaved: () => void }) {
+  const [first, setFirst] = useState("");
+  const [last, setLast] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const save = async () => {
+    if (!first.trim()) { setErr("Please enter your first name."); return; }
+    setSaving(true); setErr("");
+    try {
+      await portalApi("/api/holder/profile", { method: "POST", body: JSON.stringify({ firstName: first.trim(), lastName: last.trim() }) });
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save");
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="portal-profile-prompt">
+      <p>Add your name so your notes are tied to you across every merchant.</p>
+      <div className="portal-profile-fields">
+        <input placeholder="First name" value={first} onChange={(e) => setFirst(e.target.value)} />
+        <input placeholder="Last name (optional)" value={last} onChange={(e) => setLast(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
+        <button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+      </div>
+      {err && <p className="portal-profile-err">{err}</p>}
+    </div>
+  );
+}
+
 function LiveHolderPortal({ token }: { token: string }) {
   const wallet = useData<any>(() => portalApi("/api/holder/wallet"), [token]);
   const merchants = useData<any[]>(() => portalApi("/api/holder/merchants"), [token]);
@@ -4086,6 +4124,7 @@ function LiveHolderPortal({ token }: { token: string }) {
 
   const { holder, uens, notifications, unreadCount } = wallet.data;
   const hub = holder.exchangeHub;
+  const holderHasName = Boolean(holder.firstName) && holder.firstName.trim().toLowerCase() !== "holder";
   const totalActive = uens.filter((u: any) => u.status === "ACTIVE").length;
   const totalRedeemed = uens.reduce((n: number, u: any) => n + u.redemptions.filter((r: any) => r.redeemed).length, 0);
   const holderCollectionItems = uens.length > 0 ? uens.map((uen: any, index: number) => ({
@@ -4094,7 +4133,7 @@ function LiveHolderPortal({ token }: { token: string }) {
     title: uen.code,
     source: hub.displayName,
     rarity: index === 0 ? "Founding" : "Earned",
-    value: hub.uenValue > 0 ? `$${hub.uenValue.toFixed(2)}` : "$0.00",
+    value: "Redeemable",
     date: new Date(uen.issuedAt ?? uen.createdAt).toLocaleDateString(),
     status: uen.status,
     description: `A Universal Exchange Note issued by ${hub.displayName}. This item stays in your collection as proof of support and can unlock value with participating merchants.`
@@ -4113,7 +4152,7 @@ function LiveHolderPortal({ token }: { token: string }) {
       <nav className="portal-nav">
         <div className="portal-nav-brand">
           <div className="portal-hub-dot" style={{ background: hub.brandColor ?? "#1f6f5b" }} />
-          <span>{hub.displayName}</span>
+          <span className="portal-brand-text">UENITE<small>Universal Exchange Note</small></span>
         </div>
         <div className="portal-nav-actions">
           <button className="portal-notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
@@ -4148,8 +4187,9 @@ function LiveHolderPortal({ token }: { token: string }) {
       <section className="portal-hero">
         <div className="portal-hero-inner">
           <div className="portal-hero-copy">
-            <p className="portal-greeting">Welcome back,</p>
-            <h1 className="portal-name">{holder.firstName} {holder.lastName}</h1>
+            <p className="portal-greeting">{holderHasName ? "Welcome back," : "Welcome to your wallet"}</p>
+            <h1 className="portal-name">{holderHasName ? `${holder.firstName} ${holder.lastName}`.trim() : "Let's finish setting up"}</h1>
+            {!holderHasName && <HolderProfilePrompt onSaved={wallet.reload} />}
             <div className="portal-stats-row">
               <div className="portal-stat">
                 <Wallet size={18} />
@@ -4165,15 +4205,13 @@ function LiveHolderPortal({ token }: { token: string }) {
                   <span>Times redeemed</span>
                 </div>
               </div>
-              {hub.uenValue > 0 && (
-                <div className="portal-stat">
-                  <DollarSign size={18} />
-                  <div>
-                    <strong>${(totalActive * hub.uenValue).toFixed(2)}</strong>
-                    <span>Available value</span>
-                  </div>
+              <div className="portal-stat">
+                <ShoppingBag size={18} />
+                <div>
+                  <strong>{(merchants.data ?? []).length}</strong>
+                  <span>Place{(merchants.data ?? []).length !== 1 ? "s" : ""} to redeem</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
           <div className="portal-hero-uen-chip">

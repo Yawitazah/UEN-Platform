@@ -89,6 +89,15 @@ app.get("/shopify", (req, res, next) => {
 const clientDir = path.resolve(process.cwd(), "dist/client");
 const uploadDir = path.resolve(process.cwd(), "uploads");
 app.use("/uploads", express.static(uploadDir));
+
+// The widget script is loaded by merchant storefronts via a fixed URL, so it
+// must never be cached hard — otherwise shoppers keep seeing an old build until
+// they clear cache. Always revalidate (ETag yields 304 when unchanged).
+app.get("/widget.js", (_req, res) => {
+  res.setHeader("Cache-Control", "no-cache, must-revalidate");
+  res.sendFile(path.join(clientDir, "widget.js"));
+});
+
 app.use(express.static(clientDir));
 app.get("*", (_req, res) => {
   // Never cache index.html — browser must always fetch fresh so it gets

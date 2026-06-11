@@ -116,6 +116,17 @@ async function redeem(token: string, merchantId: string, mode: "AUTO" | "MANUAL"
   return response.json();
 }
 
+async function fetchHolderName(token: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${UEN_API_BASE}/api/holder/profile?token=${encodeURIComponent(token)}`);
+    if (!r.ok) return null;
+    const p = (await r.json()) as { firstName?: string | null };
+    return p.firstName ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function widgetLogin(merchantId: string, email: string): Promise<string> {
   const response = await fetch(`${UEN_API_BASE}/api/holder/widget-login`, {
     method: "POST",
@@ -175,7 +186,7 @@ function injectStyles() {
     }
     #uen-widget-fab::after {
       content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%;
-      background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--uen-mint) 35%, transparent), transparent);
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.32), transparent);
       animation: uen-coin-shine 4.5s ease-in-out infinite; pointer-events: none;
     }
     #uen-widget-fab:hover { box-shadow: 0 10px 36px rgba(0,0,0,0.5), 0 0 22px color-mix(in srgb, var(--uen-mint) 38%, transparent); transform: translateY(-3px); }
@@ -188,10 +199,10 @@ function injectStyles() {
     #uen-widget-panel {
       --uen-ink1: #0C1A14; --uen-ink2: #0E261D; --uen-emerald: #1F6F5B; --uen-mint: #74E2AC; --uen-gold: #fbbf24;
       background:
-        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--uen-mint) 18%, transparent), transparent 60%),
-        linear-gradient(165deg, var(--uen-ink2) 0%, var(--uen-ink1) 70%, #08130d 100%);
-      backdrop-filter: blur(18px) saturate(1.2);
-      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--uen-mint) 16%, transparent), transparent 60%),
+        linear-gradient(165deg, rgba(14,38,29,0.74) 0%, rgba(12,26,20,0.84) 70%, rgba(8,19,13,0.9) 100%);
+      backdrop-filter: blur(20px) saturate(1.3);
+      -webkit-backdrop-filter: blur(20px) saturate(1.3);
       border: 1px solid color-mix(in srgb, var(--uen-mint) 26%, transparent);
       border-radius: 22px;
       box-shadow: 0 18px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
@@ -220,9 +231,9 @@ function injectStyles() {
 
     .uen-panel-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; position: relative; }
     .uen-panel-title {
-      background: linear-gradient(90deg, #fff, var(--uen-mint) 60%, #fff);
+      background: linear-gradient(90deg, #fff, var(--uen-gold) 60%, #fff);
       background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent; color: var(--uen-mint);
+      -webkit-text-fill-color: transparent; color: var(--uen-gold);
       font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
       animation: uen-sheen 5s linear infinite;
     }
@@ -236,6 +247,8 @@ function injectStyles() {
     .uen-icon-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
     .uen-icon-btn.spinning { animation: uen-spin 0.7s ease; }
 
+    .uen-greeting { color: #cfe6da; font-size: 13.5px; margin: 0 0 10px; text-align: center; position: relative; }
+    .uen-greeting strong { color: #fff; font-weight: 700; }
     .uen-count-display { text-align: center; padding: 8px 0 16px; position: relative; }
     .uen-count-display::before {
       content: ""; position: absolute; top: -6px; left: 50%; width: 150px; height: 150px;
@@ -245,11 +258,9 @@ function injectStyles() {
     }
     .uen-count-display strong {
       position: relative;
-      background: linear-gradient(135deg, #eafff6, var(--uen-mint) 60%, #4fbf8c);
-      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-      color: var(--uen-mint);
+      color: #fff; -webkit-text-fill-color: #fff;
       display: block; font-size: 60px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
-      filter: drop-shadow(0 2px 12px color-mix(in srgb, var(--uen-mint) 40%, transparent));
+      filter: drop-shadow(0 2px 14px color-mix(in srgb, var(--uen-mint) 45%, transparent));
     }
     .uen-count-display .uen-label { color: var(--uen-mint); display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; margin-top: 4px; text-transform: uppercase; position: relative; }
     .uen-count-display .uen-value { color: #cfe6da; font-size: 13px; margin-top: 8px; position: relative; }
@@ -262,10 +273,10 @@ function injectStyles() {
     .uen-panel-offer strong { color: var(--uen-gold); }
     .uen-panel-actions { display: flex; flex-direction: column; gap: 9px; position: relative; }
     .uen-btn { border: none; border-radius: 12px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 700; padding: 13px; transition: transform 0.15s, box-shadow 0.2s, opacity 0.15s; width: 100%; position: relative; overflow: hidden; }
-    .uen-btn-primary { background: linear-gradient(135deg, var(--uen-mint), var(--uen-emerald) 90%); color: var(--uen-ink1); box-shadow: 0 6px 18px color-mix(in srgb, var(--uen-mint) 30%, transparent); }
-    .uen-btn-primary::after { content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent); animation: uen-coin-shine 3.8s ease-in-out infinite; }
+    .uen-btn-primary { background: linear-gradient(135deg, #ffe08a, var(--uen-gold) 55%, #e0930f); color: #2a1a02; box-shadow: 0 6px 18px color-mix(in srgb, var(--uen-gold) 30%, transparent); }
+    .uen-btn-primary::after { content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent); animation: uen-coin-shine 3.8s ease-in-out infinite; }
     .uen-btn-secondary { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: #fff; }
-    .uen-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px color-mix(in srgb, var(--uen-mint) 34%, transparent); }
+    .uen-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px color-mix(in srgb, var(--uen-gold) 32%, transparent); }
     .uen-btn:disabled { cursor: default; opacity: 0.4; }
     .uen-code-result { background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--uen-mint) 28%, transparent); border-radius: 12px; margin-top: 12px; padding: 14px; animation: uen-pop-in 0.3s ease both; }
     .uen-code-result p { color: #9ec0b2; font-size: 11px; margin: 0 0 6px; }
@@ -334,6 +345,7 @@ function buildWidget(merchantId: string) {
   let panelOpen = false;
   let merchantInfo: WalletMerchant | null = null;
   let generatedCode: string | null = null;
+  let holderName: string | null = null;
 
   function renderPanel(state: "loading" | "login" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string } = {}) {
     const offerText = merchantInfo ? formatOffer(merchantInfo) : "";
@@ -362,9 +374,10 @@ function buildWidget(merchantId: string) {
       ${state === "no-uens" ? `<p class="uen-msg uen-msg-info">You have no available notes for this merchant right now. Tap refresh after a new contribution, or open your full dashboard below.</p>` : ""}
       ${state === "error" ? `<p class="uen-msg uen-msg-error">${opts.error ?? "Something went wrong."}</p>` : ""}
       ${state === "ready" || state === "code-shown" ? `
+        ${holderName ? `<p class="uen-greeting">Welcome, <strong>${escapeHtml(holderName)}</strong></p>` : ""}
         <div class="uen-count-display">
           <strong>${available}</strong>
-          <span class="uen-label">UEN</span>
+          <span class="uen-label">UEN${available === 1 ? "" : "s"} available</span>
           ${offerText ? `<p class="uen-value">Each worth <strong>${offerText}</strong> here</p>` : ""}
         </div>
         ${offerText ? `<div class="uen-panel-offer">Use 1 UEN → <strong>${offerText}</strong> at checkout</div>` : ""}
@@ -387,6 +400,8 @@ function buildWidget(merchantId: string) {
         <button class="uen-signout" id="uen-signout-btn">Sign out</button>
       ` : ""}
     `;
+
+    panel.scrollTop = 0; // always show the count/greeting first, esp. on mobile
 
     document.getElementById("uen-close-btn")?.addEventListener("click", closePanel);
 
@@ -474,12 +489,15 @@ function buildWidget(merchantId: string) {
     }
 
     renderPanel("loading");
-    merchantInfo = await fetchMerchantInfo(token, merchantId);
+    const [info, name] = await Promise.all([fetchMerchantInfo(token, merchantId), fetchHolderName(token)]);
+    merchantInfo = info;
+    holderName = name;
 
     if (!merchantInfo) {
       // Token is stale or this merchant isn't visible to it — clear and re-login.
       setToken("");
       token = "";
+      holderName = null;
       renderPanel("login", { error: "Your session expired. Enter your email to sign back in." });
       return;
     }

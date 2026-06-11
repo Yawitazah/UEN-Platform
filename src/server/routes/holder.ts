@@ -99,6 +99,49 @@ router.get("/holder/wallet", async (req, res) => {
   }
 });
 
+// GET /api/holder/profile?token=...  — minimal identity for the widget greeting.
+// `registered` is false when the holder was auto-created (placeholder name) and
+// hasn't completed their profile yet.
+router.get("/holder/profile", async (req, res) => {
+  try {
+    const token = String(req.query.token ?? "");
+    const holder = token
+      ? await prisma.holder.findUnique({ where: { portalToken: token }, select: { firstName: true, lastName: true, email: true } })
+      : null;
+    if (!holder) return res.status(404).json({ error: "Invalid portal token" });
+    const hasName = Boolean(holder.firstName) && holder.firstName.trim().toLowerCase() !== "holder";
+    res.json({
+      firstName: hasName ? holder.firstName : null,
+      lastName: holder.lastName || null,
+      email: holder.email,
+      registered: hasName
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not load profile" });
+  }
+});
+
+// POST /api/holder/profile  — holder completes their profile (name) from the
+// dashboard. Identified by their portal token; no separate password needed.
+router.post("/holder/profile", async (req, res) => {
+  try {
+    const { firstName, lastName } = req.body as { firstName?: string; lastName?: string };
+    const token = String(req.query.token ?? (req.body as { token?: string }).token ?? "");
+    const holder = token ? await prisma.holder.findUnique({ where: { portalToken: token } }) : null;
+    if (!holder) return res.status(404).json({ error: "Invalid portal token" });
+    if (!firstName || !firstName.trim()) return res.status(400).json({ error: "First name is required" });
+    const updated = await prisma.holder.update({
+      where: { id: holder.id },
+      data: { firstName: firstName.trim(), lastName: (lastName ?? "").trim() }
+    });
+    res.json({ firstName: updated.firstName, lastName: updated.lastName, email: updated.email });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not update profile" });
+  }
+});
+
 // GET /api/holder/merchants?token=...
 router.get("/holder/merchants", async (req, res) => {
   try {

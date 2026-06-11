@@ -3893,12 +3893,16 @@ html { background: #050e09; }
 }
 
 .portal-spinner {
-  animation: spinSlow 1s linear infinite;
+  animation: portalSpin 0.9s linear infinite;
   border: 3px solid rgba(117, 227, 173, 0.2);
   border-top-color: #75e3ad;
   border-radius: 999px;
   height: 40px;
   width: 40px;
+}
+
+@keyframes portalSpin {
+  to { transform: rotate(360deg); }
 }
 
 .portal-error {
@@ -3950,6 +3954,71 @@ html { background: #050e09; }
   font-weight: 700;
   gap: 10px;
 }
+
+.portal-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+}
+
+.portal-brand-text small {
+  color: #6b8f7d;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portal-profile-prompt {
+  background: rgba(117, 227, 173, 0.06);
+  border: 1px solid rgba(117, 227, 173, 0.18);
+  border-radius: 14px;
+  margin: 0 0 22px;
+  padding: 16px;
+}
+
+.portal-profile-prompt > p {
+  color: #b9d4c8;
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.portal-profile-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portal-profile-fields input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  color: #fff;
+  flex: 1 1 140px;
+  font-size: 14px;
+  padding: 11px 13px;
+}
+
+.portal-profile-fields input:focus {
+  border-color: #75e3ad;
+  outline: none;
+}
+
+.portal-profile-fields button {
+  background: linear-gradient(135deg, #75e3ad, #1f6f5b);
+  border: none;
+  border-radius: 10px;
+  color: #0c1a14;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 20px;
+}
+
+.portal-profile-fields button:disabled { opacity: 0.5; cursor: default; }
+
+.portal-profile-err { color: #ff9999; font-size: 12px; margin: 8px 0 0; }
 
 .portal-hub-dot {
   border-radius: 999px;
