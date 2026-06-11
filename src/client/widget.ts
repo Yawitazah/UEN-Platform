@@ -142,12 +142,9 @@ function injectStyles() {
   if (document.getElementById("uen-widget-styles")) return;
   const style = document.createElement("style");
   style.id = "uen-widget-styles";
-  // Accent color flows through --uen-accent (set inline on the fab/panel from
-  // the embed settings); placement edges are set inline too, so the stylesheet
-  // carries no corner assumptions.
-  // --uen-accent = merchant's chosen accent (default emerald). --uen-gold is the
-  // fixed brand gold used for the coin/count luster. Animations stay subtle but
-  // give the widget the premium, alive feel the brand calls for.
+  // Brand palette. Primary surfaces = ink greens + emerald/mint; text = white or
+  // mint; gold (--uen-gold) is an ACCENT only (FAB pulse + the discount figure).
+  // --uen-accent = merchant's optional override (default mint).
   style.textContent = `
     @keyframes uen-pop-in { from { opacity: 0; transform: translateY(18px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes uen-dot-pulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--uen-gold) 70%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
@@ -157,12 +154,12 @@ function injectStyles() {
     @keyframes uen-coin-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 100% { transform: translateX(220%) skewX(-18deg); } }
 
     #uen-widget-fab {
-      --uen-gold: #fbbf24;
+      --uen-ink1: #0C1A14; --uen-ink2: #0E261D; --uen-emerald: #1F6F5B; --uen-mint: #74E2AC; --uen-gold: #fbbf24;
       align-items: center;
-      background: linear-gradient(135deg, #1f6f5b 0%, #143d2c 55%, #0f2d20 100%);
-      border: 1px solid color-mix(in srgb, var(--uen-gold) 45%, transparent);
+      background: linear-gradient(135deg, var(--uen-emerald) 0%, var(--uen-ink2) 55%, var(--uen-ink1) 100%);
+      border: 1px solid color-mix(in srgb, var(--uen-mint) 42%, transparent);
       border-radius: 50px;
-      box-shadow: 0 6px 26px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12);
+      box-shadow: 0 6px 26px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
       color: #fff;
       cursor: pointer;
       display: flex;
@@ -178,10 +175,10 @@ function injectStyles() {
     }
     #uen-widget-fab::after {
       content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%;
-      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
+      background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--uen-mint) 35%, transparent), transparent);
       animation: uen-coin-shine 4.5s ease-in-out infinite; pointer-events: none;
     }
-    #uen-widget-fab:hover { box-shadow: 0 10px 36px rgba(0,0,0,0.5), 0 0 22px color-mix(in srgb, var(--uen-gold) 35%, transparent); transform: translateY(-3px); }
+    #uen-widget-fab:hover { box-shadow: 0 10px 36px rgba(0,0,0,0.5), 0 0 22px color-mix(in srgb, var(--uen-mint) 38%, transparent); transform: translateY(-3px); }
     #uen-widget-fab .uen-fab-dot {
       background: radial-gradient(circle at 35% 30%, #ffe9a8, var(--uen-gold));
       border-radius: 50%; height: 10px; width: 10px; flex: none;
@@ -189,15 +186,15 @@ function injectStyles() {
     }
 
     #uen-widget-panel {
-      --uen-gold: #fbbf24;
+      --uen-ink1: #0C1A14; --uen-ink2: #0E261D; --uen-emerald: #1F6F5B; --uen-mint: #74E2AC; --uen-gold: #fbbf24;
       background:
-        radial-gradient(120% 80% at 50% -10%, rgba(117,227,173,0.18), transparent 60%),
-        linear-gradient(165deg, #11332557 0%, #0c2018ee 60%, #0a1b14 100%);
+        radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--uen-mint) 18%, transparent), transparent 60%),
+        linear-gradient(165deg, var(--uen-ink2) 0%, var(--uen-ink1) 70%, #08130d 100%);
       backdrop-filter: blur(18px) saturate(1.2);
       -webkit-backdrop-filter: blur(18px) saturate(1.2);
-      border: 1px solid color-mix(in srgb, var(--uen-gold) 28%, transparent);
+      border: 1px solid color-mix(in srgb, var(--uen-mint) 26%, transparent);
       border-radius: 22px;
-      box-shadow: 0 18px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
       color: #fff;
       display: none;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -215,17 +212,17 @@ function injectStyles() {
     #uen-widget-panel::before {
       content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 22px;
       background:
-        radial-gradient(2px 2px at 18% 22%, rgba(255,255,255,0.5), transparent),
-        radial-gradient(1.5px 1.5px at 78% 30%, color-mix(in srgb, var(--uen-gold) 80%, transparent), transparent),
-        radial-gradient(1.5px 1.5px at 62% 12%, rgba(255,255,255,0.4), transparent);
+        radial-gradient(2px 2px at 18% 22%, rgba(255,255,255,0.45), transparent),
+        radial-gradient(1.5px 1.5px at 78% 30%, color-mix(in srgb, var(--uen-mint) 80%, transparent), transparent),
+        radial-gradient(1.5px 1.5px at 62% 12%, rgba(255,255,255,0.35), transparent);
       opacity: 0.7; animation: uen-float 5s ease-in-out infinite;
     }
 
     .uen-panel-header { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; position: relative; }
     .uen-panel-title {
-      background: linear-gradient(90deg, #fff, var(--uen-gold) 60%, #fff);
+      background: linear-gradient(90deg, #fff, var(--uen-mint) 60%, #fff);
       background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent; color: var(--uen-gold);
+      -webkit-text-fill-color: transparent; color: var(--uen-mint);
       font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
       animation: uen-sheen 5s linear infinite;
     }
@@ -242,41 +239,42 @@ function injectStyles() {
     .uen-count-display { text-align: center; padding: 8px 0 16px; position: relative; }
     .uen-count-display::before {
       content: ""; position: absolute; top: -6px; left: 50%; width: 150px; height: 150px;
-      transform: translateX(-50%); pointer-events: none; opacity: 0.5;
-      background: conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--uen-gold) 45%, transparent), transparent 40%);
+      transform: translateX(-50%); pointer-events: none; opacity: 0.55;
+      background: conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--uen-mint) 50%, transparent), transparent 40%);
       border-radius: 50%; filter: blur(14px); animation: uen-spin 9s linear infinite;
     }
     .uen-count-display strong {
       position: relative;
-      background: linear-gradient(135deg, #ffe9a8, var(--uen-gold) 55%, #d97706);
+      background: linear-gradient(135deg, #eafff6, var(--uen-mint) 60%, #4fbf8c);
       -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-      color: var(--uen-gold);
+      color: var(--uen-mint);
       display: block; font-size: 60px; font-weight: 800; letter-spacing: -0.02em; line-height: 1;
-      filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--uen-gold) 35%, transparent));
+      filter: drop-shadow(0 2px 12px color-mix(in srgb, var(--uen-mint) 40%, transparent));
     }
-    .uen-count-display .uen-label { color: #cfe6da; display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; margin-top: 4px; text-transform: uppercase; position: relative; }
-    .uen-count-display .uen-value { color: #9ec0b2; font-size: 13px; margin-top: 8px; position: relative; }
+    .uen-count-display .uen-label { color: var(--uen-mint); display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; margin-top: 4px; text-transform: uppercase; position: relative; }
+    .uen-count-display .uen-value { color: #cfe6da; font-size: 13px; margin-top: 8px; position: relative; }
+    .uen-count-display .uen-value strong { color: var(--uen-gold); }
     .uen-panel-offer {
-      background: linear-gradient(135deg, color-mix(in srgb, var(--uen-gold) 14%, transparent), color-mix(in srgb, var(--uen-accent, #75e3ad) 10%, transparent));
-      border: 1px solid color-mix(in srgb, var(--uen-gold) 22%, transparent);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--uen-mint) 14%, transparent), color-mix(in srgb, var(--uen-emerald) 18%, transparent));
+      border: 1px solid color-mix(in srgb, var(--uen-mint) 26%, transparent);
       border-radius: 12px; font-size: 13px; margin-bottom: 16px; padding: 11px 14px; text-align: center; color: #eafff5; position: relative;
     }
     .uen-panel-offer strong { color: var(--uen-gold); }
     .uen-panel-actions { display: flex; flex-direction: column; gap: 9px; position: relative; }
     .uen-btn { border: none; border-radius: 12px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 700; padding: 13px; transition: transform 0.15s, box-shadow 0.2s, opacity 0.15s; width: 100%; position: relative; overflow: hidden; }
-    .uen-btn-primary { background: linear-gradient(135deg, #ffe08a, var(--uen-gold) 55%, #e0930f); color: #2a1a02; box-shadow: 0 6px 18px color-mix(in srgb, var(--uen-gold) 28%, transparent); }
-    .uen-btn-primary::after { content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent); animation: uen-coin-shine 3.8s ease-in-out infinite; }
+    .uen-btn-primary { background: linear-gradient(135deg, var(--uen-mint), var(--uen-emerald) 90%); color: var(--uen-ink1); box-shadow: 0 6px 18px color-mix(in srgb, var(--uen-mint) 30%, transparent); }
+    .uen-btn-primary::after { content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent); animation: uen-coin-shine 3.8s ease-in-out infinite; }
     .uen-btn-secondary { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: #fff; }
-    .uen-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px color-mix(in srgb, var(--uen-gold) 32%, transparent); }
+    .uen-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px color-mix(in srgb, var(--uen-mint) 34%, transparent); }
     .uen-btn:disabled { cursor: default; opacity: 0.4; }
-    .uen-code-result { background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--uen-gold) 22%, transparent); border-radius: 12px; margin-top: 12px; padding: 14px; animation: uen-pop-in 0.3s ease both; }
+    .uen-code-result { background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--uen-mint) 28%, transparent); border-radius: 12px; margin-top: 12px; padding: 14px; animation: uen-pop-in 0.3s ease both; }
     .uen-code-result p { color: #9ec0b2; font-size: 11px; margin: 0 0 6px; }
     .uen-code-value { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
-    .uen-code-value code { color: var(--uen-gold); font-family: 'SF Mono', ui-monospace, monospace; font-size: 16px; font-weight: 700; letter-spacing: 0.04em; word-break: break-all; }
-    .uen-copy-btn { background: color-mix(in srgb, var(--uen-gold) 18%, transparent); border: none; border-radius: 8px; color: var(--uen-gold); cursor: pointer; font-size: 12px; font-weight: 700; padding: 6px 12px; white-space: nowrap; transition: background 0.15s; }
-    .uen-copy-btn:hover { background: color-mix(in srgb, var(--uen-gold) 28%, transparent); }
+    .uen-code-value code { color: var(--uen-mint); font-family: 'SF Mono', ui-monospace, monospace; font-size: 16px; font-weight: 700; letter-spacing: 0.04em; word-break: break-all; }
+    .uen-copy-btn { background: color-mix(in srgb, var(--uen-mint) 18%, transparent); border: none; border-radius: 8px; color: var(--uen-mint); cursor: pointer; font-size: 12px; font-weight: 700; padding: 6px 12px; white-space: nowrap; transition: background 0.15s; }
+    .uen-copy-btn:hover { background: color-mix(in srgb, var(--uen-mint) 28%, transparent); }
     .uen-dash-link { align-items: center; color: #cfe6da; display: flex; font-size: 12.5px; font-weight: 600; gap: 6px; justify-content: center; margin-top: 14px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,0.08); text-decoration: none; transition: color 0.15s; position: relative; }
-    .uen-dash-link:hover { color: var(--uen-gold); }
+    .uen-dash-link:hover { color: var(--uen-mint); }
     .uen-dash-link .uen-arrow { transition: transform 0.2s; }
     .uen-dash-link:hover .uen-arrow { transform: translateX(3px); }
     .uen-signout { background: none; border: none; color: #7c9a8c; cursor: pointer; display: block; font-size: 11px; margin: 8px auto 0; padding: 2px; position: relative; text-decoration: underline; }
@@ -287,7 +285,7 @@ function injectStyles() {
     .uen-login-form { display: flex; flex-direction: column; gap: 9px; position: relative; }
     .uen-login-form p { color: #b9d4c8; font-size: 13px; line-height: 1.45; margin: 0 0 4px; text-align: center; }
     .uen-login-input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 11px; box-sizing: border-box; color: #fff; font-family: inherit; font-size: 14px; padding: 13px; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }
-    .uen-login-input:focus { border-color: var(--uen-gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uen-gold) 18%, transparent); outline: none; }
+    .uen-login-input:focus { border-color: var(--uen-mint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uen-mint) 20%, transparent); outline: none; }
     @media (prefers-reduced-motion: reduce) {
       #uen-widget-fab::after, .uen-btn-primary::after, .uen-panel-title, .uen-count-display::before, #uen-widget-panel::before, #uen-widget-panel.open, .uen-fab-dot { animation: none !important; }
     }
@@ -367,7 +365,7 @@ function buildWidget(merchantId: string) {
         <div class="uen-count-display">
           <strong>${available}</strong>
           <span class="uen-label">UEN</span>
-          ${offerText ? `<p class="uen-value">Each worth <strong style="color:var(--uen-accent, #75e3ad)">${offerText}</strong> here</p>` : ""}
+          ${offerText ? `<p class="uen-value">Each worth <strong>${offerText}</strong> here</p>` : ""}
         </div>
         ${offerText ? `<div class="uen-panel-offer">Use 1 UEN → <strong>${offerText}</strong> at checkout</div>` : ""}
         <div class="uen-panel-actions">
