@@ -1161,23 +1161,29 @@ router.post("/exchange-hubs/:exchangeHubId/holders/preload", requireRole(writeRo
     const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
     if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
 
-    let created = 0;
-    let updated = 0;
-    for (const entry of data.entries) {
-      const email = entry.email.trim().toLowerCase();
-      const existing = await prisma.holder.findUnique({ where: { exchangeHubId_email: { exchangeHubId, email } } });
+    // Bulk-shaped: one read + one createMany; per-row updates only for the few
+    // existing holders that need a fill-in (per-row round trips trip Cloudflare's
+    // origin timeout at production latency).
+    const normalized = data.entries.map((entry) => ({ ...entry, email: entry.email.trim().toLowerCase() }));
+    const existingRows = await prisma.holder.findMany({
+      where: { exchangeHubId, email: { in: normalized.map((entry) => entry.email) } },
+      select: { id: true, email: true, firstName: true, phone: true }
+    });
+    const existingByEmail = new Map(existingRows.map((row) => [row.email, row]));
+
+    const toCreate: Array<{ exchangeHubId: string; email: string; firstName: string; lastName: string; phone: string | null; status: string }> = [];
+    const toUpdate: Array<{ id: string; data: Record<string, unknown> }> = [];
+    for (const entry of normalized) {
+      const existing = existingByEmail.get(entry.email);
       if (!existing) {
-        await prisma.holder.create({
-          data: {
-            exchangeHubId,
-            email,
-            firstName: entry.firstName?.trim() || "Holder",
-            lastName: entry.lastName?.trim() || "",
-            phone: entry.phone?.trim() || null,
-            status: "ACTIVE"
-          }
+        toCreate.push({
+          exchangeHubId,
+          email: entry.email,
+          firstName: entry.firstName?.trim() || "Holder",
+          lastName: entry.lastName?.trim() || "",
+          phone: entry.phone?.trim() || null,
+          status: "ACTIVE"
         });
-        created += 1;
       } else {
         const placeholderName = !existing.firstName || existing.firstName.trim().toLowerCase() === "holder";
         const updates: Record<string, unknown> = {};
@@ -1186,13 +1192,14 @@ router.post("/exchange-hubs/:exchangeHubId/holders/preload", requireRole(writeRo
           updates.lastName = entry.lastName?.trim() || "";
         }
         if (!existing.phone && entry.phone?.trim()) updates.phone = entry.phone.trim();
-        if (Object.keys(updates).length) {
-          await prisma.holder.update({ where: { id: existing.id }, data: updates });
-          updated += 1;
-        }
+        if (Object.keys(updates).length) toUpdate.push({ id: existing.id, data: updates });
       }
     }
-    res.status(201).json({ created, updated });
+    if (toCreate.length) await prisma.holder.createMany({ data: toCreate });
+    for (const update of toUpdate) {
+      await prisma.holder.update({ where: { id: update.id }, data: update.data });
+    }
+    res.status(201).json({ created: toCreate.length, updated: toUpdate.length });
   } catch (error) {
     handleError(res, error);
   }
