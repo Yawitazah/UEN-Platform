@@ -133,6 +133,36 @@ router.get("/me", async (req, res) => {
   });
 });
 
+// Update the signed-in merchant's own account details.
+router.patch("/me", async (req, res) => {
+  try {
+    if (!req.auth || req.auth.actorType !== "merchant") return res.status(401).json({ error: "Not signed in" });
+    const data = z.object({
+      businessName: z.string().min(2).max(120).optional(),
+      contactEmail: z.string().email().optional()
+    }).parse(req.body);
+    if (!data.businessName && !data.contactEmail) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+    const updates: Record<string, unknown> = {};
+    if (data.businessName) updates.businessName = data.businessName.trim();
+    if (data.contactEmail) updates.contactEmail = data.contactEmail.trim().toLowerCase();
+    try {
+      const merchant = await prisma.merchant.update({ where: { id: req.auth.merchantId }, data: updates });
+      res.json({ businessName: merchant.businessName, contactEmail: merchant.contactEmail });
+    } catch (updateError) {
+      if ((updateError as { code?: string }).code === "P2002") {
+        return res.status(409).json({ error: "That email is already used by another account" });
+      }
+      throw updateError;
+    }
+  } catch (error) {
+    if (error instanceof z.ZodError) return res.status(400).json({ error: "Enter a valid name and email" });
+    console.error(error);
+    res.status(500).json({ error: "Could not update account" });
+  }
+});
+
 // Submit an Exchange Hub application from a logged-in merchant.
 router.post("/apply-hub", async (req, res) => {
   try {

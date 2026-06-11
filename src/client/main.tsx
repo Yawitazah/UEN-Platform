@@ -2112,6 +2112,15 @@ function ShopifyMerchantPortal() {
   // Navigation
   const [nav, setNav] = useState<MpNav>("dashboard");
 
+  // Editable account details (Settings tab)
+  const [acctForm, setAcctForm] = useState({ businessName: "", contactEmail: "" });
+  const [acctSaving, setAcctSaving] = useState(false);
+  const [acctMsg, setAcctMsg] = useState("");
+  const [acctErr, setAcctErr] = useState("");
+  useEffect(() => {
+    if (merchant) setAcctForm({ businessName: merchant.businessName ?? "", contactEmail: merchant.contactEmail ?? "" });
+  }, [merchant?.businessName, merchant?.contactEmail]);
+
   // Analytics
   const [period, setPeriod] = useState("month");
   const analytics = useData<any>(
@@ -2537,9 +2546,32 @@ function ShopifyMerchantPortal() {
 
             <div className="mp-form-card">
               <h2>Account</h2>
-              <div className="mp-account-row"><span>Business name</span><strong>{merchant?.businessName}</strong></div>
-              <div className="mp-account-row"><span>Email</span><strong>{merchant?.contactEmail}</strong></div>
-              <div className="mp-account-row"><span>Shopify store</span><strong>{shopDisplay}</strong></div>
+              {acctMsg && <p className="mp-notice">{acctMsg}</p>}
+              {acctErr && <p className="mp-error">{acctErr}</p>}
+              <div className="mp-form-grid">
+                <label>Business name<input value={acctForm.businessName} onChange={(e) => setAcctForm({ ...acctForm, businessName: e.target.value })} /></label>
+                <label>Contact email<input type="email" value={acctForm.contactEmail} onChange={(e) => setAcctForm({ ...acctForm, contactEmail: e.target.value })} /></label>
+              </div>
+              <button className="mp-btn" style={{ marginTop: 14 }} disabled={acctSaving} onClick={async () => {
+                setAcctSaving(true); setAcctErr(""); setAcctMsg("");
+                try {
+                  const r = await fetch("/api/merchant/me", { method: "PATCH", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(acctForm) });
+                  const data = await r.json();
+                  if (!r.ok) { setAcctErr(data.error ?? "Could not save."); }
+                  else {
+                    setMerchant((prev: any) => ({ ...prev, businessName: data.businessName, contactEmail: data.contactEmail }));
+                    setAcctMsg("Account details saved.");
+                  }
+                } catch { setAcctErr("Could not connect. Try again."); }
+                finally { setAcctSaving(false); }
+              }}>{acctSaving ? "Saving…" : "Save changes"}</button>
+              <div className="mp-account-row" style={{ marginTop: 18 }}>
+                <span>Shopify store</span>
+                <strong>{merchant?.shopDomain ?? shopDisplay ?? "Not connected"}</strong>
+              </div>
+              {!merchant?.shopDomain && !shop && (
+                <p className="mp-muted-note">No Shopify store is connected to this account yet. Store connections are set up with the UENITE team — email <a href="mailto:work@zahbrandsolutions.com?subject=Connect my Shopify store">work@zahbrandsolutions.com</a> and we'll link your store, load your notes, and switch on order tracking.</p>
+              )}
             </div>
 
             <div className={`mp-form-card mp-hub-card ${merchant?.hubStatus === "APPROVED" ? "mp-hub-active" : merchant?.hubStatus === "PENDING" ? "mp-hub-pending" : "mp-hub-apply"}`}>
@@ -4072,7 +4104,7 @@ function HolderPortal() {
   return <LiveHolderPortal token={token} />;
 }
 
-function HolderProfilePrompt({ holder, onSaved }: { holder: any; onSaved: () => void }) {
+function HolderProfilePrompt({ holder, onSaved, editing = false }: { holder: any; onSaved: () => void; editing?: boolean }) {
   const knownName = holder.firstName && holder.firstName.trim().toLowerCase() !== "holder";
   const [first, setFirst] = useState(knownName ? holder.firstName : "");
   const [last, setLast] = useState(knownName ? (holder.lastName ?? "") : "");
@@ -4093,7 +4125,9 @@ function HolderProfilePrompt({ holder, onSaved }: { holder: any; onSaved: () => 
   };
   return (
     <div className="portal-profile-prompt">
-      <p>{knownName
+      <p>{editing
+        ? "Update your details below. Your email is your sign-in and can't be changed here."
+        : knownName
         ? "Verify your details and add your phone number to unlock all wallet features."
         : "Verify your details to unlock all wallet features — redeeming, codes, and merchant offers."}</p>
       <div className="portal-profile-email">Signed in as <strong>{holder.email}</strong></div>
@@ -4114,6 +4148,12 @@ function LiveHolderPortal({ token }: { token: string }) {
   const banners = useData<any[]>(() => portalApi("/api/holder/banners"), [token]);
   const [activeTab, setActiveTab] = useState<"collection" | "wallet" | "merchants">("collection");
   const [notifOpen, setNotifOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const signOut = () => {
+    localStorage.removeItem("uen_portal_token");
+    window.location.href = "/";
+  };
 
   if (wallet.loading) {
     return <div className="portal-loading"><div className="portal-spinner" /><p>Loading your wallet...</p></div>;
@@ -4163,12 +4203,39 @@ function LiveHolderPortal({ token }: { token: string }) {
           <span className="portal-brand-text">UENITE<small>Universal Exchange Note</small></span>
         </div>
         <div className="portal-nav-actions">
-          <button className="portal-notif-btn" onClick={() => setNotifOpen(!notifOpen)}>
+          <button className="portal-notif-btn" onClick={() => { setNotifOpen(!notifOpen); setMenuOpen(false); }}>
             <Bell size={20} />
             {unreadCount > 0 && <span className="portal-notif-badge">{unreadCount}</span>}
           </button>
+          <button className="portal-notif-btn" onClick={() => { setMenuOpen(!menuOpen); setNotifOpen(false); }} aria-label="Account menu">
+            <Menu size={20} />
+          </button>
         </div>
       </nav>
+
+      {/* Account menu */}
+      {menuOpen && (
+        <div className="portal-menu-drawer">
+          <button onClick={() => { setEditOpen(true); setMenuOpen(false); }}>Edit my details</button>
+          <a href={`mailto:work@zahbrandsolutions.com?subject=UENITE help request&body=Wallet email: ${encodeURIComponent(holder.email)}`}>Help &amp; contact</a>
+          <a href={`mailto:work@zahbrandsolutions.com?subject=Something is missing from my wallet&body=Wallet email: ${encodeURIComponent(holder.email)}%0AWhat's missing: `}>Report something missing</a>
+          <a href={`mailto:work@zahbrandsolutions.com?subject=Delete my UENITE account&body=Please delete the account for: ${encodeURIComponent(holder.email)}`}>Request account deletion</a>
+          <button className="portal-menu-signout" onClick={signOut}>Sign out</button>
+        </div>
+      )}
+
+      {/* Edit profile modal */}
+      {editOpen && (
+        <div className="portal-modal-backdrop" onClick={() => setEditOpen(false)}>
+          <div className="portal-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="portal-notif-header">
+              <h3>My details</h3>
+              <button className="portal-icon-btn" onClick={() => setEditOpen(false)}><X size={18} /></button>
+            </div>
+            <HolderProfilePrompt holder={holder} editing onSaved={() => { setEditOpen(false); wallet.reload(); }} />
+          </div>
+        </div>
+      )}
 
       {/* Notification drawer */}
       {notifOpen && (
