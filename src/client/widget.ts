@@ -297,8 +297,15 @@ function injectStyles() {
     .uen-login-form p { color: #b9d4c8; font-size: 13px; line-height: 1.45; margin: 0 0 4px; text-align: center; }
     .uen-login-input { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 11px; box-sizing: border-box; color: #fff; font-family: inherit; font-size: 14px; padding: 13px; width: 100%; transition: border-color 0.15s, box-shadow 0.15s; }
     .uen-login-input:focus { border-color: var(--uen-mint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uen-mint) 20%, transparent); outline: none; }
+    @keyframes uen-count-glow {
+      0%, 100% { filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--uen-mint) 35%, transparent)); }
+      50% { filter: drop-shadow(0 2px 22px color-mix(in srgb, var(--uen-mint) 70%, transparent)); }
+    }
+    .uen-count-display strong { animation: uen-count-glow 3s ease-in-out infinite; }
+    /* Reduced motion: only suppress translation-heavy movement; glows, sheens
+       and pulses are gentle and stay on (they ARE the brand). */
     @media (prefers-reduced-motion: reduce) {
-      #uen-widget-fab::after, .uen-btn-primary::after, .uen-panel-title, .uen-count-display::before, #uen-widget-panel::before, #uen-widget-panel.open, .uen-fab-dot { animation: none !important; }
+      #uen-widget-panel.open, #uen-widget-panel::before { animation: none !important; }
     }
   `;
   document.head.appendChild(style);
@@ -402,6 +409,22 @@ function buildWidget(merchantId: string) {
     `;
 
     panel.scrollTop = 0; // always show the count/greeting first, esp. on mobile
+
+    // Count-up: the UEN number rolls from 0 to its value when the wallet opens.
+    if (state === "ready" && available > 0) {
+      const counter = panel.querySelector(".uen-count-display strong");
+      if (counter) {
+        const started = performance.now();
+        const duration = 650;
+        const tick = (now: number) => {
+          const t = Math.min(1, (now - started) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          counter.textContent = String(Math.round(eased * available));
+          if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    }
 
     document.getElementById("uen-close-btn")?.addEventListener("click", closePanel);
 
