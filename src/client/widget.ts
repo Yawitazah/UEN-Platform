@@ -86,7 +86,7 @@ type RedeemResult = {
 type WalletMerchant = {
   id: string;
   businessName: string;
-  offer: { discountType: string; discountValue: number | null } | null;
+  offer: { discountType: string; discountValue: number | null; minimumOrderAmount: number | null; usageLimitPerNote: number } | null;
   availableUens: number;
   redeemedUens: number;
   shopDomain: string | null;
@@ -271,6 +271,7 @@ function injectStyles() {
       border-radius: 12px; font-size: 13px; margin-bottom: 16px; padding: 11px 14px; text-align: center; color: #eafff5; position: relative;
     }
     .uen-panel-offer strong { color: var(--uen-gold); }
+    .uen-offer-rule { color: #9ec0b2; display: block; font-size: 11px; margin-top: 5px; }
     .uen-panel-actions { display: flex; flex-direction: column; gap: 9px; position: relative; }
     .uen-btn { border: none; border-radius: 12px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 700; padding: 13px; transition: transform 0.15s, box-shadow 0.2s, opacity 0.15s; width: 100%; position: relative; overflow: hidden; }
     .uen-btn-primary { background: linear-gradient(135deg, #ffe08a, var(--uen-gold) 55%, #e0930f); color: #2a1a02; box-shadow: 0 6px 18px color-mix(in srgb, var(--uen-gold) 30%, transparent); }
@@ -354,7 +355,7 @@ function buildWidget(merchantId: string) {
   let generatedCode: string | null = null;
   let holderName: string | null = null;
 
-  function renderPanel(state: "loading" | "login" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string } = {}) {
+  function renderPanel(state: "loading" | "login" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string; notice?: string } = {}) {
     const offerText = merchantInfo ? formatOffer(merchantInfo) : "";
     const available = merchantInfo?.availableUens ?? 0;
 
@@ -372,6 +373,7 @@ function buildWidget(merchantId: string) {
       ${state === "loading" ? `<p class="uen-msg uen-msg-info">Loading your UEN wallet...</p>` : ""}
       ${state === "login" ? `
         <div class="uen-login-form">
+          ${opts.notice ? `<p class="uen-msg uen-msg-info" style="margin:0 0 6px">${opts.notice}</p>` : ""}
           <p>Enter the email you used for your UEN account or original Love Note purchase.</p>
           <input class="uen-login-input" id="uen-login-email" type="email" placeholder="you@example.com" autocomplete="email" />
           <button class="uen-btn uen-btn-primary" id="uen-login-btn">Access My Notes</button>
@@ -387,7 +389,13 @@ function buildWidget(merchantId: string) {
           <span class="uen-label">UEN${available === 1 ? "" : "s"} available</span>
           ${offerText ? `<p class="uen-value">Each worth <strong>${offerText}</strong> here</p>` : ""}
         </div>
-        ${offerText ? `<div class="uen-panel-offer">Use 1 UEN → <strong>${offerText}</strong> at checkout</div>` : ""}
+        ${offerText ? `
+          <div class="uen-panel-offer">
+            Use 1 UEN → <strong>${offerText}</strong> at checkout
+            ${merchantInfo?.offer?.minimumOrderAmount ? `<span class="uen-offer-rule">Requires a minimum order of $${Number(merchantInfo.offer.minimumOrderAmount).toFixed(2)}</span>` : ""}
+            <span class="uen-offer-rule">Each note can be used once at this store</span>
+          </div>
+        ` : ""}
         <div class="uen-panel-actions">
           <button class="uen-btn uen-btn-primary" id="uen-auto-btn" ${available === 0 ? "disabled" : ""}>Apply Discount Automatically</button>
           <button class="uen-btn uen-btn-secondary" id="uen-manual-btn" ${available === 0 ? "disabled" : ""}>Generate Code to Paste</button>
@@ -436,10 +444,11 @@ function buildWidget(merchantId: string) {
 
     document.getElementById("uen-signout-btn")?.addEventListener("click", () => {
       setToken("");
+      try { localStorage.removeItem("uen_portal_token"); } catch { /* storage may be blocked */ }
       token = "";
       merchantInfo = null;
       generatedCode = null;
-      renderPanel("login");
+      renderPanel("login", { notice: "You've been signed out of this store." });
     });
 
     const loginSubmit = async () => {
@@ -470,7 +479,13 @@ function buildWidget(merchantId: string) {
       btn.textContent = "Applying...";
       try {
         const result = await redeem(token, merchantId, "AUTO");
-        if (result.autoApplyUrl) {
+        if (result.code) {
+          // Apply on the CURRENT storefront origin. The server's URL uses the
+          // myshopify.com domain; on stores with a custom primary domain the
+          // cross-domain redirect can drop the discount cookie. The widget is
+          // already running on the storefront, so its own origin is always right.
+          window.location.href = `${window.location.origin}/discount/${encodeURIComponent(result.code)}?redirect=/`;
+        } else if (result.autoApplyUrl) {
           window.location.href = result.autoApplyUrl;
         }
       } catch (err) {
@@ -544,7 +559,12 @@ function buildWidget(merchantId: string) {
   });
 
   document.addEventListener("click", (e) => {
-    if (panelOpen && !panel.contains(e.target as Node) && e.target !== fab) {
+    // composedPath is captured at dispatch time, so this stays correct even
+    // when a button's own handler re-renders the panel (detaching the target
+    // from the DOM) before the event bubbles up here. panel.contains() would
+    // see the detached node as "outside" and wrongly close the panel.
+    const path = e.composedPath();
+    if (panelOpen && !path.includes(panel) && !path.includes(fab)) {
       closePanel();
     }
   });

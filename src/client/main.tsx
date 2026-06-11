@@ -4156,7 +4156,15 @@ function LiveHolderPortal({ token }: { token: string }) {
   };
 
   if (wallet.loading) {
-    return <div className="portal-loading"><div className="portal-spinner" /><p>Loading your wallet...</p></div>;
+    return (
+      <div className="portal-loading">
+        <div className="portal-loading-coin-wrap">
+          <div className="portal-loading-glow" />
+          <img className="portal-loading-coin" src="/uenite-coin.png" alt="UENITE" />
+        </div>
+        <p>Loading your wallet...</p>
+      </div>
+    );
   }
 
   if (wallet.error || !wallet.data) {
