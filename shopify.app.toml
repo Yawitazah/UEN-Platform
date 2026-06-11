@@ -2,8 +2,8 @@
 # Used by the Shopify CLI to deploy the theme app extension (extensions/).
 # Config mirrors the dashboard settings — keep them in sync if either changes.
 
-client_id = "7a960874850e6cfd7ca95d07b1415249"
-name = "UEN Platform"
+client_id = "08ec74e897988cc82a16bd80b5bad0d2"
+name = "UENITE"
 application_url = "https://uenite.com/shopify"
 embedded = true
 
