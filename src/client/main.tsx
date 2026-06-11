@@ -373,7 +373,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
   const refreshAuth = async () => {
     try {
       const storedToken = localStorage.getItem("uen_admin_token");
@@ -403,6 +403,7 @@ function Shell() {
         <Routes>
           <Route path="/" element={<UeniteHome />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
@@ -924,6 +925,44 @@ function AboutPage() {
         <h2>The future of support is an exchange.</h2>
         <p>People should be able to support what they believe in and hold something that reflects that goodwill. UENITE gives every campaign a collection, every Holder a reason to return, and every Merchant a new way to connect with motivated customers.</p>
         <a className="button-link button-link-large" href="/signup">Start with UENITE</a>
+      </section>
+      <PoweredByFooter />
+    </main>
+  );
+}
+
+function PrivacyPolicyPage() {
+  return (
+    <main className="about-page">
+      <UeniteNav
+        className="about-nav"
+        links={[
+          { href: "/", label: "Home" },
+          { href: "/about", label: "About" },
+          { href: "/login", label: "Sign in" },
+        ]}
+      />
+      <section className="about-hero">
+        <span className="eyebrow dark"><Shield size={16} /> Privacy Policy</span>
+        <h1>How UENITE handles data.</h1>
+        <p>Last updated June 10, 2026. UENITE is operated by Zah Brand Solutions. This policy explains what we collect, why we collect it, and the choices available to merchants, Exchange Hubs, and Holders.</p>
+      </section>
+      <section className="about-grid">
+        {[
+          ["What we collect", "Merchant account details (business name, contact email), Shopify store connection data, and order information from connected stores — including customer email addresses and names — solely to issue Universal Exchange Notes after qualifying purchases and to record when notes are redeemed. Holders share their name and email when they create a wallet."],
+          ["Why we collect it", "App functionality only. Order emails let us deliver purchased notes to the right person; redemption records let merchants honor notes a single time each; holder emails power wallet login. We do not sell personal data, use it for advertising, or share it with third parties beyond the infrastructure that hosts the platform."],
+          ["Where it lives", "Data is stored in a managed PostgreSQL database hosted on Railway with encryption in transit. Shopify access tokens are stored server-side and never exposed to browsers. Payment details are never collected — checkout happens entirely on the merchant's store."],
+          ["Your choices", "Merchants can disconnect their store at any time, which stops all data flow. We honor Shopify's privacy webhooks: customer data requests, customer data deletion, and full shop deletion are processed automatically. Holders can request account deletion by contacting us."]
+        ].map(([title, body]) => (
+          <article key={title}>
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </article>
+        ))}
+      </section>
+      <section className="about-statement">
+        <h2>Questions about your data?</h2>
+        <p>Contact us at cleannlawful@gmail.com and we will respond within 30 days. If you are a customer of a store using UENITE, you can also contact that merchant directly — deletion requests made through Shopify reach us automatically.</p>
       </section>
       <PoweredByFooter />
     </main>
