@@ -1143,6 +1143,61 @@ router.post("/exchange-hubs/:exchangeHubId/code-inventory/import", requireRole(w
   }
 });
 
+// Pre-load holder identities (name/phone keyed by email) from historical
+// purchase data, so returning purchasers see their real name pre-filled and
+// only have to verify. Never clobbers data a holder entered themselves:
+// names only fill placeholders, phone only fills empty.
+router.post("/exchange-hubs/:exchangeHubId/holders/preload", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const data = z.object({
+      entries: z.array(z.object({
+        email: z.string().email(),
+        firstName: z.string().max(80).optional(),
+        lastName: z.string().max(80).optional(),
+        phone: z.string().max(32).optional()
+      })).min(1).max(500)
+    }).parse(req.body);
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+
+    let created = 0;
+    let updated = 0;
+    for (const entry of data.entries) {
+      const email = entry.email.trim().toLowerCase();
+      const existing = await prisma.holder.findUnique({ where: { exchangeHubId_email: { exchangeHubId, email } } });
+      if (!existing) {
+        await prisma.holder.create({
+          data: {
+            exchangeHubId,
+            email,
+            firstName: entry.firstName?.trim() || "Holder",
+            lastName: entry.lastName?.trim() || "",
+            phone: entry.phone?.trim() || null,
+            status: "ACTIVE"
+          }
+        });
+        created += 1;
+      } else {
+        const placeholderName = !existing.firstName || existing.firstName.trim().toLowerCase() === "holder";
+        const updates: Record<string, unknown> = {};
+        if (placeholderName && entry.firstName?.trim()) {
+          updates.firstName = entry.firstName.trim();
+          updates.lastName = entry.lastName?.trim() || "";
+        }
+        if (!existing.phone && entry.phone?.trim()) updates.phone = entry.phone.trim();
+        if (Object.keys(updates).length) {
+          await prisma.holder.update({ where: { id: existing.id }, data: updates });
+          updated += 1;
+        }
+      }
+    }
+    res.status(201).json({ created, updated });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 // Grandfathered legacy codes (2022 Love Notes): imported as RESERVED with an
 // email reservation from the original purchase. RESERVED (not AVAILABLE) keeps
 // them out of nextCodeForIssuance, so new Shopify purchases can never be handed

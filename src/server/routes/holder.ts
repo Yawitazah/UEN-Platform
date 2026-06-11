@@ -57,22 +57,53 @@ router.get("/holder/wallet", async (req, res) => {
       take: 20
     });
 
-    const uens = holder.universalExchangeNotes.map((uen) => ({
-      id: uen.id,
-      code: uen.code,
-      issuedAt: uen.issuedAt,
-      expiresAt: uen.expiresAt,
-      status: uen.status,
-      redemptions: uen.syncedNotes.map((sn) => ({
-        merchantId: sn.merchantId,
-        merchantName: sn.merchant.businessName,
-        shopDomain: sn.merchant.shopifyConnections[0]?.shopDomain ?? null,
-        redeemed: sn.redeemedAt !== null,
-        redeemedAt: sn.redeemedAt,
-        redeemedOrderAmount: sn.redeemedOrderAmount ? Number(sn.redeemedOrderAmount) : null,
-        syncStatus: sn.syncStatus
-      }))
-    }));
+    // Estimated value comes from live merchant offers, not a fixed hub figure.
+    // A note can be redeemed once at EACH merchant, so a note's potential is
+    // the sum of offer values across merchants where it hasn't been used yet.
+    // PERCENTAGE offers are valued against a $100 spend cap so they translate
+    // to an understandable dollar estimate (15% -> $15).
+    const PERCENT_SPEND_CAP = 100;
+    const offerMerchants = await prisma.merchant.findMany({
+      where: {
+        status: "ACTIVE",
+        accessRules: { some: { exchangeHubId: holder.exchangeHubId, status: "ACTIVE" } }
+      },
+      include: { offers: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 1 } }
+    });
+    const offerValue = (offer: { discountType: string; discountValue: unknown } | undefined | null) => {
+      if (!offer || offer.discountValue == null) return 0;
+      const value = Number(offer.discountValue);
+      if (!Number.isFinite(value) || value <= 0) return 0;
+      if (offer.discountType === "PERCENTAGE") return Math.min(value, 100) * (PERCENT_SPEND_CAP / 100);
+      if (offer.discountType === "FIXED_AMOUNT") return value;
+      return 0;
+    };
+    const merchantValues = new Map(offerMerchants.map((m) => [m.id, offerValue(m.offers[0])]));
+
+    const uens = holder.universalExchangeNotes.map((uen) => {
+      const redeemedMerchantIds = new Set(uen.syncedNotes.filter((sn) => sn.redeemedAt !== null).map((sn) => sn.merchantId));
+      const estimatedValue = uen.status === "ACTIVE"
+        ? [...merchantValues.entries()].reduce((sum, [merchantId, value]) => sum + (redeemedMerchantIds.has(merchantId) ? 0 : value), 0)
+        : 0;
+      return {
+        id: uen.id,
+        code: uen.code,
+        issuedAt: uen.issuedAt,
+        expiresAt: uen.expiresAt,
+        status: uen.status,
+        estimatedValue: Math.round(estimatedValue * 100) / 100,
+        redemptions: uen.syncedNotes.map((sn) => ({
+          merchantId: sn.merchantId,
+          merchantName: sn.merchant.businessName,
+          shopDomain: sn.merchant.shopifyConnections[0]?.shopDomain ?? null,
+          redeemed: sn.redeemedAt !== null,
+          redeemedAt: sn.redeemedAt,
+          redeemedOrderAmount: sn.redeemedOrderAmount ? Number(sn.redeemedOrderAmount) : null,
+          syncStatus: sn.syncStatus
+        }))
+      };
+    });
+    const estimatedTotalValue = Math.round(uens.reduce((sum, u) => sum + (u.estimatedValue ?? 0), 0) * 100) / 100;
 
     res.json({
       holder: {
@@ -80,6 +111,7 @@ router.get("/holder/wallet", async (req, res) => {
         firstName: holder.firstName,
         lastName: holder.lastName,
         email: holder.email,
+        phone: holder.phone ?? null,
         exchangeHub: {
           id: holder.exchangeHub.id,
           displayName: holder.exchangeHub.displayName,
@@ -90,6 +122,8 @@ router.get("/holder/wallet", async (req, res) => {
         }
       },
       uens,
+      estimatedTotalValue,
+      participatingMerchants: offerMerchants.length,
       notifications,
       unreadCount: notifications.filter((n) => !n.readAt).length
     });
@@ -106,15 +140,22 @@ router.get("/holder/profile", async (req, res) => {
   try {
     const token = String(req.query.token ?? "");
     const holder = token
-      ? await prisma.holder.findUnique({ where: { portalToken: token }, select: { firstName: true, lastName: true, email: true } })
+      ? await prisma.holder.findUnique({
+          where: { portalToken: token },
+          select: { firstName: true, lastName: true, email: true, phone: true }
+        })
       : null;
     if (!holder) return res.status(404).json({ error: "Invalid portal token" });
     const hasName = Boolean(holder.firstName) && holder.firstName.trim().toLowerCase() !== "holder";
+    const hasPhone = Boolean(holder.phone && holder.phone.trim());
     res.json({
       firstName: hasName ? holder.firstName : null,
       lastName: holder.lastName || null,
       email: holder.email,
-      registered: hasName
+      phone: holder.phone || null,
+      registered: hasName,
+      // Full access to redemption features requires a verified name AND phone.
+      complete: hasName && hasPhone
     });
   } catch (error) {
     console.error(error);
@@ -126,16 +167,20 @@ router.get("/holder/profile", async (req, res) => {
 // dashboard. Identified by their portal token; no separate password needed.
 router.post("/holder/profile", async (req, res) => {
   try {
-    const { firstName, lastName } = req.body as { firstName?: string; lastName?: string };
+    const { firstName, lastName, phone } = req.body as { firstName?: string; lastName?: string; phone?: string };
     const token = String(req.query.token ?? (req.body as { token?: string }).token ?? "");
     const holder = token ? await prisma.holder.findUnique({ where: { portalToken: token } }) : null;
     if (!holder) return res.status(404).json({ error: "Invalid portal token" });
     if (!firstName || !firstName.trim()) return res.status(400).json({ error: "First name is required" });
+    const cleanPhone = (phone ?? "").replace(/[^\d+()\-\s.]/g, "").trim();
+    if (!cleanPhone || cleanPhone.replace(/\D/g, "").length < 7) {
+      return res.status(400).json({ error: "A valid phone number is required" });
+    }
     const updated = await prisma.holder.update({
       where: { id: holder.id },
-      data: { firstName: firstName.trim(), lastName: (lastName ?? "").trim() }
+      data: { firstName: firstName.trim(), lastName: (lastName ?? "").trim(), phone: cleanPhone }
     });
-    res.json({ firstName: updated.firstName, lastName: updated.lastName, email: updated.email });
+    res.json({ firstName: updated.firstName, lastName: updated.lastName, email: updated.email, phone: updated.phone });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not update profile" });

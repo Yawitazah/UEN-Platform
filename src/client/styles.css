@@ -4020,6 +4020,23 @@ html { background: #050e09; }
 
 .portal-profile-err { color: #ff9999; font-size: 12px; margin: 8px 0 0; }
 
+.portal-profile-email {
+  color: #9ec0b2;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.portal-profile-email strong { color: #eafff5; }
+
+.portal-tab-locked { opacity: 0.45; cursor: not-allowed; }
+
+.portal-locked-note {
+  color: #9ec0b2;
+  font-size: 13px;
+  margin: 10px 24px 0;
+  text-align: center;
+}
+
 .portal-hub-dot {
   border-radius: 999px;
   flex-shrink: 0;

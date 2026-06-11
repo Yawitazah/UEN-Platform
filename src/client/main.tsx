@@ -4072,16 +4072,19 @@ function HolderPortal() {
   return <LiveHolderPortal token={token} />;
 }
 
-function HolderProfilePrompt({ onSaved }: { onSaved: () => void }) {
-  const [first, setFirst] = useState("");
-  const [last, setLast] = useState("");
+function HolderProfilePrompt({ holder, onSaved }: { holder: any; onSaved: () => void }) {
+  const knownName = holder.firstName && holder.firstName.trim().toLowerCase() !== "holder";
+  const [first, setFirst] = useState(knownName ? holder.firstName : "");
+  const [last, setLast] = useState(knownName ? (holder.lastName ?? "") : "");
+  const [phone, setPhone] = useState(holder.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const save = async () => {
     if (!first.trim()) { setErr("Please enter your first name."); return; }
+    if (phone.replace(/\D/g, "").length < 7) { setErr("Please enter a valid phone number."); return; }
     setSaving(true); setErr("");
     try {
-      await portalApi("/api/holder/profile", { method: "POST", body: JSON.stringify({ firstName: first.trim(), lastName: last.trim() }) });
+      await portalApi("/api/holder/profile", { method: "POST", body: JSON.stringify({ firstName: first.trim(), lastName: last.trim(), phone: phone.trim() }) });
       onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save");
@@ -4090,11 +4093,15 @@ function HolderProfilePrompt({ onSaved }: { onSaved: () => void }) {
   };
   return (
     <div className="portal-profile-prompt">
-      <p>Add your name so your notes are tied to you across every merchant.</p>
+      <p>{knownName
+        ? "Verify your details and add your phone number to unlock all wallet features."
+        : "Verify your details to unlock all wallet features — redeeming, codes, and merchant offers."}</p>
+      <div className="portal-profile-email">Signed in as <strong>{holder.email}</strong></div>
       <div className="portal-profile-fields">
         <input placeholder="First name" value={first} onChange={(e) => setFirst(e.target.value)} />
-        <input placeholder="Last name (optional)" value={last} onChange={(e) => setLast(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
-        <button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+        <input placeholder="Last name" value={last} onChange={(e) => setLast(e.target.value)} />
+        <input placeholder="Phone number (required)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
+        <button onClick={save} disabled={saving}>{saving ? "Saving…" : "Verify & Unlock"}</button>
       </div>
       {err && <p className="portal-profile-err">{err}</p>}
     </div>
@@ -4122,9 +4129,10 @@ function LiveHolderPortal({ token }: { token: string }) {
     );
   }
 
-  const { holder, uens, notifications, unreadCount } = wallet.data;
+  const { holder, uens, notifications, unreadCount, estimatedTotalValue, participatingMerchants } = wallet.data;
   const hub = holder.exchangeHub;
   const holderHasName = Boolean(holder.firstName) && holder.firstName.trim().toLowerCase() !== "holder";
+  const profileComplete = holderHasName && Boolean(holder.phone);
   const totalActive = uens.filter((u: any) => u.status === "ACTIVE").length;
   const totalRedeemed = uens.reduce((n: number, u: any) => n + u.redemptions.filter((r: any) => r.redeemed).length, 0);
   const holderCollectionItems = uens.length > 0 ? uens.map((uen: any, index: number) => ({
@@ -4133,7 +4141,7 @@ function LiveHolderPortal({ token }: { token: string }) {
     title: uen.code,
     source: hub.displayName,
     rarity: index === 0 ? "Founding" : "Earned",
-    value: "Redeemable",
+    value: uen.estimatedValue > 0 ? `$${Number(uen.estimatedValue).toFixed(2)}` : "Redeemable",
     date: new Date(uen.issuedAt ?? uen.createdAt).toLocaleDateString(),
     status: uen.status,
     description: `A Universal Exchange Note issued by ${hub.displayName}. This item stays in your collection as proof of support and can unlock value with participating merchants.`
@@ -4189,7 +4197,7 @@ function LiveHolderPortal({ token }: { token: string }) {
           <div className="portal-hero-copy">
             <p className="portal-greeting">{holderHasName ? "Welcome back," : "Welcome to your wallet"}</p>
             <h1 className="portal-name">{holderHasName ? `${holder.firstName} ${holder.lastName}`.trim() : "Let's finish setting up"}</h1>
-            {!holderHasName && <HolderProfilePrompt onSaved={wallet.reload} />}
+            {!profileComplete && <HolderProfilePrompt holder={holder} onSaved={wallet.reload} />}
             <div className="portal-stats-row">
               <div className="portal-stat">
                 <Wallet size={18} />
@@ -4198,18 +4206,20 @@ function LiveHolderPortal({ token }: { token: string }) {
                   <span>Active UEN{totalActive !== 1 ? "s" : ""}</span>
                 </div>
               </div>
+              {estimatedTotalValue > 0 && (
+                <div className="portal-stat">
+                  <DollarSign size={18} />
+                  <div>
+                    <strong>${Number(estimatedTotalValue).toFixed(2)}</strong>
+                    <span>Est. value across {participatingMerchants} merchant{participatingMerchants !== 1 ? "s" : ""}</span>
+                  </div>
+                </div>
+              )}
               <div className="portal-stat">
                 <CheckCircle size={18} />
                 <div>
                   <strong>{totalRedeemed}</strong>
                   <span>Times redeemed</span>
-                </div>
-              </div>
-              <div className="portal-stat">
-                <ShoppingBag size={18} />
-                <div>
-                  <strong>{(merchants.data ?? []).length}</strong>
-                  <span>Place{(merchants.data ?? []).length !== 1 ? "s" : ""} to redeem</span>
                 </div>
               </div>
             </div>
@@ -4249,18 +4259,21 @@ function LiveHolderPortal({ token }: { token: string }) {
         </div>
       )}
 
-      {/* Tab bar */}
+      {/* Tab bar — redemption features unlock once the profile is verified */}
       <div className="portal-tabs">
         <button className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}>
           <Star size={16} /> Collection
         </button>
-        <button className={`portal-tab ${activeTab === "merchants" ? "active" : ""}`} onClick={() => setActiveTab("merchants")}>
-          <Globe size={16} /> Where to Redeem
+        <button className={`portal-tab ${activeTab === "merchants" ? "active" : ""} ${!profileComplete ? "portal-tab-locked" : ""}`} onClick={() => profileComplete && setActiveTab("merchants")}>
+          <Globe size={16} /> Where to Redeem {!profileComplete && <Shield size={12} />}
         </button>
-        <button className={`portal-tab ${activeTab === "wallet" ? "active" : ""}`} onClick={() => setActiveTab("wallet")}>
-          <Wallet size={16} /> My Codes
+        <button className={`portal-tab ${activeTab === "wallet" ? "active" : ""} ${!profileComplete ? "portal-tab-locked" : ""}`} onClick={() => profileComplete && setActiveTab("wallet")}>
+          <Wallet size={16} /> My Codes {!profileComplete && <Shield size={12} />}
         </button>
       </div>
+      {!profileComplete && (
+        <p className="portal-locked-note">Verify your name and phone number above to unlock redemption features.</p>
+      )}
 
       {activeTab === "collection" && (
         <HolderCollectionExperience holderName={holder.firstName} items={holderCollectionItems} />
