@@ -78,6 +78,32 @@ export function createMerchantSession(input: { id: string; merchantId: string })
   return `${payload}.${signature}`;
 }
 
+// Verifies a Shopify App Bridge session token (a JWT signed with the app
+// secret) and returns the shop domain it was minted for. These tokens are how
+// the embedded merchant portal authenticates: browsers increasingly refuse
+// third-party cookies inside the admin iframe, so cookie sessions cannot be
+// relied on there — and Shopify's app review explicitly checks for them.
+export function verifyShopifyIdToken(token: string): string | null {
+  try {
+    if (!config.shopifyApiSecret || !config.shopifyApiKey) return null;
+    const [headerB64, payloadB64, signatureB64] = token.split(".");
+    if (!headerB64 || !payloadB64 || !signatureB64) return null;
+    const expected = createHmac("sha256", config.shopifyApiSecret).update(`${headerB64}.${payloadB64}`).digest("base64url");
+    if (!safeEqual(signatureB64, expected)) return null;
+    const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as {
+      exp?: number;
+      aud?: string;
+      dest?: string;
+    };
+    if (!payload.exp || payload.exp * 1000 < Date.now()) return null;
+    if (payload.aud !== config.shopifyApiKey) return null;
+    const shop = String(payload.dest ?? "").replace(/^https:\/\//, "").trim().toLowerCase();
+    return /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop) ? shop : null;
+  } catch {
+    return null;
+  }
+}
+
 export function verifyMerchantSession(value?: string) {
   if (!value) return null;
   const [payload, signature] = value.split(".");
@@ -126,6 +152,20 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 
   if (safeEqual(token, config.internalApiKey)) {
     req.auth = { actorType: "internal", role: AdminRole.SUPER_ADMIN };
+    return next();
+  }
+
+  // App Bridge session token from the embedded merchant portal: resolve the
+  // shop it was signed for to that shop's merchant. JWTs are never API keys,
+  // so skip the key lookup either way.
+  if (token.split(".").length === 3) {
+    const shop = verifyShopifyIdToken(token);
+    if (shop) {
+      const connection = await prisma.shopifyConnection.findUnique({ where: { shopDomain: shop } });
+      if (connection) {
+        req.auth = { actorId: connection.id, actorType: "merchant", role: AdminRole.MERCHANT, merchantId: connection.merchantId };
+      }
+    }
     return next();
   }
 

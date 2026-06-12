@@ -8,9 +8,35 @@ import "./styles.css";
 const adminToken = () => localStorage.getItem("uen_admin_token") ?? "dev-admin-token";
 const shopDomain = () => {
   const params = new URLSearchParams(window.location.search);
-  return params.get("shopDomain") ?? params.get("shop") ?? localStorage.getItem("uen_shop_domain") ?? "nubreed-love.myshopify.com";
+  // No silent fallback to a real store: a missing shop must surface as a
+  // server-side "shopDomain is required" error, never as another shop's data.
+  return params.get("shopDomain") ?? params.get("shop") ?? localStorage.getItem("uen_shop_domain") ?? "";
 };
 let authRefresh: (() => void) | null = null;
+
+// Inside the Shopify admin iframe, third-party cookies are unreliable (and
+// increasingly blocked outright), so every same-origin API call also carries
+// an App Bridge session token. Wrapping fetch covers every call site at once;
+// outside the embedded context window.shopify is absent and this is a no-op.
+const rawFetch = window.fetch.bind(window);
+window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  try {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const isApiCall = url.startsWith("/api/") || url.startsWith("/shopify/api");
+    const bridge = (window as unknown as { shopify?: { idToken?: () => Promise<string> } }).shopify;
+    if (isApiCall && bridge?.idToken) {
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      if (!headers.has("authorization")) {
+        const token = await bridge.idToken();
+        if (token) headers.set("authorization", `Bearer ${token}`);
+        return rawFetch(input, { ...init, headers });
+      }
+    }
+  } catch {
+    // fall through to a plain fetch
+  }
+  return rawFetch(input, init);
+}) as typeof window.fetch;
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {

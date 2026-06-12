@@ -9,6 +9,10 @@ embedded = true
 
 [access_scopes]
 scopes = "read_discounts,write_discounts,read_orders,read_products"
+# Managed installation grants scopes without ever hitting our OAuth callback,
+# so no ShopifyConnection row is created and the embedded app renders blank.
+# Legacy install flow forces every install through /shopify/auth -> callback.
+use_legacy_install_flow = true
 
 [auth]
 redirect_urls = ["https://uenite.com/shopify/auth/callback"]

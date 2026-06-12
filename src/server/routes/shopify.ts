@@ -186,6 +186,13 @@ async function connectionFromRequest(req: express.Request, res: express.Response
     res.status(404).json({ error: "Shopify store is not connected" });
     return null;
   }
+  // The shopDomain param alone must never grant access: a merchant session
+  // (cookie or App Bridge token) is only valid for the shop it belongs to,
+  // otherwise any signed-in merchant could read or configure another store.
+  if (req.auth?.actorType === "merchant" && req.auth.merchantId && connection.merchantId !== req.auth.merchantId) {
+    res.status(403).json({ error: "This Shopify store belongs to a different merchant account" });
+    return null;
+  }
   return connection;
 }
 

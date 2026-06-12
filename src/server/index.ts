@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import cors from "cors";
 import express from "express";
@@ -99,12 +100,30 @@ app.get("/widget.js", (_req, res) => {
 });
 
 app.use(express.static(clientDir));
-app.get("*", (_req, res) => {
+
+// Shopify requires embedded apps to load app-bridge.js from its CDN as the
+// first script in <head>. Injecting it (plus the API key meta tag it reads)
+// server-side when serving the embedded merchant portal makes that hold
+// deterministically instead of depending on a client-side fetch race.
+// index.html is cached per process — each deploy restarts the process.
+let cachedIndexHtml: string | null = null;
+function indexHtml() {
+  cachedIndexHtml ??= fs.readFileSync(path.join(clientDir, "index.html"), "utf8");
+  return cachedIndexHtml;
+}
+
+app.get("*", (req, res) => {
   // Never cache index.html — browser must always fetch fresh so it gets
   // the latest hashed JS/CSS bundle references after each deploy.
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
+  if (req.path.startsWith("/shopify/merchant") && config.shopifyApiKey) {
+    const appBridgeTags =
+      `<meta name="shopify-api-key" content="${config.shopifyApiKey}">` +
+      `<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>`;
+    return res.send(indexHtml().replace("<head>", `<head>${appBridgeTags}`));
+  }
   res.sendFile(path.join(clientDir, "index.html"));
 });
 
