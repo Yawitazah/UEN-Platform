@@ -373,7 +373,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/faq" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
   const refreshAuth = async () => {
     try {
       const storedToken = localStorage.getItem("uen_admin_token");
@@ -404,6 +404,7 @@ function Shell() {
           <Route path="/" element={<UeniteHome />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/faq" element={<FaqPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
@@ -963,6 +964,50 @@ function PrivacyPolicyPage() {
       <section className="about-statement">
         <h2>Questions about your data?</h2>
         <p>Contact us at cleannlawful@gmail.com and we will respond within 30 days. If you are a customer of a store using UENITE, you can also contact that merchant directly — deletion requests made through Shopify reach us automatically.</p>
+      </section>
+      <PoweredByFooter />
+    </main>
+  );
+}
+
+function FaqPage() {
+  return (
+    <main className="about-page">
+      <UeniteNav
+        className="about-nav"
+        links={[
+          { href: "/", label: "Home" },
+          { href: "/about", label: "About" },
+          { href: "/signup", label: "Get Started", cta: true },
+          { href: "/login", label: "Sign in" },
+        ]}
+      />
+      <section className="about-hero">
+        <span className="eyebrow dark"><Star size={16} /> Frequently Asked Questions</span>
+        <h1>How UENITE works.</h1>
+        <p>UENITE turns support into value. Creators reward the supporters who back them with Universal Exchange Notes, and stores welcome those supporters by accepting the notes as discounts. Here are the questions we hear most.</p>
+      </section>
+      <section className="about-grid">
+        {[
+          ["What is a Universal Exchange Note?", "A digital note a supporter receives for backing a creator, cause, or community. It lives in their personal wallet, can be redeemed as a discount at participating stores, and stays as a keepsake of what they supported."],
+          ["Who is UENITE for?", "Two kinds of Shopify store owners. Creators, influencers, causes, and communities (Exchange Hubs) issue notes to the supporters who back them. Other stores (Merchants) accept those notes as discounts to welcome engaged, values-driven shoppers."],
+          ["How does a merchant accept exchange notes?", "Install UENITE and set your offer — a percentage or fixed amount, with an optional minimum order. Each note becomes a discount code that is validated automatically at checkout. A note can be redeemed once per store."],
+          ["How does a supporter get and use a note?", "A note is issued when they back a creator or buy a qualifying product, and it lands in their UENITE wallet. The wallet shows where the note is redeemable, and they apply it as a discount at any participating store."],
+          ["What does it cost?", "UENITE is free to install."],
+          ["What about my customers' data?", "UENITE only reads customer name and email from orders, solely to deliver notes to the right person and record one-time redemptions. We never sell data, and we honor Shopify's privacy and redaction webhooks. See our Privacy Policy for details."],
+          ["Can a note be used more than once?", "Each note is honored once per store and validated automatically. A supporter can use the same note at different participating stores, but not twice at the same one."],
+          ["How do I get help?", "Email work@zahbrandsolutions.com and we will get back to you."]
+        ].map(([title, body]) => (
+          <article key={title}>
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </article>
+        ))}
+      </section>
+      <section className="about-statement">
+        <h2>Ready to spread the love?</h2>
+        <p>Whether you reward the supporters who back you or welcome supporters into your store, UENITE gives every note a story and every store a community.</p>
+        <a className="button-link button-link-large" href="/signup">Start with UENITE</a>
       </section>
       <PoweredByFooter />
     </main>
