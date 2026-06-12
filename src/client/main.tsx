@@ -2310,10 +2310,16 @@ function ShopifyMerchantPortal() {
 
   // ── Auth screens ──────────────────────────────────────────────────────────
   if (authState === "loading") {
+    // Same branded loader as the holder portal: the UENITE coin floating and
+    // breathing over a pulsing glow, instead of a bare "Loading…" card.
     return (
-      <main className="mp-auth-screen">
-        <div className="mp-auth-card"><div className="mp-auth-brand"><Shield size={26} /><BrandWord /></div><p style={{ color: "rgba(226,240,232,0.5)", fontSize: 14 }}>Loading…</p></div>
-      </main>
+      <div className="portal-loading">
+        <div className="portal-loading-coin-wrap">
+          <div className="portal-loading-glow" />
+          <img className="portal-loading-coin" src="/uenite-coin.png" alt="UENITE" />
+        </div>
+        <p>Loading your dashboard...</p>
+      </div>
     );
   }
 
