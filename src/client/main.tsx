@@ -2236,19 +2236,45 @@ function ShopifyMerchantPortal() {
       setAuthState("dashboard");
       return;
     }
-    // Always check for an existing merchant session first. A self-registered
-    // creator / Exchange Hub merchant has no Shopify shop param but is still a
-    // valid login, so we must not bounce them to a login screen on sight.
-    fetch("/api/merchant/me", { credentials: "include" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
+    // Inside the Shopify admin, the App Bridge session token IS the login.
+    // Merchants (and app reviewers) must never see a create-account or sign-in
+    // wall there — requiring separate credentials in an embedded app is an
+    // explicit App Store rejection reason. App Bridge can come up a beat after
+    // first render, so wait briefly for the token instead of racing it.
+    const embeddedToken = async () => {
+      if (!host) return null;
+      for (let attempt = 0; attempt < 16; attempt += 1) {
+        try {
+          const token = await (window as unknown as { shopify?: { idToken?: () => Promise<string> } }).shopify?.idToken?.();
+          if (token) return token;
+        } catch {
+          // App Bridge not ready yet
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      return null;
+    };
+    (async () => {
+      const token = await embeddedToken();
+      try {
+        // Check for an existing login. A self-registered creator / Exchange Hub
+        // merchant has no Shopify shop param but is still a valid session, so
+        // we must not bounce them to a login screen on sight. The explicit
+        // bearer header covers the embedded case even before the global fetch
+        // wrapper can see App Bridge.
+        const response = await fetch("/api/merchant/me", {
+          credentials: "include",
+          headers: token ? { authorization: `Bearer ${token}` } : {}
+        });
+        const data = response.ok ? await response.json() : null;
         if (data?.merchant) { setMerchant(data.merchant); setAuthState("dashboard"); return; }
         if (!shop) { setAuthState("login"); return; }
-        return fetch(`/api/merchant/account-status?shopDomain=${encodeURIComponent(shop)}`)
-          .then((r) => r.json())
-          .then((status) => setAuthState(status.hasAccount ? "login" : "no-account"));
-      })
-      .catch(() => setAuthState("login"));
+        const status = await fetch(`/api/merchant/account-status?shopDomain=${encodeURIComponent(shop)}`).then((res) => res.json());
+        setAuthState(status.hasAccount ? "login" : "no-account");
+      } catch {
+        setAuthState("login");
+      }
+    })();
   }, [shop]);
 
   const submitSetup = async () => {
@@ -2429,7 +2455,10 @@ function ShopifyMerchantPortal() {
             <Globe size={15} />
             <span>Help</span>
           </a>
-          <button className="mp-signout" onClick={logout}>Sign out</button>
+          {/* Inside the Shopify admin, auth is the App Bridge session token —
+              signing out is meaningless there and only strands the merchant on
+              a login card, which reviewers flag. Only offer it standalone. */}
+          {!host && <button className="mp-signout" onClick={logout}>Sign out</button>}
           <span className="mp-domain">{shopDisplay}</span>
         </div>
       </aside>
