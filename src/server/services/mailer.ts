@@ -70,3 +70,54 @@ export async function sendHolderLoginEmail(to: string, loginUrl: string, hubName
     throw new Error(`ZeptoMail send failed (${response.status}): ${detail.slice(0, 300)}`);
   }
 }
+
+function emailChangeHtml(confirmUrl: string) {
+  return `
+  <div style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <div style="max-width:480px;margin:0 auto;padding:32px 20px;">
+      <div style="background:#ffffff;border-radius:16px;padding:36px 32px;border:1px solid #e7e9ee;">
+        <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#7c3aed;font-weight:700;">UEN Wallet</div>
+        <h1 style="margin:14px 0 8px;font-size:22px;color:#10182b;">Confirm your new email</h1>
+        <p style="margin:0 0 22px;font-size:15px;line-height:1.55;color:#4a5160;">
+          A request was made to change the email on your UEN wallet to this address. Tap below to confirm the switch. This link works for 30 minutes.
+        </p>
+        <a href="${confirmUrl}" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:10px;">Confirm new email</a>
+        <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#8a909c;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <span style="color:#7c3aed;word-break:break-all;">${confirmUrl}</span>
+        </p>
+        <hr style="border:none;border-top:1px solid #eceef2;margin:26px 0 18px;">
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#a2a8b4;">
+          If you didn't ask to change your wallet email, you can safely ignore this message — nothing changes unless this link is clicked.
+        </p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Sends the confirmation link to a holder's NEW email address.
+export async function sendEmailChangeVerification(to: string, confirmUrl: string) {
+  if (!mailerConfigured()) {
+    console.log(`[mailer] ZeptoMail not configured — email-change link for ${to}:\n${confirmUrl}`);
+    return;
+  }
+  const response = await fetch(ZEPTOMAIL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: config.zeptomail.token
+    },
+    body: JSON.stringify({
+      from: { address: config.zeptomail.fromAddress, name: config.zeptomail.fromName },
+      to: [{ email_address: { address: to } }],
+      subject: "Confirm your new UEN wallet email",
+      htmlbody: emailChangeHtml(confirmUrl),
+      textbody: `Confirm your new UEN wallet email. This link works for 30 minutes:\n\n${confirmUrl}\n\nIf you didn't request this, you can ignore this email.`
+    })
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`ZeptoMail send failed (${response.status}): ${detail.slice(0, 300)}`);
+  }
+}

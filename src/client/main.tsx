@@ -3888,12 +3888,13 @@ function HolderRegister() {
   const params = new URLSearchParams(window.location.search);
   const preselectedHub = params.get("hub") ?? "";
   const hubs = useData<any[]>(() => fetch("/api/public/exchange-hubs").then((r) => r.json()));
-  const [form, setForm] = useState({ exchangeHubId: preselectedHub, firstName: "", lastName: "", email: "" });
+  const [form, setForm] = useState({ exchangeHubId: preselectedHub, email: "", password: "" });
   const [result, setResult] = useState<any | null>(null);
   const [error, setError] = useState(params.get("expired") === "1" ? "That sign-in link expired. Enter your email and we'll send a fresh one." : "");
   const [loading, setLoading] = useState(false);
 
-  const submit = async () => {
+  // Emails a one-time sign-in link (passwordless / forgot-password path).
+  const sendLink = async () => {
     setError("");
     if (!form.email) { setError("Please enter your email address."); return; }
     setLoading(true);
@@ -3909,6 +3910,29 @@ function HolderRegister() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send your sign-in link");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // Primary action: with a password, sign in directly; without one, fall back
+  // to the email link so nobody is stuck.
+  const signIn = async () => {
+    setError("");
+    if (!form.email) { setError("Please enter your email address."); return; }
+    if (!form.password) { return sendLink(); }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/holder/login-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ exchangeHubId: form.exchangeHubId || undefined, email: form.email, password: form.password })
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Could not sign in");
+      try { localStorage.setItem("uen_portal_token", payload.portalToken); } catch { /* storage may be blocked */ }
+      window.location.href = `/holder/portal?token=${encodeURIComponent(payload.portalToken)}`;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in");
       setLoading(false);
     }
   };
@@ -3953,16 +3977,32 @@ function HolderRegister() {
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="you@email.com"
-                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
                   />
                 </label>
 
-                <button className="holder-reg-btn" onClick={submit} disabled={loading}>
-                  {loading ? "Sending..." : <><Mail size={16} /> Email Me a Sign-In Link</>}
+                <label className="holder-reg-label">
+                  Password
+                  <input
+                    className="holder-reg-input"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="Leave blank to get a sign-in link"
+                    onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
+                  />
+                </label>
+
+                <button className="holder-reg-btn" onClick={signIn} disabled={loading}>
+                  {loading ? "Working..." : form.password ? <><Shield size={16} /> Sign In</> : <><Mail size={16} /> Email Me a Sign-In Link</>}
+                </button>
+
+                <button className="mp-link-btn" style={{ marginTop: 10 }} onClick={sendLink} disabled={loading}>
+                  Forgot your password? Email me a sign-in link
                 </button>
 
                 <p className="holder-reg-fine">
-                  We'll email you a secure link that opens your wallet — no password to remember.
+                  No password yet? Leave it blank for a secure email link — you can set a password later in your wallet settings.
                 </p>
               </div>
             </>
@@ -4195,7 +4235,7 @@ function HolderProfilePrompt({ holder, onSaved, editing = false }: { holder: any
   return (
     <div className="portal-profile-prompt">
       <p>{editing
-        ? "Update your details below. Your email is your sign-in and can't be changed here."
+        ? "Update your details below."
         : knownName
         ? "Verify your details and add your phone number to unlock all wallet features."
         : "Verify your details to unlock all wallet features — redeeming, codes, and merchant offers."}</p>
@@ -4204,8 +4244,75 @@ function HolderProfilePrompt({ holder, onSaved, editing = false }: { holder: any
         <input placeholder="First name" value={first} onChange={(e) => setFirst(e.target.value)} />
         <input placeholder="Last name" value={last} onChange={(e) => setLast(e.target.value)} />
         <input placeholder="Phone number (required)" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
-        <button onClick={save} disabled={saving}>{saving ? "Saving…" : "Verify & Unlock"}</button>
+        <button onClick={save} disabled={saving}>{saving ? "Saving…" : editing ? "Save details" : "Verify & Unlock"}</button>
       </div>
+      {err && <p className="portal-profile-err">{err}</p>}
+      {editing && <HolderEmailSection holder={holder} />}
+      {editing && <HolderPasswordSection holder={holder} />}
+    </div>
+  );
+}
+
+function HolderEmailSection({ holder }: { holder: any }) {
+  const [newEmail, setNewEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr(""); setMsg("");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail.trim())) { setErr("Enter a valid email address."); return; }
+    setBusy(true);
+    try {
+      await portalApi("/api/holder/request-email-change", { method: "POST", body: JSON.stringify({ newEmail: newEmail.trim() }) });
+      setMsg(`We sent a confirmation link to ${newEmail.trim()}. Click it to switch your email — nothing changes until you do.`);
+      setNewEmail("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not start the email change");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="portal-settings-section">
+      <h4>Email address</h4>
+      <p className="portal-settings-hint">Your email is how you sign in. Changing it sends a confirmation link to the new address.</p>
+      <div className="portal-profile-fields">
+        <input placeholder={`New email (current: ${holder.email})`} type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+        <button onClick={submit} disabled={busy}>{busy ? "Sending…" : "Send confirmation link"}</button>
+      </div>
+      {msg && <p className="portal-profile-msg">{msg}</p>}
+      {err && <p className="portal-profile-err">{err}</p>}
+    </div>
+  );
+}
+
+function HolderPasswordSection({ holder }: { holder: any }) {
+  const hasPassword = Boolean(holder.hasPassword);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr(""); setMsg("");
+    if (next.length < 8) { setErr("Password must be at least 8 characters."); return; }
+    setBusy(true);
+    try {
+      await portalApi("/api/holder/password", { method: "POST", body: JSON.stringify({ currentPassword: current || undefined, newPassword: next }) });
+      setMsg(hasPassword ? "Password updated." : "Password set. You can now sign in with your email and password.");
+      setCurrent(""); setNext("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not update password");
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="portal-settings-section">
+      <h4>{hasPassword ? "Change password" : "Set a password"}</h4>
+      <p className="portal-settings-hint">{hasPassword ? "Update the password you use to sign in." : "Optional — set one so you can sign in with a password instead of an email link each time."}</p>
+      <div className="portal-profile-fields">
+        {hasPassword && <input placeholder="Current password" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} />}
+        <input placeholder="New password (min 8 characters)" type="password" value={next} onChange={(e) => setNext(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} />
+        <button onClick={submit} disabled={busy}>{busy ? "Saving…" : hasPassword ? "Update password" : "Set password"}</button>
+      </div>
+      {msg && <p className="portal-profile-msg">{msg}</p>}
       {err && <p className="portal-profile-err">{err}</p>}
     </div>
   );
@@ -4271,8 +4378,19 @@ function LiveHolderPortal({ token }: { token: string }) {
     return "Offer active";
   };
 
+  const emailChangeStatus = new URLSearchParams(window.location.search).get("emailChange");
+
   return (
     <div className="portal-root">
+      {emailChangeStatus && (
+        <div className={`portal-banner ${emailChangeStatus === "success" ? "portal-banner-ok" : "portal-banner-warn"}`}>
+          {emailChangeStatus === "success"
+            ? `Your email was changed to ${holder.email}.`
+            : emailChangeStatus === "taken"
+            ? "That email is already in use, so your email wasn't changed."
+            : "That email-change link expired. Please try again from your settings."}
+        </div>
+      )}
       {/* Nav */}
       <nav className="portal-nav">
         <div className="portal-nav-brand">

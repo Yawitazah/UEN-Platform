@@ -1,10 +1,18 @@
 import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import express from "express";
 import { prisma } from "../db";
-import { createHolderLoginToken, verifyHolderLoginToken } from "../security";
+import {
+  createHolderLoginToken,
+  verifyHolderLoginToken,
+  createEmailChangeToken,
+  verifyEmailChangeToken
+} from "../security";
 import { claimReservedCodesForHolder } from "../services/grandfather";
-import { sendHolderLoginEmail } from "../services/mailer";
+import { sendHolderLoginEmail, sendEmailChangeVerification } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount } from "../services/sync";
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const router = express.Router();
 
@@ -133,6 +141,7 @@ router.get("/holder/wallet", async (req, res) => {
         lastName: holder.lastName,
         email: holder.email,
         phone: holder.phone ?? null,
+        hasPassword: Boolean(holder.passwordHash),
         exchangeHub: {
           id: holder.exchangeHub.id,
           displayName: holder.exchangeHub.displayName,
@@ -205,6 +214,161 @@ router.post("/holder/profile", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not update profile" });
+  }
+});
+
+// POST /api/holder/password  — set or change the holder's password.
+// Identified by their portal token (i.e. already signed in). When a password is
+// already set, the current one is required to change it.
+router.post("/holder/password", async (req, res) => {
+  try {
+    const token = String(req.query.token ?? (req.body as { token?: string }).token ?? "");
+    const holder = token ? await prisma.holder.findUnique({ where: { portalToken: token } }) : null;
+    if (!holder) return res.status(404).json({ error: "Invalid portal token" });
+
+    const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+    if (holder.passwordHash) {
+      if (!currentPassword || !(await bcrypt.compare(currentPassword, holder.passwordHash))) {
+        return res.status(403).json({ error: "Current password is incorrect" });
+      }
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.holder.update({ where: { id: holder.id }, data: { passwordHash } });
+    res.json({ ok: true, hasPassword: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not update password" });
+  }
+});
+
+// POST /api/holder/login-password  — email + password sign-in.
+// Hub is resolved the same way as the magic-link flow: an explicit hub, a
+// merchant's hubs (widget), or the email's own hub. Only matches holders who
+// have actually set a password. Errors are deliberately generic.
+router.post("/holder/login-password", async (req, res) => {
+  try {
+    const { email, password, exchangeHubId, merchantId } = req.body as {
+      email?: string;
+      password?: string;
+      exchangeHubId?: string;
+      merchantId?: string;
+    };
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+    if (!EMAIL_RE.test(normalizedEmail) || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+    const ip = req.ip ?? "unknown";
+    if (loginRateLimited(`pw:${ip}`)) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+    }
+
+    let candidateHubIds: string[] = [];
+    if (exchangeHubId) {
+      candidateHubIds = [exchangeHubId];
+    } else if (merchantId) {
+      const merchant = await prisma.merchant.findUnique({
+        where: { id: merchantId },
+        include: { accessRules: { where: { status: "ACTIVE" } } }
+      });
+      if (merchant) {
+        candidateHubIds = [
+          ...new Set([
+            ...merchant.accessRules.map((r) => r.exchangeHubId),
+            ...(merchant.linkedExchangeHubId ? [merchant.linkedExchangeHubId] : [])
+          ])
+        ];
+      }
+    } else {
+      const hub = await resolveHubForEmail(normalizedEmail);
+      if (hub) candidateHubIds = [hub];
+    }
+
+    const holder = candidateHubIds.length
+      ? await prisma.holder.findFirst({
+          where: {
+            email: normalizedEmail,
+            exchangeHubId: { in: candidateHubIds },
+            status: "ACTIVE",
+            passwordHash: { not: null }
+          },
+          orderBy: { createdAt: "asc" }
+        })
+      : null;
+
+    if (!holder || !holder.passwordHash || !(await bcrypt.compare(password, holder.passwordHash))) {
+      return res.status(401).json({ error: "Incorrect email or password. You can request a sign-in link instead." });
+    }
+
+    const portalToken = holder.portalToken ?? crypto.randomBytes(24).toString("base64url");
+    if (!holder.portalToken) {
+      await prisma.holder.update({ where: { id: holder.id }, data: { portalToken } });
+    }
+    res.json({ portalToken });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not sign in" });
+  }
+});
+
+// POST /api/holder/request-email-change  — emails a confirmation link to the
+// NEW address. The email only switches once that link is clicked, so a wallet
+// can't be hijacked by changing it to an address the holder doesn't control.
+router.post("/holder/request-email-change", async (req, res) => {
+  try {
+    const token = String(req.query.token ?? (req.body as { token?: string }).token ?? "");
+    const holder = token ? await prisma.holder.findUnique({ where: { portalToken: token } }) : null;
+    if (!holder) return res.status(404).json({ error: "Invalid portal token" });
+
+    const newEmail = String((req.body as { newEmail?: string }).newEmail ?? "").trim().toLowerCase();
+    if (!EMAIL_RE.test(newEmail)) return res.status(400).json({ error: "A valid email address is required" });
+    if (newEmail === holder.email) return res.status(400).json({ error: "That's already your email." });
+
+    const ip = req.ip ?? "unknown";
+    if (loginRateLimited(`emailchange:${ip}`)) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+    }
+
+    const clash = await prisma.holder.findUnique({
+      where: { exchangeHubId_email: { exchangeHubId: holder.exchangeHubId, email: newEmail } }
+    });
+    if (clash) return res.status(409).json({ error: "That email is already in use on this Exchange Hub." });
+
+    const changeToken = createEmailChangeToken({ holderId: holder.id, newEmail });
+    const link = `${publicBaseUrl(req)}/api/holder/verify-email-change?t=${encodeURIComponent(changeToken)}`;
+    await sendEmailChangeVerification(newEmail, link);
+
+    res.json({ sent: true, newEmail });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not start the email change" });
+  }
+});
+
+// GET /api/holder/verify-email-change?t=...  — confirms and applies the new
+// email, then drops the holder back into their portal.
+router.get("/holder/verify-email-change", async (req, res) => {
+  try {
+    const parsed = verifyEmailChangeToken(String(req.query.t ?? ""));
+    if (!parsed) return res.redirect("/holder/register?emailChange=expired");
+    const holder = await prisma.holder.findUnique({ where: { id: parsed.holderId } });
+    if (!holder) return res.redirect("/holder/register?emailChange=expired");
+
+    const clash = await prisma.holder.findUnique({
+      where: { exchangeHubId_email: { exchangeHubId: holder.exchangeHubId, email: parsed.newEmail } }
+    });
+    const portalToken = holder.portalToken ?? crypto.randomBytes(24).toString("base64url");
+    if (clash && clash.id !== holder.id) {
+      if (!holder.portalToken) await prisma.holder.update({ where: { id: holder.id }, data: { portalToken } });
+      return res.redirect(`/holder/portal?token=${encodeURIComponent(portalToken)}&emailChange=taken`);
+    }
+    await prisma.holder.update({ where: { id: holder.id }, data: { email: parsed.newEmail, portalToken } });
+    return res.redirect(`/holder/portal?token=${encodeURIComponent(portalToken)}&emailChange=success`);
+  } catch (error) {
+    console.error(error);
+    return res.redirect("/holder/register?emailChange=expired");
   }
 });
 

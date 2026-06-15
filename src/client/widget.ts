@@ -142,6 +142,21 @@ async function widgetLogin(merchantId: string, email: string): Promise<void> {
   }
 }
 
+// Email + password sign-in. Returns a portal token directly (no email step).
+async function widgetLoginPassword(merchantId: string, email: string, password: string): Promise<string> {
+  const response = await fetch(`${UEN_API_BASE}/api/holder/login-password`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ merchantId, email, password })
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error((body as any).error ?? "Sign in failed");
+  }
+  const payload = (await response.json()) as { portalToken: string };
+  return payload.portalToken;
+}
+
 function formatOffer(merchant: WalletMerchant): string {
   const offer = merchant.offer;
   if (!offer) return "";
@@ -375,9 +390,11 @@ function buildWidget(merchantId: string) {
       ${state === "login" ? `
         <div class="uen-login-form">
           ${opts.notice ? `<p class="uen-msg uen-msg-info" style="margin:0 0 6px">${opts.notice}</p>` : ""}
-          <p>Enter the email you used for your UEN account or original Love Note purchase.</p>
+          <p>Sign in to your wallet. Use your password, or get a one-time sign-in link by email.</p>
           <input class="uen-login-input" id="uen-login-email" type="email" placeholder="you@example.com" autocomplete="email" />
-          <button class="uen-btn uen-btn-primary" id="uen-login-btn">Access My Notes</button>
+          <input class="uen-login-input" id="uen-login-password" type="password" placeholder="Password (optional)" autocomplete="current-password" />
+          <button class="uen-btn uen-btn-primary" id="uen-login-btn">Sign In</button>
+          <button class="uen-btn uen-btn-secondary" id="uen-login-link-btn">Email me a sign-in link</button>
           ${opts.error ? `<p class="uen-msg uen-msg-error">${opts.error}</p>` : ""}
         </div>
       ` : ""}
@@ -457,15 +474,15 @@ function buildWidget(merchantId: string) {
       renderPanel("login", { notice: "You've been signed out of this store." });
     });
 
-    const loginSubmit = async () => {
-      const input = document.getElementById("uen-login-email") as HTMLInputElement | null;
-      const email = input?.value.trim() ?? "";
+    const emailVal = () => (document.getElementById("uen-login-email") as HTMLInputElement | null)?.value.trim() ?? "";
+    const passwordVal = () => (document.getElementById("uen-login-password") as HTMLInputElement | null)?.value ?? "";
+
+    // Email a one-time sign-in link (passwordless / forgot-password path).
+    const sendLink = async () => {
+      const email = emailVal();
       if (!email) return;
-      const btn = document.getElementById("uen-login-btn") as HTMLButtonElement | null;
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = "Sending...";
-      }
+      const btn = document.getElementById("uen-login-link-btn") as HTMLButtonElement | null;
+      if (btn) { btn.disabled = true; btn.textContent = "Sending..."; }
       try {
         await widgetLogin(merchantId, email);
         renderPanel("link-sent", { notice: email });
@@ -473,7 +490,29 @@ function buildWidget(merchantId: string) {
         renderPanel("login", { error: err instanceof Error ? err.message : "Login failed." });
       }
     };
+
+    // Primary: password sign-in, or fall back to the email link when blank.
+    const loginSubmit = async () => {
+      const email = emailVal();
+      if (!email) return;
+      const password = passwordVal();
+      if (!password) return sendLink();
+      const btn = document.getElementById("uen-login-btn") as HTMLButtonElement | null;
+      if (btn) { btn.disabled = true; btn.textContent = "Signing in..."; }
+      try {
+        token = await widgetLoginPassword(merchantId, email, password);
+        setToken(token);
+        await openPanel();
+      } catch (err) {
+        renderPanel("login", { error: err instanceof Error ? err.message : "Sign in failed." });
+      }
+    };
+
     document.getElementById("uen-login-btn")?.addEventListener("click", loginSubmit);
+    document.getElementById("uen-login-link-btn")?.addEventListener("click", sendLink);
+    document.getElementById("uen-login-password")?.addEventListener("keydown", (e) => {
+      if ((e as KeyboardEvent).key === "Enter") loginSubmit();
+    });
     document.getElementById("uen-login-email")?.addEventListener("keydown", (e) => {
       if ((e as KeyboardEvent).key === "Enter") loginSubmit();
     });

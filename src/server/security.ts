@@ -105,6 +105,44 @@ export function verifyHolderLoginToken(value?: string) {
   }
 }
 
+// Confirms a holder's NEW email address before switching it. Signed and
+// time-limited like the sign-in token, bound to the holder id + new email, so
+// the email only changes once the link sent to that new address is clicked.
+export function createEmailChangeToken(input: { holderId: string; newEmail: string }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      holderId: input.holderId,
+      newEmail: input.newEmail,
+      kind: "holder-email-change",
+      exp: Date.now() + 1000 * 60 * 30
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyEmailChangeToken(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      holderId: string;
+      newEmail: string;
+      kind: string;
+      exp: number;
+    };
+    if (parsed.kind !== "holder-email-change") return null;
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    if (!parsed.holderId || !parsed.newEmail) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function createMerchantSession(input: { id: string; merchantId: string }) {
   const payload = Buffer.from(
     JSON.stringify({

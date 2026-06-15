@@ -51,6 +51,7 @@ model Holder {
   phone                  String?
   status                 String                  @default("ACTIVE")
   portalToken            String?                 @unique
+  passwordHash           String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   exchangeHub            ExchangeHub             @relation(fields: [exchangeHubId], references: [id])
