@@ -5175,7 +5175,14 @@ html { background: #050e09; }
   color: white;
   font-size: clamp(24px, 3vw, 38px);
   line-height: 1.08;
-  margin: 0 0 28px;
+  margin: 0 0 16px;
+}
+
+.holder-reg-side-intro {
+  color: #b6d4c6;
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 0 26px;
 }
 
 .holder-reg-perks {

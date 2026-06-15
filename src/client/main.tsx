@@ -3893,6 +3893,11 @@ function HolderRegister() {
   const [result, setResult] = useState<any | null>(null);
   const [error, setError] = useState(params.get("expired") === "1" ? "That sign-in link expired. Enter your email and we'll send a fresh one." : "");
   const [loading, setLoading] = useState(false);
+  // The hub is normally known (passed by the widget, or resolved from the email),
+  // so the picker stays hidden until the server says it genuinely needs one.
+  const [showHubPicker, setShowHubPicker] = useState(false);
+  // Hide the bootstrap/test hub from the public picker.
+  const hubOptions = (hubs.data ?? []).filter((h: any) => h.displayName !== "Exchange Hub A");
 
   // Emails a one-time sign-in link (passwordless / forgot-password path).
   const sendLink = async () => {
@@ -3906,7 +3911,10 @@ function HolderRegister() {
         body: JSON.stringify({ exchangeHubId: form.exchangeHubId, email: form.email })
       });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "Could not send your sign-in link");
+      if (!res.ok) {
+        if (payload.needsHub) setShowHubPicker(true);
+        throw new Error(payload.error ?? "Could not send your sign-in link");
+      }
       setResult(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send your sign-in link");
@@ -3951,24 +3959,26 @@ function HolderRegister() {
             <>
               <div className="holder-reg-icon"><Wallet size={32} /></div>
               <h1 className="holder-reg-title">Access your UEN wallet</h1>
-              <p className="holder-reg-sub">Enter your email and we'll send you a secure sign-in link. If you already have UEN notes from an Exchange Hub, they'll be waiting in your wallet.</p>
+              <p className="holder-reg-sub">Your UEN wallet holds your <strong>Universal Exchange Notes</strong> — the original <strong>Love Notes</strong> — in one place, ready to redeem with participating merchants. Enter your email and we'll send a secure link to open it.</p>
 
               {error && <div className="holder-reg-error">{error}</div>}
 
               <div className="holder-reg-form">
-                <label className="holder-reg-label">
-                  Where did you get your notes from?
-                  <select
-                    className="holder-reg-input"
-                    value={form.exchangeHubId}
-                    onChange={(e) => setForm({ ...form, exchangeHubId: e.target.value })}
-                  >
-                    <option value="">Select your Exchange Hub (optional)</option>
-                    {(hubs.data ?? []).map((h: any) => (
-                      <option key={h.id} value={h.id}>{h.displayName}</option>
-                    ))}
-                  </select>
-                </label>
+                {showHubPicker && (
+                  <label className="holder-reg-label">
+                    Where did you get your notes from?
+                    <select
+                      className="holder-reg-input"
+                      value={form.exchangeHubId}
+                      onChange={(e) => setForm({ ...form, exchangeHubId: e.target.value })}
+                    >
+                      <option value="">Select where you got your notes</option>
+                      {hubOptions.map((h: any) => (
+                        <option key={h.id} value={h.id}>{h.displayName}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
                 <label className="holder-reg-label">
                   Email address
@@ -4023,15 +4033,16 @@ function HolderRegister() {
 
         <div className="holder-reg-side">
           <div className="holder-reg-side-content">
-            <span className="eyebrow"><Ticket size={16} /> Your UEN wallet</span>
-            <h2>One link. All your notes. Every merchant.</h2>
+            <span className="eyebrow"><Ticket size={16} /> What is a UEN wallet?</span>
+            <h2>Your Love Notes, now Universal Exchange Notes.</h2>
+            <p className="holder-reg-side-intro">A Universal Exchange Note (UEN) is the original Love Note — a token of support you can actually redeem for value. Your wallet keeps every one of them in a single place.</p>
             <ul className="holder-reg-perks">
               {[
-                [Wallet, "See all your Universal Exchange Notes in one place"],
-                [ShoppingBag, "Discover participating merchants and their current offers"],
-                [CheckCircle, "Track which codes you've used and where"],
-                [Bell, "Receive notifications and promos from your Exchange Hub"],
-                [Shield, "Sign in securely with a link sent to your email - no password to remember"]
+                [Wallet, "Every Love Note you've received, now as Universal Exchange Notes, in one place"],
+                [DollarSign, "Redeem them for real discounts at participating merchants"],
+                [ShoppingBag, "See which merchants and offers your notes unlock"],
+                [CheckCircle, "Track what you've redeemed and where"],
+                [Bell, "Get notified when new value or merchants are added"]
               ].map(([Icon, text], i) => (
                 <li key={i}>
                   <span className="holder-reg-perk-icon"><Icon size={16} /></span>
