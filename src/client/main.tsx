@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Menu, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Mail, Menu, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
 import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
@@ -3890,9 +3890,8 @@ function HolderRegister() {
   const hubs = useData<any[]>(() => fetch("/api/public/exchange-hubs").then((r) => r.json()));
   const [form, setForm] = useState({ exchangeHubId: preselectedHub, firstName: "", lastName: "", email: "" });
   const [result, setResult] = useState<any | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(params.get("expired") === "1" ? "That sign-in link expired. Enter your email and we'll send a fresh one." : "");
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const submit = async () => {
     setError("");
@@ -3902,22 +3901,16 @@ function HolderRegister() {
       const res = await fetch("/api/holder/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ exchangeHubId: form.exchangeHubId, email: form.email })
       });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "Registration failed");
+      if (!res.ok) throw new Error(payload.error ?? "Could not send your sign-in link");
       setResult(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : "Could not send your sign-in link");
     } finally {
       setLoading(false);
     }
-  };
-
-  const copy = () => {
-    navigator.clipboard.writeText(window.location.origin + result.portalUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
   };
 
   return (
@@ -3933,7 +3926,7 @@ function HolderRegister() {
             <>
               <div className="holder-reg-icon"><Wallet size={32} /></div>
               <h1 className="holder-reg-title">Access your UEN wallet</h1>
-              <p className="holder-reg-sub">Enter your details to get your personal portal link. If you already have UEN codes from an Exchange Hub, they will appear in your wallet.</p>
+              <p className="holder-reg-sub">Enter your email and we'll send you a secure sign-in link. If you already have UEN notes from an Exchange Hub, they'll be waiting in your wallet.</p>
 
               {error && <div className="holder-reg-error">{error}</div>}
 
@@ -3952,27 +3945,6 @@ function HolderRegister() {
                   </select>
                 </label>
 
-                <div className="holder-reg-name-row">
-                  <label className="holder-reg-label">
-                    First name
-                    <input
-                      className="holder-reg-input"
-                      value={form.firstName}
-                      onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                      placeholder="Alex"
-                    />
-                  </label>
-                  <label className="holder-reg-label">
-                    Last name
-                    <input
-                      className="holder-reg-input"
-                      value={form.lastName}
-                      onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                      placeholder="Johnson"
-                    />
-                  </label>
-                </div>
-
                 <label className="holder-reg-label">
                   Email address
                   <input
@@ -3981,37 +3953,28 @@ function HolderRegister() {
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="you@email.com"
+                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
                   />
                 </label>
 
                 <button className="holder-reg-btn" onClick={submit} disabled={loading}>
-                  {loading ? "Setting up..." : <><Wallet size={16} /> Get My Portal Link</>}
+                  {loading ? "Sending..." : <><Mail size={16} /> Email Me a Sign-In Link</>}
                 </button>
 
                 <p className="holder-reg-fine">
-                  Already accessed your portal? Use your original link or enter your email above to retrieve it.
+                  We'll email you a secure link that opens your wallet — no password to remember.
                 </p>
               </div>
             </>
           ) : (
             <div className="holder-reg-success">
-              <div className="holder-reg-success-icon"><CheckCircle size={40} /></div>
-              <h1>You're in, {result.holder.firstName}!</h1>
-              <p>Your personal UEN wallet is ready. Save this link - it's how you access your wallet. Anyone with this link can view your wallet, so keep it private.</p>
-
-              <div className="holder-reg-link-box">
-                <span className="holder-reg-link-text">{window.location.origin + result.portalUrl}</span>
-                <button className="holder-reg-copy-btn" onClick={copy}>
-                  {copied ? <><CheckCircle size={14} /> Copied!</> : <><Copy size={14} /> Copy</>}
-                </button>
-              </div>
-
-              <a className="holder-reg-open-btn" href={result.portalUrl}>
-                Open my wallet <ExternalLink size={16} />
-              </a>
+              <div className="holder-reg-success-icon"><Mail size={40} /></div>
+              <h1>Check your email</h1>
+              <p>We sent a secure sign-in link to <strong>{result.email}</strong>. Open that email and tap <strong>Open my wallet</strong> to view your notes. The link works for 15 minutes.</p>
 
               <p className="holder-reg-fine">
-                <strong>{result.holder.exchangeHub}</strong> - {result.holder.email}
+                Didn't get it? Check your spam folder, or{" "}
+                <button className="mp-link-btn" onClick={() => { setResult(null); }}>try again</button>.
               </p>
             </div>
           )}
@@ -4027,7 +3990,7 @@ function HolderRegister() {
                 [ShoppingBag, "Discover participating merchants and their current offers"],
                 [CheckCircle, "Track which codes you've used and where"],
                 [Bell, "Receive notifications and promos from your Exchange Hub"],
-                [Shield, "Your portal link is personal - no password needed"]
+                [Shield, "Sign in securely with a link sent to your email - no password to remember"]
               ].map(([Icon, text], i) => (
                 <li key={i}>
                   <span className="holder-reg-perk-icon"><Icon size={16} /></span>

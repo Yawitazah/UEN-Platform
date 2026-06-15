@@ -1,10 +1,31 @@
 import crypto from "node:crypto";
 import express from "express";
 import { prisma } from "../db";
+import { createHolderLoginToken, verifyHolderLoginToken } from "../security";
 import { claimReservedCodesForHolder } from "../services/grandfather";
+import { sendHolderLoginEmail } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount } from "../services/sync";
 
 const router = express.Router();
+
+// Lightweight in-memory rate limiter for the email-sending login endpoints.
+// Keyed by IP: caps how often we'll fire verification emails so the endpoint
+// can't be abused to spam an inbox or probe which emails have accounts. Single
+// instance only, which matches the current Railway deployment.
+const loginAttempts = new Map<string, number[]>();
+function loginRateLimited(key: string, max = 5, windowMs = 10 * 60 * 1000) {
+  const now = Date.now();
+  const hits = (loginAttempts.get(key) ?? []).filter((t) => now - t < windowMs);
+  hits.push(now);
+  loginAttempts.set(key, hits);
+  return hits.length > max;
+}
+
+// Builds the public base URL (https://host) from the incoming request. With
+// `trust proxy` enabled this honours Railway's X-Forwarded-Proto/Host headers.
+function publicBaseUrl(req: express.Request) {
+  return `${req.protocol}://${req.get("host")}`;
+}
 
 async function holderFromToken(token: string) {
   if (!token) return null;
@@ -434,43 +455,103 @@ async function findOrCreateHolderWithToken(exchangeHubId: string, email: string,
   return { holder, token };
 }
 
-// POST /api/holder/register  — self-registration
-// Finds or creates a holder by (exchangeHubId + email), generates a portal token, returns the portal URL.
+// Resolves which Exchange Hub a website visitor's email belongs to when they
+// didn't (or couldn't) pick one. An existing account with active notes wins,
+// then a grandfathered reservation, then any existing account. Returns null
+// when it genuinely can't tell — the caller then asks them to choose a hub.
+async function resolveHubForEmail(email: string): Promise<string | null> {
+  const holderWithNotes = await prisma.holder.findFirst({
+    where: { email, status: "ACTIVE", universalExchangeNotes: { some: { status: "ACTIVE" } } },
+    orderBy: { createdAt: "asc" }
+  });
+  if (holderWithNotes) return holderWithNotes.exchangeHubId;
+
+  const reservation = await prisma.uenCodeInventory.findFirst({
+    where: { status: "RESERVED", source: "GRANDFATHERED", issuedToEmail: email }
+  });
+  if (reservation) return reservation.exchangeHubId;
+
+  const existingHolder = await prisma.holder.findFirst({
+    where: { email, status: "ACTIVE" },
+    orderBy: { createdAt: "asc" }
+  });
+  return existingHolder?.exchangeHubId ?? null;
+}
+
+// POST /api/holder/register  — website sign-in request.
+// Resolves the holder's Exchange Hub, then emails a one-time sign-in link
+// instead of handing back wallet access. The wallet only opens once the link
+// in that email is clicked (see GET /holder/verify), which proves the person
+// actually owns the inbox. The response is intentionally the same whether or
+// not the email matched an account, so it can't be used to probe who has one.
 router.post("/holder/register", async (req, res) => {
   try {
-    const { exchangeHubId, firstName, lastName, email } = req.body as {
-      exchangeHubId?: string;
-      firstName?: string;
-      lastName?: string;
-      email?: string;
-    };
+    const { exchangeHubId, email } = req.body as { exchangeHubId?: string; email?: string };
 
-    if (!exchangeHubId || !email) {
-      return res.status(400).json({ error: "exchangeHubId and email are required" });
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: "A valid email address is required" });
     }
 
-    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    const ip = req.ip ?? "unknown";
+    if (loginRateLimited(`reg:${ip}`)) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+    }
+
+    // Use the chosen hub when valid; otherwise try to resolve it from the email.
+    let resolvedHubId: string | null = null;
+    if (exchangeHubId) {
+      const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+      if (!hub || hub.status !== "ACTIVE") {
+        return res.status(404).json({ error: "Exchange Hub not found or inactive" });
+      }
+      resolvedHubId = exchangeHubId;
+    } else {
+      resolvedHubId = await resolveHubForEmail(normalizedEmail);
+    }
+
+    if (!resolvedHubId) {
+      return res.status(400).json({
+        error: "Please select where you got your notes from so we can find your wallet.",
+        needsHub: true
+      });
+    }
+
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: resolvedHubId } });
     if (!hub || hub.status !== "ACTIVE") {
       return res.status(404).json({ error: "Exchange Hub not found or inactive" });
     }
 
-    const { holder, token } = await findOrCreateHolderWithToken(exchangeHubId, email, firstName, lastName);
+    const loginToken = createHolderLoginToken({ email: normalizedEmail, exchangeHubId: resolvedHubId });
+    const link = `${publicBaseUrl(req)}/api/holder/verify?lt=${encodeURIComponent(loginToken)}`;
+    await sendHolderLoginEmail(normalizedEmail, link, hub.displayName);
 
-    const portalUrl = `/holder/portal?token=${token}`;
-    res.status(201).json({
-      portalToken: token,
-      portalUrl,
-      holder: {
-        id: holder.id,
-        firstName: holder.firstName,
-        lastName: holder.lastName,
-        email: holder.email,
-        exchangeHub: hub.displayName
-      }
-    });
+    res.status(200).json({ sent: true, email: normalizedEmail });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not complete registration" });
+    res.status(500).json({ error: "Could not send your sign-in link" });
+  }
+});
+
+// GET /api/holder/verify?lt=...  — opens the wallet from a magic link.
+// Validates the signed, time-limited token from the email, then creates/loads
+// the holder and redirects into the portal with their portal token. Invalid or
+// expired links bounce back to the sign-in page with a friendly flag.
+router.get("/holder/verify", async (req, res) => {
+  try {
+    const parsed = verifyHolderLoginToken(String(req.query.lt ?? ""));
+    if (!parsed) {
+      return res.redirect("/holder/register?expired=1");
+    }
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: parsed.exchangeHubId } });
+    if (!hub || hub.status !== "ACTIVE") {
+      return res.redirect("/holder/register?expired=1");
+    }
+    const { token } = await findOrCreateHolderWithToken(parsed.exchangeHubId, parsed.email);
+    return res.redirect(`/holder/portal?token=${encodeURIComponent(token)}`);
+  } catch (error) {
+    console.error(error);
+    return res.redirect("/holder/register?expired=1");
   }
 });
 
@@ -503,13 +584,18 @@ router.get("/public/widget-config", async (req, res) => {
 // that's what keeps grandfathered codes locked to the original purchaser.
 router.post("/holder/widget-login", async (req, res) => {
   try {
-    const { merchantId, email, firstName } = req.body as { merchantId?: string; email?: string; firstName?: string };
+    const { merchantId, email } = req.body as { merchantId?: string; email?: string };
     if (!merchantId || !email) {
       return res.status(400).json({ error: "merchantId and email are required" });
     }
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizedEmail)) {
       return res.status(400).json({ error: "A valid email address is required" });
+    }
+
+    const ip = req.ip ?? "unknown";
+    if (loginRateLimited(`widget:${ip}`)) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
     }
 
     const merchant = await prisma.merchant.findUnique({
@@ -575,21 +661,16 @@ router.post("/holder/widget-login", async (req, res) => {
       return res.status(404).json({ error: "Exchange Hub not found or inactive" });
     }
 
-    const { holder, token } = await findOrCreateHolderWithToken(exchangeHubId, normalizedEmail, firstName);
+    // Don't hand back wallet access from an email alone — email a one-time
+    // sign-in link and let clicking it (i.e. owning the inbox) prove identity.
+    const loginToken = createHolderLoginToken({ email: normalizedEmail, exchangeHubId });
+    const link = `${publicBaseUrl(req)}/api/holder/verify?lt=${encodeURIComponent(loginToken)}`;
+    await sendHolderLoginEmail(normalizedEmail, link, hub.displayName);
 
-    res.json({
-      portalToken: token,
-      holder: {
-        id: holder.id,
-        firstName: holder.firstName,
-        lastName: holder.lastName,
-        email: holder.email,
-        exchangeHub: hub.displayName
-      }
-    });
+    res.json({ sent: true, email: normalizedEmail });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Could not complete login" });
+    res.status(500).json({ error: "Could not send your sign-in link" });
   }
 });
 

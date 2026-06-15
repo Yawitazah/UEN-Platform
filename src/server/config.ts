@@ -13,5 +13,15 @@ export const config = {
   shopifyScopes: process.env.SHOPIFY_SCOPES ?? "read_discounts,write_discounts,read_orders,read_products",
   adminEmail: process.env.ADMIN_EMAIL ?? "admin@uen.local",
   adminPassword: process.env.ADMIN_PASSWORD ?? "change-me",
-  bootstrapFirstBuildTarget: process.env.BOOTSTRAP_FIRST_BUILD_TARGET !== "false"
+  bootstrapFirstBuildTarget: process.env.BOOTSTRAP_FIRST_BUILD_TARGET !== "false",
+  // Zoho SMTP — used to email holders a one-time sign-in link. When SMTP_USER
+  // is empty the mailer falls back to logging the link to the console so local
+  // dev still works without sending real email.
+  smtp: {
+    host: process.env.SMTP_HOST ?? "smtp.zoho.com",
+    port: Number(process.env.SMTP_PORT ?? 465),
+    user: process.env.SMTP_USER ?? "",
+    pass: process.env.SMTP_PASS ?? "",
+    from: process.env.SMTP_FROM ?? "Zah Brand Solutions <work@zahbrandsolutions.com>"
+  }
 };

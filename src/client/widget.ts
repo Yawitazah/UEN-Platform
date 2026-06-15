@@ -127,7 +127,10 @@ async function fetchHolderName(token: string): Promise<string | null> {
   }
 }
 
-async function widgetLogin(merchantId: string, email: string): Promise<string> {
+// Requests a one-time sign-in link by email. The server no longer returns a
+// portal token here — it emails a secure link the shopper must click, so
+// nobody can open a wallet by typing someone else's email.
+async function widgetLogin(merchantId: string, email: string): Promise<void> {
   const response = await fetch(`${UEN_API_BASE}/api/holder/widget-login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -137,8 +140,6 @@ async function widgetLogin(merchantId: string, email: string): Promise<string> {
     const body = await response.json().catch(() => ({}));
     throw new Error((body as any).error ?? "Login failed");
   }
-  const payload = (await response.json()) as { portalToken: string };
-  return payload.portalToken;
 }
 
 function formatOffer(merchant: WalletMerchant): string {
@@ -355,7 +356,7 @@ function buildWidget(merchantId: string) {
   let generatedCode: string | null = null;
   let holderName: string | null = null;
 
-  function renderPanel(state: "loading" | "login" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string; notice?: string } = {}) {
+  function renderPanel(state: "loading" | "login" | "link-sent" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string; notice?: string } = {}) {
     const offerText = merchantInfo ? formatOffer(merchantInfo) : "";
     const available = merchantInfo?.availableUens ?? 0;
 
@@ -378,6 +379,11 @@ function buildWidget(merchantId: string) {
           <input class="uen-login-input" id="uen-login-email" type="email" placeholder="you@example.com" autocomplete="email" />
           <button class="uen-btn uen-btn-primary" id="uen-login-btn">Access My Notes</button>
           ${opts.error ? `<p class="uen-msg uen-msg-error">${opts.error}</p>` : ""}
+        </div>
+      ` : ""}
+      ${state === "link-sent" ? `
+        <div class="uen-login-form">
+          <p class="uen-msg uen-msg-info">Check your email — we sent a secure sign-in link to <strong>${escapeHtml(opts.notice ?? "your inbox")}</strong>. Tap it to open your wallet. The link works for 15 minutes.</p>
         </div>
       ` : ""}
       ${state === "no-uens" ? `<p class="uen-msg uen-msg-info">You have no available notes for this merchant right now. Tap refresh after a new contribution, or open your full dashboard below.</p>` : ""}
@@ -458,12 +464,11 @@ function buildWidget(merchantId: string) {
       const btn = document.getElementById("uen-login-btn") as HTMLButtonElement | null;
       if (btn) {
         btn.disabled = true;
-        btn.textContent = "Checking...";
+        btn.textContent = "Sending...";
       }
       try {
-        token = await widgetLogin(merchantId, email);
-        setToken(token);
-        await openPanel();
+        await widgetLogin(merchantId, email);
+        renderPanel("link-sent", { notice: email });
       } catch (err) {
         renderPanel("login", { error: err instanceof Error ? err.message : "Login failed." });
       }

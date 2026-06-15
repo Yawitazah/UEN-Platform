@@ -66,6 +66,45 @@ export function verifyAdminSession(value?: string) {
   }
 }
 
+// One-time-style sign-in token emailed to a holder as a magic link. Stateless
+// and signed with the session secret — no DB row needed. It carries the email
+// and hub it was issued for and expires after 15 minutes, so possession of the
+// link (i.e. access to the inbox) is what proves identity.
+export function createHolderLoginToken(input: { email: string; exchangeHubId: string }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      email: input.email,
+      exchangeHubId: input.exchangeHubId,
+      kind: "holder-login",
+      exp: Date.now() + 1000 * 60 * 15
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyHolderLoginToken(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      email: string;
+      exchangeHubId: string;
+      kind: string;
+      exp: number;
+    };
+    if (parsed.kind !== "holder-login") return null;
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    if (!parsed.email || !parsed.exchangeHubId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function createMerchantSession(input: { id: string; merchantId: string }) {
   const payload = Buffer.from(
     JSON.stringify({
