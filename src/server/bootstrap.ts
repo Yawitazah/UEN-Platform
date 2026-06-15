@@ -4,6 +4,24 @@ import { config } from "./config";
 import { prisma } from "./db";
 import { hashSecret } from "./security";
 
+// Idempotent additive migrations applied at startup, before the server accepts
+// traffic, so prod (Supabase Postgres) stays in sync without a separate migrate
+// step in the deploy pipeline. Skipped on the local SQLite DB, which is managed
+// with `prisma db push`. Each statement must be safe to run repeatedly.
+export async function ensureSchema() {
+  if (!(process.env.DATABASE_URL ?? "").startsWith("postgres")) return;
+  const statements = [
+    'ALTER TABLE "Holder" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT'
+  ];
+  for (const sql of statements) {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch (error) {
+      console.error(`ensureSchema failed: ${sql}`, error);
+    }
+  }
+}
+
 export async function ensureFirstBuildTarget() {
   const existingHub = await prisma.exchangeHub.findFirst({
     where: { name: "exchange-hub-a" }

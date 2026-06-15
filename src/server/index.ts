@@ -4,7 +4,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { ensureFirstBuildTarget } from "./bootstrap";
+import { ensureFirstBuildTarget, ensureSchema } from "./bootstrap";
 import { config } from "./config";
 import { authenticate } from "./security";
 import authRoutes from "./routes/auth";
@@ -128,6 +128,7 @@ app.get("*", (req, res) => {
 });
 
 async function start() {
+  await ensureSchema();
   if (config.bootstrapFirstBuildTarget) {
     await ensureFirstBuildTarget();
   }
