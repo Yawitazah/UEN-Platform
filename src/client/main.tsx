@@ -3887,8 +3887,9 @@ function Notice({ children, tone = "neutral" }: { children: React.ReactNode; ton
 function HolderRegister() {
   const params = new URLSearchParams(window.location.search);
   const preselectedHub = params.get("hub") ?? "";
+  const preselectedEmail = params.get("email") ?? "";
   const hubs = useData<any[]>(() => fetch("/api/public/exchange-hubs").then((r) => r.json()));
-  const [form, setForm] = useState({ exchangeHubId: preselectedHub, email: "", password: "" });
+  const [form, setForm] = useState({ exchangeHubId: preselectedHub, email: preselectedEmail, password: "" });
   const [result, setResult] = useState<any | null>(null);
   const [error, setError] = useState(params.get("expired") === "1" ? "That sign-in link expired. Enter your email and we'll send a fresh one." : "");
   const [loading, setLoading] = useState(false);
@@ -4394,8 +4395,8 @@ function LiveHolderPortal({ token }: { token: string }) {
       {/* Nav */}
       <nav className="portal-nav">
         <div className="portal-nav-brand">
-          <div className="portal-hub-dot" style={{ background: hub.brandColor ?? "#1f6f5b" }} />
-          <span className="portal-brand-text">UENITE<small>Universal Exchange Note</small></span>
+          <div className="portal-hub-dot portal-hub-dot-pulse" style={{ background: hub.brandColor ?? "#1f6f5b" }} />
+          <span className="portal-brand-text">UENITE<small>Universal Exchange Note</small><small className="portal-brand-sub">the original Love Note</small></span>
         </div>
         <div className="portal-nav-actions">
           <button className="portal-notif-btn" onClick={() => { setNotifOpen(!notifOpen); setMenuOpen(false); }}>

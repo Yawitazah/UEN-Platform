@@ -4144,6 +4144,25 @@ html { background: #050e09; }
   width: 14px;
 }
 
+/* Pulsating brand dot next to the UENITE wordmark. */
+.portal-hub-dot-pulse {
+  transform-origin: center;
+  animation: portal-dot-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes portal-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.78; }
+}
+
+/* "the original Love Note" association line under Universal Exchange Note. */
+.portal-brand-sub {
+  text-transform: none !important;
+  font-style: italic;
+  color: #c98a3a !important;
+  letter-spacing: 0.02em !important;
+}
+
 .portal-nav-actions {
   align-items: center;
   display: flex;

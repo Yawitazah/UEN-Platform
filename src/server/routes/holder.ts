@@ -838,4 +838,71 @@ router.post("/holder/widget-login", async (req, res) => {
   }
 });
 
+// POST /api/holder/widget-recognize — storefront teaser only.
+// Given a merchant + email, reports whether the email has notes and how many,
+// WITHOUT logging anyone in or exposing the dashboard. The widget renders the
+// count blurred; real access requires completing the verified registration
+// flow. Returns the resolved hub so the widget can deep-link to /holder/register.
+router.post("/holder/widget-recognize", async (req, res) => {
+  try {
+    const { merchantId, email } = req.body as { merchantId?: string; email?: string };
+    if (!merchantId || !email) return res.status(400).json({ error: "merchantId and email are required" });
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(normalizedEmail)) return res.status(400).json({ error: "A valid email address is required" });
+
+    const ip = req.ip ?? "unknown";
+    if (loginRateLimited(`recognize:${ip}`, 12)) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+    }
+
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: merchantId },
+      include: { accessRules: { where: { status: "ACTIVE" } } }
+    });
+    if (!merchant || merchant.status !== "ACTIVE") return res.status(404).json({ error: "Merchant not found" });
+
+    const candidateHubIds = [
+      ...new Set([
+        ...merchant.accessRules.map((r) => r.exchangeHubId),
+        ...(merchant.linkedExchangeHubId ? [merchant.linkedExchangeHubId] : [])
+      ])
+    ];
+    if (!candidateHubIds.length) {
+      return res.json({ recognized: false, count: 0, exchangeHubId: null });
+    }
+
+    let count = 0;
+    let exchangeHubId: string | null = null;
+
+    const holder = await prisma.holder.findFirst({
+      where: { email: normalizedEmail, exchangeHubId: { in: candidateHubIds }, status: "ACTIVE" },
+      orderBy: { createdAt: "asc" }
+    });
+    if (holder) {
+      exchangeHubId = holder.exchangeHubId;
+      count = await prisma.universalExchangeNote.count({ where: { holderId: holder.id, status: "ACTIVE" } });
+    }
+
+    // Grandfathered codes reserved for this email but not yet claimed.
+    const reservedCount = await prisma.uenCodeInventory.count({
+      where: { exchangeHubId: { in: candidateHubIds }, status: "RESERVED", source: "GRANDFATHERED", issuedToEmail: normalizedEmail }
+    });
+    const total = count + reservedCount;
+
+    if (!exchangeHubId) {
+      const reservation = total > 0
+        ? await prisma.uenCodeInventory.findFirst({
+            where: { exchangeHubId: { in: candidateHubIds }, status: "RESERVED", source: "GRANDFATHERED", issuedToEmail: normalizedEmail }
+          })
+        : null;
+      exchangeHubId = reservation?.exchangeHubId ?? (candidateHubIds.length === 1 ? candidateHubIds[0] : null);
+    }
+
+    res.json({ recognized: total > 0, count: total, exchangeHubId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Could not check this email" });
+  }
+});
+
 export default router;

@@ -142,6 +142,21 @@ async function widgetLogin(merchantId: string, email: string): Promise<void> {
   }
 }
 
+// Storefront teaser: does this email have notes, and how many? No login, no
+// token — just enough to recognize them and nudge them to register.
+async function widgetRecognize(merchantId: string, email: string): Promise<{ recognized: boolean; count: number; exchangeHubId: string | null }> {
+  const response = await fetch(`${UEN_API_BASE}/api/holder/widget-recognize`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ merchantId, email })
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error((body as any).error ?? "Could not check this email");
+  }
+  return response.json() as Promise<{ recognized: boolean; count: number; exchangeHubId: string | null }>;
+}
+
 // Email + password sign-in. Returns a portal token directly (no email step).
 async function widgetLoginPassword(merchantId: string, email: string, password: string): Promise<string> {
   const response = await fetch(`${UEN_API_BASE}/api/holder/login-password`, {
@@ -307,6 +322,10 @@ function injectStyles() {
     .uen-dash-link:hover .uen-arrow { transform: translateX(3px); }
     .uen-signout { background: none; border: none; color: #7c9a8c; cursor: pointer; display: block; font-size: 11px; margin: 8px auto 0; padding: 2px; position: relative; text-decoration: underline; }
     .uen-signout:hover { color: #cfe6da; }
+    .uen-teaser-count { text-align: center; padding: 10px 0 14px; }
+    .uen-teaser-num { display: inline-block; font-size: 46px; font-weight: 800; color: #fff; filter: blur(11px); user-select: none; pointer-events: none; line-height: 1; }
+    .uen-teaser-count .uen-label { color: var(--uen-mint); display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; margin-top: 8px; text-transform: uppercase; }
+    .uen-teaser-sub { display: block; color: #9fc3b5; font-size: 11.5px; margin-top: 3px; font-style: italic; }
     .uen-msg { border-radius: 10px; font-size: 12px; margin-top: 10px; padding: 10px 12px; position: relative; }
     .uen-msg-error { background: rgba(255,80,80,0.14); color: #ffb3b3; }
     .uen-msg-info { background: rgba(255,255,255,0.05); color: #9ec0b2; }
@@ -371,7 +390,7 @@ function buildWidget(merchantId: string) {
   let generatedCode: string | null = null;
   let holderName: string | null = null;
 
-  function renderPanel(state: "loading" | "login" | "link-sent" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string; notice?: string } = {}) {
+  function renderPanel(state: "loading" | "login" | "teaser" | "link-sent" | "no-uens" | "ready" | "code-shown" | "error", opts: { error?: string; code?: string; notice?: string; recognized?: boolean; count?: number; hubId?: string | null; email?: string } = {}) {
     const offerText = merchantInfo ? formatOffer(merchantInfo) : "";
     const available = merchantInfo?.availableUens ?? 0;
 
@@ -390,17 +409,30 @@ function buildWidget(merchantId: string) {
       ${state === "login" ? `
         <div class="uen-login-form">
           ${opts.notice ? `<p class="uen-msg uen-msg-info" style="margin:0 0 6px">${opts.notice}</p>` : ""}
-          <p>Sign in to your wallet. Use your password, or get a one-time sign-in link by email.</p>
+          <p>Enter your email to check for Universal Exchange Notes (originally Love Notes) tied to it.</p>
           <input class="uen-login-input" id="uen-login-email" type="email" placeholder="you@example.com" autocomplete="email" />
-          <input class="uen-login-input" id="uen-login-password" type="password" placeholder="Password (optional)" autocomplete="current-password" />
-          <button class="uen-btn uen-btn-primary" id="uen-login-btn">Sign In</button>
-          <button class="uen-btn uen-btn-secondary" id="uen-login-link-btn">Email me a sign-in link</button>
+          <button class="uen-btn uen-btn-primary" id="uen-login-btn">Check My Notes</button>
           ${opts.error ? `<p class="uen-msg uen-msg-error">${opts.error}</p>` : ""}
         </div>
       ` : ""}
-      ${state === "link-sent" ? `
+      ${state === "teaser" ? `
         <div class="uen-login-form">
-          <p class="uen-msg uen-msg-info">Check your email — we sent a secure sign-in link to <strong>${escapeHtml(opts.notice ?? "your inbox")}</strong>. Tap it to open your wallet. The link works for 15 minutes.</p>
+          ${opts.recognized ? `
+            <p style="text-align:center;margin:0 0 2px;color:#fff;font-weight:700;font-size:15px;">We recognize you! 🎉</p>
+            <p>You have notes waiting on this email.</p>
+            <div class="uen-teaser-count">
+              <span class="uen-teaser-num">${opts.count ?? 0}</span>
+              <span class="uen-label">Universal Exchange Notes</span>
+              <span class="uen-teaser-sub">originally known as Love Notes</span>
+            </div>
+            <p style="text-align:center;">Register to verify your email and see them in your dashboard.</p>
+            <button class="uen-btn uen-btn-primary" id="uen-register-btn">Register to unlock</button>
+          ` : `
+            <p style="text-align:center;color:#fff;font-weight:600;">No wallet found for this email yet.</p>
+            <p>Register to create your UEN wallet and start collecting Universal Exchange Notes (originally Love Notes).</p>
+            <button class="uen-btn uen-btn-primary" id="uen-register-btn">Register now</button>
+          `}
+          <button class="uen-btn uen-btn-secondary" id="uen-teaser-back-btn">Use a different email</button>
         </div>
       ` : ""}
       ${state === "no-uens" ? `<p class="uen-msg uen-msg-info">You have no available notes for this merchant right now. Tap refresh after a new contribution, or open your full dashboard below.</p>` : ""}
@@ -475,47 +507,40 @@ function buildWidget(merchantId: string) {
     });
 
     const emailVal = () => (document.getElementById("uen-login-email") as HTMLInputElement | null)?.value.trim() ?? "";
-    const passwordVal = () => (document.getElementById("uen-login-password") as HTMLInputElement | null)?.value ?? "";
+    let lastEmail = "";
+    let lastHubId: string | null = null;
 
-    // Email a one-time sign-in link (passwordless / forgot-password path).
-    const sendLink = async () => {
+    // Check the email and show the recognition teaser. Never logs in or reveals
+    // the dashboard — registration (with email verification) is required for that.
+    const checkNotes = async () => {
       const email = emailVal();
       if (!email) return;
-      const btn = document.getElementById("uen-login-link-btn") as HTMLButtonElement | null;
-      if (btn) { btn.disabled = true; btn.textContent = "Sending..."; }
-      try {
-        await widgetLogin(merchantId, email);
-        renderPanel("link-sent", { notice: email });
-      } catch (err) {
-        renderPanel("login", { error: err instanceof Error ? err.message : "Login failed." });
-      }
-    };
-
-    // Primary: password sign-in, or fall back to the email link when blank.
-    const loginSubmit = async () => {
-      const email = emailVal();
-      if (!email) return;
-      const password = passwordVal();
-      if (!password) return sendLink();
+      lastEmail = email;
       const btn = document.getElementById("uen-login-btn") as HTMLButtonElement | null;
-      if (btn) { btn.disabled = true; btn.textContent = "Signing in..."; }
+      if (btn) { btn.disabled = true; btn.textContent = "Checking..."; }
       try {
-        token = await widgetLoginPassword(merchantId, email, password);
-        setToken(token);
-        await openPanel();
+        const result = await widgetRecognize(merchantId, email);
+        lastHubId = result.exchangeHubId;
+        renderPanel("teaser", { recognized: result.recognized, count: result.count, hubId: result.exchangeHubId, email });
       } catch (err) {
-        renderPanel("login", { error: err instanceof Error ? err.message : "Sign in failed." });
+        renderPanel("login", { error: err instanceof Error ? err.message : "Could not check this email." });
       }
     };
 
-    document.getElementById("uen-login-btn")?.addEventListener("click", loginSubmit);
-    document.getElementById("uen-login-link-btn")?.addEventListener("click", sendLink);
-    document.getElementById("uen-login-password")?.addEventListener("keydown", (e) => {
-      if ((e as KeyboardEvent).key === "Enter") loginSubmit();
-    });
+    // Register / sign in — opens the standard registration page, pre-filled.
+    const goRegister = () => {
+      const params = new URLSearchParams();
+      if (lastHubId) params.set("hub", lastHubId);
+      if (lastEmail) params.set("email", lastEmail);
+      window.open(`${UEN_API_BASE}/holder/register?${params.toString()}`, "_blank", "noopener");
+    };
+
+    document.getElementById("uen-login-btn")?.addEventListener("click", checkNotes);
     document.getElementById("uen-login-email")?.addEventListener("keydown", (e) => {
-      if ((e as KeyboardEvent).key === "Enter") loginSubmit();
+      if ((e as KeyboardEvent).key === "Enter") checkNotes();
     });
+    document.getElementById("uen-register-btn")?.addEventListener("click", goRegister);
+    document.getElementById("uen-teaser-back-btn")?.addEventListener("click", () => renderPanel("login"));
 
     document.getElementById("uen-auto-btn")?.addEventListener("click", async () => {
       const btn = document.getElementById("uen-auto-btn") as HTMLButtonElement;
