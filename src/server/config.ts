@@ -14,14 +14,14 @@ export const config = {
   adminEmail: process.env.ADMIN_EMAIL ?? "admin@uen.local",
   adminPassword: process.env.ADMIN_PASSWORD ?? "change-me",
   bootstrapFirstBuildTarget: process.env.BOOTSTRAP_FIRST_BUILD_TARGET !== "false",
-  // Zoho SMTP — used to email holders a one-time sign-in link. When SMTP_USER
-  // is empty the mailer falls back to logging the link to the console so local
-  // dev still works without sending real email.
-  smtp: {
-    host: process.env.SMTP_HOST ?? "smtp.zoho.com",
-    port: Number(process.env.SMTP_PORT ?? 465),
-    user: process.env.SMTP_USER ?? "",
-    pass: process.env.SMTP_PASS ?? "",
-    from: process.env.SMTP_FROM ?? "Zah Brand Solutions <work@zahbrandsolutions.com>"
+  // ZeptoMail HTTP API — used to email holders a one-time sign-in link.
+  // Railway blocks outbound SMTP ports, so sending goes over HTTPS via
+  // ZeptoMail instead of Zoho SMTP. `token` is the full "Zoho-enczapikey ..."
+  // Authorization value from the ZeptoMail agent. When it's empty the mailer
+  // falls back to logging the link to the console so local dev still works.
+  zeptomail: {
+    token: process.env.ZEPTOMAIL_TOKEN ?? "",
+    fromAddress: process.env.ZEPTOMAIL_FROM ?? "work@zahbrandsolutions.com",
+    fromName: process.env.ZEPTOMAIL_FROM_NAME ?? "Zah Brand Solutions"
   }
 };
