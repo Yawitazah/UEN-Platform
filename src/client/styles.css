@@ -7548,3 +7548,32 @@ html { background: #050e09; }
 .player-lyric-line { color: #6f8a7e; font-size: 15px; line-height: 1.5; margin: 0 0 11px; cursor: pointer; transition: color 0.25s, transform 0.25s, opacity 0.25s; opacity: 0.7; }
 .player-lyric-line.active { color: #fff; font-weight: 700; transform: scale(1.03); opacity: 1; text-shadow: 0 0 14px rgba(117, 227, 173, 0.4); }
 .player-lyric-line:hover { color: #cfe6da; opacity: 1; }
+
+/* --- Collection on-brand palette (gold + violet, off the basic green) --- */
+.collection-cat-tabs button.active {
+  background: linear-gradient(95deg, #cba4ff, #f2c14e);
+  border-color: transparent;
+  color: #1a1330;
+}
+.collection-cat-tabs button.active svg,
+.collection-cat-tabs button.active em { color: #1a1330; opacity: 0.75; }
+.collection-cat-tabs button svg { color: #cba4ff; }
+
+/* UEN note chip → gold/violet instead of green */
+.tile-uen-chip { background: rgba(203, 164, 255, 0.14); border-color: rgba(242, 193, 78, 0.4); }
+.tile-uen-chip span { background: linear-gradient(95deg, #cba4ff, #f2c14e); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+
+/* Vault cover — richer brand treatment */
+.vault-cover h1 {
+  background: linear-gradient(96deg, #ffffff 28%, #cba4ff 64%, #f2c14e 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+.vault-chip { border-color: rgba(203, 164, 255, 0.28); background: rgba(203, 164, 255, 0.07); }
+.vault-chip svg { color: #f2c14e; }
+.collection-back:hover, .collection-cat-tabs button:hover { border-color: rgba(203, 164, 255, 0.45); }
+
+/* --- Lyrics: focused karaoke density (fewer prominent lines) --- */
+.player-lyrics { max-height: 210px; padding: 16px 8px; }
+.player-lyric-line { font-size: 14px; margin: 0 0 15px; opacity: 0.32; color: #9fb0c8; transition: opacity 0.3s, font-size 0.3s, color 0.3s, transform 0.3s; }
+.player-lyric-line.active { font-size: 19px; font-weight: 800; opacity: 1; color: #fff; transform: scale(1.02); text-shadow: 0 0 16px rgba(203, 164, 255, 0.5); }
+.player-lyric-line:hover { opacity: 0.8; }

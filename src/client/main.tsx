@@ -1072,6 +1072,8 @@ type CollectionItem = {
   tradable?: boolean;
   // lyrics (optional) — newline-separated; auto-scrolls with playback
   lyrics?: string;
+  // timed lyrics (optional) — drives real karaoke-style sync to the audio clock
+  lyricsTimed?: { t: number; text: string }[];
 };
 
 // The collectible digital Love Note given to every original Love Note supporter.
@@ -1282,8 +1284,20 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState("");
   const [rightTab, setRightTab] = useState<"comments" | "lyrics">("comments");
-  const lyricLines = (item.lyrics ?? "").split(/\n/).map((l) => l.trim()).filter(Boolean);
-  const currentLine = duration > 0 && lyricLines.length ? Math.min(lyricLines.length - 1, Math.floor((currentTime / duration) * lyricLines.length)) : 0;
+  const timedLyrics = item.lyricsTimed && item.lyricsTimed.length ? item.lyricsTimed : null;
+  const lyricLines = timedLyrics ? timedLyrics.map((l) => l.text) : (item.lyrics ?? "").split(/\n/).map((l) => l.trim()).filter(Boolean);
+  // With real timestamps, highlight the last line whose start time has passed
+  // (and nothing during the intro). Otherwise fall back to proportional scroll.
+  const currentLine = (() => {
+    if (timedLyrics) {
+      let idx = -1;
+      for (let i = 0; i < timedLyrics.length; i++) {
+        if (currentTime >= timedLyrics[i].t) idx = i; else break;
+      }
+      return idx;
+    }
+    return duration > 0 && lyricLines.length ? Math.min(lyricLines.length - 1, Math.floor((currentTime / duration) * lyricLines.length)) : 0;
+  })();
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -1628,7 +1642,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                 <div className="player-lyrics" ref={lyricsRef}>
                   {lyricLines.map((line, i) => (
                     <p key={i} data-line={i} className={`player-lyric-line ${i === currentLine ? "active" : ""}`}
-                      onClick={() => { if (audioRef.current && duration) audioRef.current.currentTime = (i / lyricLines.length) * duration; }}>
+                      onClick={() => { if (audioRef.current) audioRef.current.currentTime = timedLyrics ? timedLyrics[i].t : (duration ? (i / lyricLines.length) * duration : 0); }}>
                       {line}
                     </p>
                   ))}
