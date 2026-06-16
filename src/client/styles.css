@@ -7268,7 +7268,7 @@ html { background: #050e09; }
   --ln-gold: #f2c14e;
   position: relative;
   overflow: hidden;
-  margin: 18px 16px 0;
+  margin: 18px 16px;
   border-radius: 22px;
   background: #0a1224;
   isolation: isolate;
@@ -7302,7 +7302,7 @@ html { background: #050e09; }
 
 @keyframes ln-border-spin { to { --ln-angle: 360deg; } }
 @media (min-width: 720px) {
-  .ln-banner { margin: 22px auto 0; max-width: 1100px; }
+  .ln-banner { margin: 22px auto; max-width: 1100px; }
 }
 
 .ln-banner-aurora {
@@ -7415,12 +7415,10 @@ html { background: #050e09; }
 @keyframes ln-text { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
 @keyframes ln-sparkle { 0%, 100% { opacity: 0; transform: scale(0.5); } 50% { opacity: 0.9; transform: scale(1); } }
 
-@media (prefers-reduced-motion: reduce) {
-  /* Keep the color-based animations (the border light travelling and the
-     gradient sweeps) — those aren't the large positional motion this setting
-     guards against. Only calm the drifting/floating/scaling movement. */
-  .ln-banner, .ln-banner-aurora, .ln-banner-sparkles span, .ln-banner-art { animation: none; }
-}
+/* The supporter banner intentionally animates fully even under
+   prefers-reduced-motion — it's a deliberate celebratory centerpiece and must
+   look identical on desktop (Zah's OS has Reduce Motion on) and mobile. So no
+   reduced-motion overrides for it. */
 
 /* --- Image collectible tile (digital Love Note) + viewer --- */
 .collection-tile-art {
