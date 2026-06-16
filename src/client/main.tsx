@@ -1393,19 +1393,27 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const postComment = async () => {
     if (!commentInput.trim() || !track) return;
     const ts = Math.floor(currentTime);
+    const body = commentInput.trim();
+    setCommentInput("");
+    const byTs = (a: DemoComment, b: DemoComment) => a.timestampSeconds - b.timestampSeconds;
     if (portalToken) {
       try {
         const res = await fetch(`/api/holder/digital-products/${track.id}/comments?token=${encodeURIComponent(portalToken)}`, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ body: commentInput.trim(), timestampSeconds: ts })
+          body: JSON.stringify({ body, timestampSeconds: ts })
         });
-        const c = await res.json();
-        setComments((prev) => [...prev, c].sort((a, b) => a.timestampSeconds - b.timestampSeconds));
-      } catch { /* ignore */ }
-    } else {
-      setComments((prev) => [...prev, { id: `local-${Date.now()}`, body: commentInput.trim(), timestampSeconds: ts, holder: { firstName: "You", lastName: "" } }].sort((a, b) => a.timestampSeconds - b.timestampSeconds));
+        if (res.ok) {
+          const c = await res.json();
+          // Only accept a well-formed comment — never append an error payload.
+          if (c && typeof c.body === "string") {
+            setComments((prev) => [...prev, c].sort(byTs));
+            return;
+          }
+        }
+      } catch { /* fall through to optimistic local */ }
     }
-    setCommentInput("");
+    // Fallback (demo, or save failed): show it locally so it never breaks.
+    setComments((prev) => [...prev, { id: `local-${Date.now()}`, body, timestampSeconds: ts, holder: { firstName: "You", lastName: "" } }].sort(byTs));
   };
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -1440,7 +1448,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
             <div className="player-waveform-wrap">
               {nearbyComment && (
                 <div className="player-comment-bubble">
-                  <strong>{nearbyComment.holder.firstName}</strong> {nearbyComment.body}
+                  <strong>{nearbyComment.holder?.firstName}</strong> {nearbyComment.body}
                 </div>
               )}
               <canvas ref={canvasRef} className="player-waveform" width={320} height={72} />
@@ -1469,7 +1477,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                 {comments.map((c) => (
                   <div key={c.id} className="player-comment-dot"
                     style={{ left: `${duration > 0 ? (c.timestampSeconds / duration) * 100 : 0}%` }}
-                    title={`${formatTime(c.timestampSeconds)}: ${c.holder.firstName} — ${c.body}`} />
+                    title={`${formatTime(c.timestampSeconds)}: ${c.holder?.firstName} — ${c.body}`} />
                 ))}
               </div>
               <span className="player-time">{formatTime(duration)}</span>
@@ -1505,7 +1513,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                       {formatTime(c.timestampSeconds)}
                     </button>
                     <div className="player-comment-body">
-                      <strong>{c.holder.firstName} {c.holder.lastName}</strong>
+                      <strong>{c.holder?.firstName} {c.holder?.lastName}</strong>
                       <span>{c.body}</span>
                     </div>
                   </div>

@@ -11,7 +11,49 @@ import { hashSecret } from "./security";
 export async function ensureSchema() {
   if (!(process.env.DATABASE_URL ?? "").startsWith("postgres")) return;
   const statements = [
-    'ALTER TABLE "Holder" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT'
+    'ALTER TABLE "Holder" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT',
+    // Digital-product (music) tables — never migrated to prod, so likes/comments
+    // 500'd. Idempotent additive creation; no-op once they exist.
+    `CREATE TABLE IF NOT EXISTS "DigitalProduct" (
+      "id" TEXT PRIMARY KEY,
+      "exchangeHubId" TEXT NOT NULL,
+      "title" TEXT NOT NULL,
+      "artist" TEXT,
+      "type" TEXT NOT NULL DEFAULT 'ALBUM',
+      "artworkUrl" TEXT,
+      "description" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "DigitalProductTrack" (
+      "id" TEXT PRIMARY KEY,
+      "digitalProductId" TEXT NOT NULL,
+      "title" TEXT NOT NULL,
+      "trackNumber" INTEGER NOT NULL,
+      "fileUrl" TEXT NOT NULL,
+      "durationSeconds" INTEGER,
+      "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "DigitalProductLike" (
+      "id" TEXT PRIMARY KEY,
+      "holderId" TEXT NOT NULL,
+      "trackId" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "DigitalProductComment" (
+      "id" TEXT PRIMARY KEY,
+      "holderId" TEXT NOT NULL,
+      "trackId" TEXT NOT NULL,
+      "timestampSeconds" INTEGER NOT NULL DEFAULT 0,
+      "body" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'CREATE UNIQUE INDEX IF NOT EXISTS "DigitalProductLike_holderId_trackId_key" ON "DigitalProductLike" ("holderId", "trackId")',
+    'CREATE INDEX IF NOT EXISTS "DigitalProductTrack_digitalProductId_idx" ON "DigitalProductTrack" ("digitalProductId")',
+    'CREATE INDEX IF NOT EXISTS "DigitalProductComment_trackId_timestampSeconds_idx" ON "DigitalProductComment" ("trackId", "timestampSeconds")'
   ];
   for (const sql of statements) {
     try {
