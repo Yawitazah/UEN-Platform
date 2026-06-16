@@ -4368,6 +4368,24 @@ function LoveNoteSupporterBanner() {
           <span key={i} style={{ top: `${(i * 61) % 96}%`, left: `${(i * 37) % 94}%`, animationDelay: `${(i % 7) * 0.45}s` } as React.CSSProperties} />
         ))}
       </div>
+      <div className="ln-banner-art" aria-hidden="true">
+        <svg viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lnArtGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#f7d889" />
+              <stop offset="0.55" stopColor="#f2c14e" />
+              <stop offset="1" stopColor="#caa4ff" />
+            </linearGradient>
+          </defs>
+          <g stroke="url(#lnArtGrad)" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round">
+            <rect x="22" y="46" width="96" height="60" rx="12" />
+            <path d="M24 52 L70 84 L116 52" />
+          </g>
+          <g className="ln-art-heart" transform="translate(57 24) scale(1.15)">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="url(#lnArtGrad)" />
+          </g>
+        </svg>
+      </div>
       <div className="ln-banner-content">
         <span className="ln-banner-eyebrow">A celebration of you</span>
         <h2 className="ln-banner-title">Welcome, <span className="ln-gradient">Love Note</span> Supporter</h2>
