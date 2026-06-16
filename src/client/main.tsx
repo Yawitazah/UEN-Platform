@@ -1108,6 +1108,71 @@ const LOVE_NOTE_MUSIC: CollectionItem = {
   status: "Owned",
   artworkUrl: "/music/filthy-coon-cover.jpg",
   description: "An exclusive track for original Love Note supporters — Nubreed ft. Yawitazah, “Filthy Coon.” Press play; it stays in your collection as part of the celebration.",
+  lyrics: `They be out here doin' whatever for the dollar
+A buncha excuses, "I'm just tryin' to provide for my family"
+No honor, no dignity, no respect
+Niggas is disgusting, they got some audacity
+Keep speakin' that blast for me, you ain't got no strategy
+Just shadowboxin' with a vendetta
+Out here just bein' extra, I'm calculated
+Two records, be a cataclysm, you misstep it
+Life can change in a split second
+Gotta move different, they volatile
+We makin' plays, they outta bounds
+Gossipin' is not allowed, over here you get exiled
+These haters weirder than X-Files
+At my apex, no predator
+I'm FBA, no settlin', original, no competitor
+Chatty patties turn federal
+No sneak dissin', you can get a blessin'
+That's 101 without a weapon, guns down, I'm a trendsetter
+You filthy coons keep tap dancing
+Gettin' back-handed by your white daddy
+Cross the line, you get dispatched
+When they showin' off, won't come outside
+I'm like Gideon takin' whole squads
+Chop 'em down, but I'm surgical, no foreheads
+Your sick mind is a horror scene
+Talkin' wild, you get blended up
+Get a new grip, better switch it up
+Made the mask slip, time to give it up
+Dirty dancin' with the devil
+Tap dancin' for dollars
+With a price tag on they head
+Sell they soul for some followers
+A bunch of dirty ass coons
+You're nothin' but a filthy coon
+
+Yeah, it's good to see you back in the lab
+This the type of song that really get these demons mad
+When you doin' good, they gonna see you doin' bad
+That's how demons are, that's the only happiness they have
+That's how I know these coons from L.A. to St. Louis
+Them stab a brother in their back and go and cut the lawn
+Them sabotage the progress that you try to make
+To make some things great for your people, they so filled with hate
+It's in they DNA, snakin' in they DNA
+Our skin might look the same, but they ain't got our DNA
+This the games they play from way back in the day
+They see the light in you and they wanna make it go away
+Sick and unstable, hate to see a brother win
+Cain wasn't able, so he killed his brother then
+Esau wasn't right, turned Edomite
+Used all they might to do us, they hate us Israelites
+Man, it sucks to be a coon, you'll never be white
+Man, it sucks to be a coon, you'll never see the light
+Christ was a black man betrayed by Israelites
+Coons hated Christ so much they loved him when they turned him white
+Coons have always been around us, take a look around
+They face down, lettin' MAGA clown go to pound town
+Then turn around and call you liberal or a Democrat
+You tried to bow yourself, puttin' on a MAGA hat
+Pretty soon you'll see these coons gon' cry for Donald Trump
+It's gonna be a war you've never seen and coons won't survive
+Dirty dancin' with the devil, tap dancin' for dollars
+With a price tag on they head, sell they soul for some followers
+A bunch of dirty ass coons
+You're nothin' but a filthy coon`,
   tracks: [
     { id: "filthy-coon-1", title: "Filthy Coon", trackNumber: 1, fileUrl: "/music/filthy-coon.mp3", likeCount: 0, likedByHolder: false }
   ]
