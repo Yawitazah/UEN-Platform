@@ -1176,6 +1176,7 @@ With a price tag on they head, sell they soul for some followers
 A bunch of dirty ass coons
 You're nothin' but a filthy coon`,
   lyricsTimed: [{"t":0,"text":"They be out here doin' whatever for the dollar"},{"t":5,"text":"A buncha excuses, \"I'm just tryin' to provide for my family\""},{"t":10,"text":"No honor, no dignity, no respect"},{"t":12,"text":"Niggas is disgusting, they got some audacity"},{"t":15,"text":"Keep speakin' that blast for me, you ain't got no strategy"},{"t":18,"text":"Just shadowboxin' with a vendetta"},{"t":21,"text":"Out here just bein' extra, I'm calculated"},{"t":24,"text":"Two records, be a cataclysm, you misstep it"},{"t":26,"text":"Life can change in a split second"},{"t":28,"text":"Gotta move different, they volatile"},{"t":30,"text":"We makin' plays, they outta bounds"},{"t":32,"text":"Gossipin' is not allowed, over here you get exiled"},{"t":35,"text":"These haters weirder than X-Files"},{"t":37,"text":"At my apex, no predator"},{"t":39,"text":"I'm FBA, no settlin', original, no competitor"},{"t":42,"text":"Chatty patties turn federal"},{"t":44,"text":"No sneak dissin', you can get a blessin'"},{"t":46,"text":"That's 101 without a weapon, guns down, I'm a trendsetter"},{"t":49,"text":"You filthy coons keep tap dancing"},{"t":51,"text":"Gettin' back-handed by your white daddy"},{"t":53,"text":"Cross the line, you get dispatched"},{"t":55,"text":"When they showin' off, won't come outside"},{"t":57,"text":"I'm like Gideon takin' whole squads, chop 'em down"},{"t":60,"text":"But I'm surgical, no foreheads"},{"t":62,"text":"Your sick mind is a horror scene"},{"t":64,"text":"Talkin' wild, you get blended up"},{"t":67,"text":"Get a new grip, better switch it up"},{"t":69,"text":"Made the mask slip, time to give it up"},{"t":71,"text":"Dirty dancin' with the devil, tap dancin' for dollars"},{"t":78,"text":"With a price tag on they head"},{"t":81,"text":"Sell they soul for some followers"},{"t":84,"text":"A bunch of dirty ass coons"},{"t":90,"text":"You're nothin' but a filthy coon"},{"t":99,"text":"Yeah, it's good to see you back in the lab"},{"t":103,"text":"This the type of song that really get these demons mad"},{"t":106,"text":"When you doin' good, they gonna see you doin' bad"},{"t":109,"text":"That's how demons are, that's the only happiness they have"},{"t":113,"text":"That's how I know these coons from L.A. to St. Louis"},{"t":116,"text":"Them stab a brother in their back and go and cut the lawn"},{"t":120,"text":"Them sabotage the progress that you try to make"},{"t":123,"text":"To make things great for your people, they so filled with hate"},{"t":127,"text":"It's in they DNA, snakin' in they DNA"},{"t":130,"text":"Our skin might look the same, but they ain't got our DNA"},{"t":134,"text":"This the games they play from way back in the day"},{"t":137,"text":"They see the light in you and they wanna make it go away"},{"t":141,"text":"Sick and unstable, hate to see a brother win"},{"t":145,"text":"Cain wasn't able, so he killed his brother then"},{"t":148,"text":"Esau wasn't right, turned Edomite"},{"t":151,"text":"Used all they might to do us, they hate us Israelites"},{"t":155,"text":"Man, it sucks to be a coon, you'll never be white"},{"t":159,"text":"Man, it sucks to be a coon, you'll never see the light"},{"t":162,"text":"Christ was a black man betrayed by Israelites"},{"t":165,"text":"Coons hated Christ so much they loved him when they turned him white"},{"t":169,"text":"Coons have always been around us, take a look around"},{"t":172,"text":"They face down, lettin' MAGA clown go to pound town"},{"t":176,"text":"Then turn around and call you liberal or a Democrat"},{"t":180,"text":"You tried to bow yourself, puttin' on a MAGA hat"},{"t":190,"text":"Dr. King ain't never mention this in his dreams"},{"t":194,"text":"He said blacks and whites were holdin' hands, he's so advanced"},{"t":198,"text":"Or maybe he just knew these coons didn't stand a chance"},{"t":201,"text":"As soon as they gettin' a chance, they try to get in white's pants"},{"t":226,"text":"Pretty soon you'll see these coons gon' cry for Donald Trump"},{"t":233,"text":"They gonna make a Trump clone then execute him live"},{"t":236,"text":"It's gonna be a war you've never seen and coons won't survive"},{"t":240,"text":"Dirty dancin' with the devil, tap dancin' for dollars"},{"t":247,"text":"With a price tag on they head, sell they soul for some followers"},{"t":252,"text":"A bunch of dirty ass coons"},{"t":259,"text":"You're nothin' but a filthy coon"}],
+  tradable: false,
   tracks: [
     { id: "filthy-coon-1", title: "Filthy Coon", trackNumber: 1, fileUrl: "/music/filthy-coon.mp3", likeCount: 0, likedByHolder: false }
   ]
@@ -1573,6 +1574,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
               <h2 className="player-album-title">{item.title}</h2>
               <p className="player-album-artist">{item.artist ?? item.source}</p>
               <p className="player-album-meta">{tracks.length} track{tracks.length !== 1 ? "s" : ""} · Exclusive drop</p>
+              <AssetMeta item={item} />
             </div>
 
             {/* Waveform */}
@@ -1930,6 +1932,34 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
 }
 
 // Detail modal for non-media collectibles (notes, badges, future assets).
+// Reusable asset details: the stat grid + a trade/sell affordance. Shown in
+// every open-asset view so the stats and the (coming-soon) trade button are
+// consistent. Keepsakes (tradable === false) show a "not tradable" note instead.
+function AssetMeta({ item }: { item: CollectionItem }) {
+  const [soon, setSoon] = useState(false);
+  return (
+    <div className="asset-meta">
+      <dl className="collection-detail-dl">
+        <div><dt>Exchange Hub</dt><dd>{item.source}</dd></div>
+        <div><dt>Received</dt><dd>{item.date}</dd></div>
+        <div><dt>Rarity</dt><dd>{item.rarity}</dd></div>
+        <div><dt>Status</dt><dd>{item.status}</dd></div>
+        <div><dt>Value</dt><dd>{item.value}</dd></div>
+      </dl>
+      {item.tradable === false ? (
+        <span className="asset-keepsake">Keepsake — yours to treasure, not to trade</span>
+      ) : (
+        <div className="asset-trade-row">
+          <button className="asset-trade-btn" onClick={() => setSoon(true)}>
+            Trade / Sell <span className="asset-soon">Coming soon</span>
+          </button>
+          {soon && <p className="asset-meta-msg">Trading & selling assets between holders is coming soon.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GenericDetailModal({ item, onClose }: { item: CollectionItem; onClose: () => void }) {
   return (
     <div className="ln-viewer-backdrop" onClick={onClose}>
@@ -1939,13 +1969,7 @@ function GenericDetailModal({ item, onClose }: { item: CollectionItem; onClose: 
           <span className="ln-viewer-kicker">{item.source} · {item.rarity}</span>
           <h3>{item.title}</h3>
           <p>{item.description}</p>
-          <dl className="collection-detail-dl">
-            <div><dt>Source</dt><dd>{item.source}</dd></div>
-            <div><dt>Received</dt><dd>{item.date}</dd></div>
-            <div><dt>Status</dt><dd>{item.status}</dd></div>
-            <div><dt>Value</dt><dd>{item.value}</dd></div>
-          </dl>
-          <span className="ln-viewer-note">{item.tradable === false ? "Keepsake — not tradable" : "Not transferable yet — gift / trade controls can be enabled later."}</span>
+          <AssetMeta item={item} />
         </div>
       </div>
     </div>
@@ -1992,8 +2016,8 @@ function CollectibleViewer({ item, onClose }: { item: CollectionItem; onClose: (
             <button className="ln-viewer-download" onClick={download} disabled={downloading}>
               <Download size={16} /> {downloading ? "Preparing…" : "Download"}
             </button>
-            {item.tradable === false && <span className="ln-viewer-note">Keepsake — not tradable</span>}
           </div>
+          <AssetMeta item={item} />
         </div>
       </div>
     </div>
