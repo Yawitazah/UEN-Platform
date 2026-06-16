@@ -7416,6 +7416,8 @@ html { background: #050e09; }
 @keyframes ln-sparkle { 0%, 100% { opacity: 0; transform: scale(0.5); } 50% { opacity: 0.9; transform: scale(1); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ln-banner, .ln-banner::before, .ln-banner-aurora, .ln-gradient, .ln-banner-eyebrow,
-  .ln-banner-sparkles span, .ln-banner-art, .ln-art-heart { animation: none; }
+  /* Keep the color-based animations (the border light travelling and the
+     gradient sweeps) — those aren't the large positional motion this setting
+     guards against. Only calm the drifting/floating/scaling movement. */
+  .ln-banner, .ln-banner-aurora, .ln-banner-sparkles span, .ln-banner-art { animation: none; }
 }
