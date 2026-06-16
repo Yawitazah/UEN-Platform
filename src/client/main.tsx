@@ -1065,6 +1065,29 @@ type CollectionItem = {
   artworkUrl?: string;
   artist?: string;
   tracks?: AlbumTrack[];
+  // image/download collectible (optional)
+  imageUrl?: string;
+  downloadUrl?: string;
+  downloadName?: string;
+  tradable?: boolean;
+};
+
+// The collectible digital Love Note given to every original Love Note supporter.
+// Viewable + downloadable, but not tradable.
+const LOVE_NOTE_COLLECTIBLE: CollectionItem = {
+  id: "love-note-collectible",
+  type: "Digital Download",
+  title: "Your Digital Love Note",
+  source: "Love Notes",
+  rarity: "Keepsake",
+  value: "Keepsake",
+  date: "2026",
+  status: "Owned",
+  imageUrl: "https://cdn.shopify.com/s/files/1/0566/5367/6659/products/1ozofLove-KingDawidTrust.gif?v=1661117710",
+  downloadUrl: "https://cdn.shopify.com/s/files/1/0566/5367/6659/products/1ozofLove-KingDawidTrust.gif?v=1661117710",
+  downloadName: "Digital-Love-Note.gif",
+  tradable: false,
+  description: "Your collectible digital Love Note — a keepsake marking that you were part of the original Love Notes. Open it to view, and download it to keep. This one is yours to treasure, not to trade."
 };
 
 const demoCollectionItems: CollectionItem[] = [
@@ -1476,6 +1499,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
   const [selected, setSelected] = useState(items[0]);
   const [actionMessage, setActionMessage] = useState("");
   const [openAlbum, setOpenAlbum] = useState<CollectionItem | null>(null);
+  const [openImage, setOpenImage] = useState<CollectionItem | null>(null);
   useEffect(() => {
     setSelected(items[0]);
   }, [items]);
@@ -1510,6 +1534,10 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
   const openItem = () => {
     if (selected.assetType === "ALBUM" && selected.tracks?.length) {
       setOpenAlbum(selected);
+      return;
+    }
+    if (selected.imageUrl) {
+      setOpenImage(selected);
       return;
     }
     setActionMessage(`${selected.title} is open. This is where the Holder would preview files, reward details, redemption utility, and the campaign memory attached to the item.`);
@@ -1596,6 +1624,22 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
                     </div>
                   </button>
                 </div>
+              );
+            }
+
+            // ── Image collectible tile (e.g. the digital Love Note) ──
+            if (item.imageUrl) {
+              return (
+                <button key={item.id} className={`collection-tile-art ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                  <img className="tile-art-img" src={item.imageUrl} alt={item.title} />
+                  <div className="tile-art-overlay" />
+                  <div className="tile-glass-shimmer" />
+                  <div className="tile-art-info">
+                    <span className="tile-art-type">{typeLabel}</span>
+                    <strong className="tile-art-title">{item.title}</strong>
+                    <small className="tile-art-meta">{item.rarity} · Tap to view</small>
+                  </div>
+                </button>
               );
             }
 
@@ -1692,14 +1736,65 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
           {actionMessage && <div className="collection-action-message">{actionMessage}</div>}
           <div className="collection-actions">
             <button onClick={openItem}>
-              {selected.assetType === "ALBUM" ? "▶ Play Album" : "Open Item"}
+              {selected.assetType === "ALBUM" ? "▶ Play Album" : selected.imageUrl ? "Open & View" : "Open Item"}
             </button>
-            <button className="ghost" onClick={previewTrade}>Gift / Trade Preview</button>
+            {selected.tradable === false
+              ? <span className="collection-keepsake-note">Keepsake — yours to treasure, not to trade</span>
+              : <button className="ghost" onClick={previewTrade}>Gift / Trade Preview</button>}
           </div>
         </aside>
       </div>
       {openAlbum && <AudioPlayerModal item={openAlbum} onClose={() => setOpenAlbum(null)} portalToken={portalToken} />}
+      {openImage && <CollectibleViewer item={openImage} onClose={() => setOpenImage(null)} />}
     </section>
+  );
+}
+
+// Lightbox for image collectibles (the digital Love Note): displays the art
+// large and offers a real download (blob fetch, with a new-tab fallback).
+function CollectibleViewer({ item, onClose }: { item: CollectionItem; onClose: () => void }) {
+  const [downloading, setDownloading] = useState(false);
+  const download = async () => {
+    const url = item.downloadUrl ?? item.imageUrl;
+    if (!url) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(url, { mode: "cors" });
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = item.downloadName ?? "love-note.gif";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 4000);
+    } catch {
+      window.open(url, "_blank", "noopener");
+    } finally {
+      setDownloading(false);
+    }
+  };
+  return (
+    <div className="ln-viewer-backdrop" onClick={onClose}>
+      <div className="ln-viewer" onClick={(e) => e.stopPropagation()}>
+        <button className="ln-viewer-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        <div className="ln-viewer-stage">
+          <img src={item.imageUrl} alt={item.title} />
+        </div>
+        <div className="ln-viewer-meta">
+          <span className="ln-viewer-kicker">{item.source} · {item.rarity}</span>
+          <h3>{item.title}</h3>
+          <p>{item.description}</p>
+          <div className="ln-viewer-actions">
+            <button className="ln-viewer-download" onClick={download} disabled={downloading}>
+              <Download size={16} /> {downloading ? "Preparing…" : "Download"}
+            </button>
+            {item.tradable === false && <span className="ln-viewer-note">Keepsake — not tradable</span>}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -4439,7 +4534,7 @@ function LiveHolderPortal({ token }: { token: string }) {
   const profileComplete = holderHasName && Boolean(holder.phone);
   const totalActive = uens.filter((u: any) => u.status === "ACTIVE").length;
   const totalRedeemed = uens.reduce((n: number, u: any) => n + u.redemptions.filter((r: any) => r.redeemed).length, 0);
-  const holderCollectionItems = uens.length > 0 ? uens.map((uen: any, index: number) => ({
+  const uenItems: CollectionItem[] = uens.map((uen: any, index: number) => ({
     id: uen.id,
     type: "Universal Exchange Note",
     title: uen.code,
@@ -4449,7 +4544,10 @@ function LiveHolderPortal({ token }: { token: string }) {
     date: new Date(uen.issuedAt ?? uen.createdAt).toLocaleDateString(),
     status: uen.status,
     description: `A Universal Exchange Note issued by ${hub.displayName}. This item stays in your collection as proof of support and can unlock value with participating merchants.`
-  })) : demoCollectionItems;
+  }));
+  // Love Note supporters always get the collectible digital Love Note, pinned first.
+  const ownedItems: CollectionItem[] = holder.isLoveNoteSupporter ? [LOVE_NOTE_COLLECTIBLE, ...uenItems] : uenItems;
+  const holderCollectionItems = ownedItems.length > 0 ? ownedItems : demoCollectionItems;
 
   const formatOffer = (offer: any) => {
     if (!offer) return "No offer";

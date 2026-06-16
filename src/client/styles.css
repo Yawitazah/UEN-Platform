@@ -7421,3 +7421,53 @@ html { background: #050e09; }
      guards against. Only calm the drifting/floating/scaling movement. */
   .ln-banner, .ln-banner-aurora, .ln-banner-sparkles span, .ln-banner-art { animation: none; }
 }
+
+/* --- Image collectible tile (digital Love Note) + viewer --- */
+.collection-tile-art {
+  position: relative;
+  overflow: hidden;
+  min-height: 220px;
+  border-radius: 18px;
+  border: 1px solid rgba(242, 193, 78, 0.35);
+  background: #0a1208;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+.collection-tile-art .tile-art-img { animation: none; }
+.collection-tile-art.active { border-color: #f2c14e; box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.4); }
+
+.collection-keepsake-note { color: #c98a3a; font-size: 12.5px; font-style: italic; align-self: center; }
+
+.ln-viewer-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(4, 8, 16, 0.82);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.ln-viewer {
+  position: relative; width: 100%; max-width: 560px; max-height: 92vh; overflow: auto;
+  background: #0c1426; border: 1px solid rgba(242, 193, 78, 0.35); border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+.ln-viewer-close {
+  position: absolute; top: 12px; right: 12px; z-index: 3;
+  background: rgba(0, 0, 0, 0.45); border: none; color: #fff;
+  border-radius: 999px; width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer;
+}
+.ln-viewer-stage { display: flex; align-items: center; justify-content: center; padding: 26px 26px 0; }
+.ln-viewer-stage img { max-width: 100%; max-height: 56vh; border-radius: 12px; object-fit: contain; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+.ln-viewer-meta { padding: 18px 26px 26px; }
+.ln-viewer-kicker { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #f2c14e; font-weight: 700; }
+.ln-viewer-meta h3 { color: #fff; margin: 6px 0 8px; font-size: 22px; }
+.ln-viewer-meta p { color: #c6d6ee; font-size: 14px; line-height: 1.55; margin: 0 0 16px; }
+.ln-viewer-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ln-viewer-download {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(95deg, #cba4ff, #f2c14e); color: #1a1330;
+  border: none; font-weight: 700; font-size: 14px; padding: 11px 20px; border-radius: 11px; cursor: pointer;
+}
+.ln-viewer-download:disabled { opacity: 0.7; cursor: default; }
+.ln-viewer-note { color: #9fb0cc; font-size: 12.5px; font-style: italic; }
