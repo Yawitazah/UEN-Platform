@@ -4,7 +4,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { ensureFirstBuildTarget, ensureSchema } from "./bootstrap";
+import { ensureFirstBuildTarget, ensureSchema, ensureFounderSupporter } from "./bootstrap";
 import { config } from "./config";
 import { authenticate } from "./security";
 import authRoutes from "./routes/auth";
@@ -132,6 +132,7 @@ async function start() {
   if (config.bootstrapFirstBuildTarget) {
     await ensureFirstBuildTarget();
   }
+  await ensureFounderSupporter();
 
   app.listen(config.port, () => {
     console.log(`Universal Exchange Note app listening on http://localhost:${config.port}`);

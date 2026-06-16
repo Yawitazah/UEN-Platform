@@ -22,6 +22,30 @@ export async function ensureSchema() {
   }
 }
 
+// Marks the founder's email as an original Love Note supporter so it sees the
+// full supporter experience (banner, music, collectibles). Driven by env so it
+// stays out of the code; set FOUNDER_SUPPORTER_EMAIL to enable. Idempotent.
+export async function ensureFounderSupporter() {
+  const email = (process.env.FOUNDER_SUPPORTER_EMAIL ?? "").trim().toLowerCase();
+  if (!email) return;
+  try {
+    const existing = await prisma.uenCodeInventory.findFirst({
+      where: { source: "GRANDFATHERED", issuedToEmail: email }
+    });
+    if (existing) return;
+    const hub =
+      (await prisma.exchangeHub.findFirst({ where: { status: HubStatus.ACTIVE, NOT: { displayName: "Exchange Hub A" } }, orderBy: { createdAt: "asc" } })) ??
+      (await prisma.exchangeHub.findFirst({ where: { status: HubStatus.ACTIVE }, orderBy: { createdAt: "asc" } }));
+    if (!hub) return;
+    await prisma.uenCodeInventory.create({
+      data: { exchangeHubId: hub.id, code: `FOUNDER-${email}`, source: "GRANDFATHERED", status: "RESERVED", issuedToEmail: email }
+    });
+    console.log(`ensureFounderSupporter: ${email} marked as Love Note supporter in ${hub.displayName}`);
+  } catch (error) {
+    console.error("ensureFounderSupporter failed", error);
+  }
+}
+
 export async function ensureFirstBuildTarget() {
   const existingHub = await prisma.exchangeHub.findFirst({
     where: { name: "exchange-hub-a" }
