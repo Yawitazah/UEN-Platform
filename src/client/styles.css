@@ -7523,3 +7523,18 @@ html { background: #050e09; }
 .collection-detail-dl div { display: flex; flex-direction: column; }
 .collection-detail-dl dt { color: #8aa0bd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
 .collection-detail-dl dd { color: #fff; margin: 0; font-size: 14px; }
+
+/* --- Player: touch scrubbing + comment edit/delete --- */
+.player-progress-track { touch-action: none; }
+@media (max-width: 720px) {
+  .player-progress-track { height: 12px; }
+  .player-progress-fill::after { height: 18px; width: 18px; right: -9px; }
+}
+.player-comment-body { flex: 1; min-width: 0; }
+.player-comment-actions { display: flex; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.player-comment-actions button { background: none; border: none; color: #7c9a8c; cursor: pointer; font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+.player-comment-actions button:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.player-comment-edit { display: flex; gap: 6px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
+.player-comment-edit input { flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(117, 227, 173, 0.35); border-radius: 8px; color: #fff; font-family: inherit; font-size: 13px; padding: 6px 10px; outline: none; }
+.player-comment-edit button { background: #75e3ad; border: none; color: #07120e; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.player-comment-edit button.ghost { background: rgba(255, 255, 255, 0.1); color: #cfe6da; }

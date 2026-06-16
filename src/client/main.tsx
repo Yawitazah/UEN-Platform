@@ -1175,7 +1175,7 @@ const demoCollectionItems: CollectionItem[] = [
   }
 ];
 
-type DemoComment = { id: string; body: string; timestampSeconds: number; holder: { firstName: string; lastName: string } };
+type DemoComment = { id: string; body: string; timestampSeconds: number; holder: { firstName: string; lastName: string }; holderId?: string; isMine?: boolean };
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -1210,6 +1210,9 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editInput, setEditInput] = useState("");
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -1351,11 +1354,46 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     setPlaying(!playing);
   };
 
-  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  // Scrub with drag — works for mouse AND touch (pointer events). Tapping the
+  // thin bar on mobile was unreliable; now you can press anywhere and drag.
+  const seekToClientX = (clientX: number) => {
+    const el = progressRef.current;
+    if (!el || !audioRef.current || !duration) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     audioRef.current.currentTime = ratio * duration;
+    setCurrentTime(ratio * duration);
+  };
+  const onProgressPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    seekToClientX(e.clientX);
+    const move = (ev: PointerEvent) => seekToClientX(ev.clientX);
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const deleteComment = async (c: DemoComment) => {
+    setComments((prev) => prev.filter((x) => x.id !== c.id));
+    if (portalToken && !c.id.startsWith("local-") && !c.id.startsWith("seed-")) {
+      try { await fetch(`/api/holder/digital-products/comments/${c.id}?token=${encodeURIComponent(portalToken)}`, { method: "DELETE" }); } catch { /* already removed locally */ }
+    }
+  };
+  const saveEdit = async (c: DemoComment) => {
+    const body = editInput.trim();
+    if (!body) return;
+    setComments((prev) => prev.map((x) => (x.id === c.id ? { ...x, body } : x)));
+    setEditingId(null);
+    if (portalToken && !c.id.startsWith("local-") && !c.id.startsWith("seed-")) {
+      try {
+        await fetch(`/api/holder/digital-products/comments/${c.id}?token=${encodeURIComponent(portalToken)}`, {
+          method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ body })
+        });
+      } catch { /* kept local edit */ }
+    }
   };
 
   const changeTrack = (index: number) => {
@@ -1446,11 +1484,6 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
 
             {/* Waveform */}
             <div className="player-waveform-wrap">
-              {nearbyComment && (
-                <div className="player-comment-bubble">
-                  <strong>{nearbyComment.holder?.firstName}</strong> {nearbyComment.body}
-                </div>
-              )}
               <canvas ref={canvasRef} className="player-waveform" width={320} height={72} />
             </div>
 
@@ -1472,7 +1505,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
             {/* Progress bar */}
             <div className="player-progress-wrap">
               <span className="player-time">{formatTime(currentTime)}</span>
-              <div className="player-progress-track" onClick={seek}>
+              <div className="player-progress-track" ref={progressRef} onPointerDown={onProgressPointerDown}>
                 <div className="player-progress-fill" style={{ width: `${progressPct}%` }} />
                 {comments.map((c) => (
                   <div key={c.id} className="player-comment-dot"
@@ -1514,8 +1547,23 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                     </button>
                     <div className="player-comment-body">
                       <strong>{c.holder?.firstName} {c.holder?.lastName}</strong>
-                      <span>{c.body}</span>
+                      {editingId === c.id ? (
+                        <div className="player-comment-edit">
+                          <input value={editInput} autoFocus onChange={(e) => setEditInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveEdit(c); if (e.key === "Escape") setEditingId(null); }} />
+                          <button onClick={() => saveEdit(c)}>Save</button>
+                          <button className="ghost" onClick={() => setEditingId(null)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <span>{c.body}</span>
+                      )}
                     </div>
+                    {c.isMine && editingId !== c.id && (
+                      <div className="player-comment-actions">
+                        <button onClick={() => { setEditingId(c.id); setEditInput(c.body); }} aria-label="Edit comment">✎</button>
+                        <button onClick={() => deleteComment(c)} aria-label="Delete comment">🗑</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
