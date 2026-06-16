@@ -7577,3 +7577,6 @@ html { background: #050e09; }
 .player-lyric-line { font-size: 14px; margin: 0 0 15px; opacity: 0.32; color: #9fb0c8; transition: opacity 0.3s, font-size 0.3s, color 0.3s, transform 0.3s; }
 .player-lyric-line.active { font-size: 19px; font-weight: 800; opacity: 1; color: #fff; transform: scale(1.02); text-shadow: 0 0 16px rgba(203, 164, 255, 0.5); }
 .player-lyric-line:hover { opacity: 0.8; }
+
+/* Player tabs on-brand (match collection) */
+.player-tabs button.active { background: linear-gradient(95deg, #cba4ff, #f2c14e); border-color: transparent; color: #1a1330; }
