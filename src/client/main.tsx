@@ -1183,6 +1183,14 @@ function formatTime(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// A few seeded comments shown alongside real ones for social proof — when
+// people see a track already has chatter, they're more likely to join in.
+const SEED_COMMENTS: DemoComment[] = [
+  { id: "seed-1", body: "This beat is COLD 🔥", timestampSeconds: 8, holder: { firstName: "Raquel", lastName: "H." } },
+  { id: "seed-2", body: "Gunna would body this", timestampSeconds: 24, holder: { firstName: "Marcus", lastName: "T." } },
+  { id: "seed-3", body: "The 808s are perfect 🙌", timestampSeconds: 47, holder: { firstName: "Aliyah", lastName: "W." } }
+];
+
 function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: CollectionItem; onClose: () => void; portalToken?: string }) {
   const tracks = item.tracks ?? [];
   const [trackIndex, setTrackIndex] = useState(0);
@@ -1196,12 +1204,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>(() =>
     Object.fromEntries(tracks.map((t) => [t.id, t.likeCount ?? 0]))
   );
-  const [comments, setComments] = useState<DemoComment[]>([
-    { id: "dc1", body: "This beat is COLD 🔥", timestampSeconds: 8, holder: { firstName: "Raquel", lastName: "H." } },
-    { id: "dc2", body: "That melody at 0:22 hits different", timestampSeconds: 22, holder: { firstName: "Marcus", lastName: "T." } },
-    { id: "dc3", body: "Gunna would body this", timestampSeconds: 47, holder: { firstName: "Aliyah", lastName: "W." } },
-    { id: "dc4", body: "The 808s are perfect", timestampSeconds: 63, holder: { firstName: "Devon", lastName: "J." } },
-  ]);
+  const [comments, setComments] = useState<DemoComment[]>(SEED_COMMENTS);
   const [commentInput, setCommentInput] = useState("");
   const [nearbyComment, setNearbyComment] = useState<DemoComment | null>(null);
 
@@ -1214,6 +1217,35 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const waveformReady = useRef(false);
 
   const track = tracks[trackIndex];
+
+  // Load real comments + like state for this track (signed-in supporters).
+  // Real comments are merged below the seed comments; demo albums just 404 here
+  // and keep the seeds.
+  useEffect(() => {
+    if (!portalToken || !track) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/holder/digital-products/${track.id}/comments?token=${encodeURIComponent(portalToken)}`);
+        if (res.ok) {
+          const real = (await res.json()) as DemoComment[];
+          if (!cancelled) setComments([...SEED_COMMENTS, ...real].sort((a, b) => a.timestampSeconds - b.timestampSeconds));
+        }
+      } catch { /* keep seeds */ }
+      try {
+        const pres = await fetch(`/api/holder/digital-products/${item.id}?token=${encodeURIComponent(portalToken)}`);
+        if (pres.ok) {
+          const product = await pres.json();
+          const t = (product.tracks ?? []).find((x: { id: string }) => x.id === track.id);
+          if (t && !cancelled) {
+            setLikeCounts((prev) => ({ ...prev, [track.id]: t.likeCount ?? 0 }));
+            setLiked((prev) => ({ ...prev, [track.id]: Boolean(t.likedByHolder) }));
+          }
+        }
+      } catch { /* keep defaults */ }
+    })();
+    return () => { cancelled = true; };
+  }, [portalToken, track?.id, item.id]);
 
   const initAudioContext = useCallback(() => {
     if (!audioRef.current || waveformReady.current) return;
@@ -4719,7 +4751,7 @@ function LiveHolderPortal({ token }: { token: string }) {
       )}
 
       {activeTab === "collection" && (
-        <HolderCollectionExperience holderName={holder.firstName} items={holderCollectionItems} />
+        <HolderCollectionExperience holderName={holder.firstName} items={holderCollectionItems} portalToken={token} />
       )}
 
       {/* Merchant directory */}

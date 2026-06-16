@@ -46,6 +46,47 @@ export async function ensureFounderSupporter() {
   }
 }
 
+// Seeds the Love Note supporter music ("Filthy Coon") as a real DigitalProduct
+// + Track so likes and comments persist (they FK to a real track id). Uses
+// fixed ids that match the client-side LOVE_NOTE_MUSIC collectible. Idempotent.
+export async function ensureLoveNoteMusic() {
+  try {
+    const existing = await prisma.digitalProductTrack.findUnique({ where: { id: "filthy-coon-1" } });
+    if (existing) return;
+    const hub =
+      (await prisma.exchangeHub.findFirst({ where: { status: HubStatus.ACTIVE, NOT: { displayName: "Exchange Hub A" } }, orderBy: { createdAt: "asc" } })) ??
+      (await prisma.exchangeHub.findFirst({ where: { status: HubStatus.ACTIVE }, orderBy: { createdAt: "asc" } }));
+    if (!hub) return;
+    await prisma.digitalProduct.upsert({
+      where: { id: "love-note-music" },
+      update: {},
+      create: {
+        id: "love-note-music",
+        exchangeHubId: hub.id,
+        title: "Filthy Coon",
+        artist: "Nubreed ft. Yawitazah",
+        type: "ALBUM",
+        artworkUrl: "/music/filthy-coon-cover.jpg",
+        description: "An exclusive track for original Love Note supporters.",
+        status: "ACTIVE"
+      }
+    });
+    await prisma.digitalProductTrack.create({
+      data: {
+        id: "filthy-coon-1",
+        digitalProductId: "love-note-music",
+        title: "Filthy Coon",
+        trackNumber: 1,
+        fileUrl: "/music/filthy-coon.mp3",
+        status: "ACTIVE"
+      }
+    });
+    console.log("ensureLoveNoteMusic: seeded Filthy Coon track");
+  } catch (error) {
+    console.error("ensureLoveNoteMusic failed", error);
+  }
+}
+
 export async function ensureFirstBuildTarget() {
   const existingHub = await prisma.exchangeHub.findFirst({
     where: { name: "exchange-hub-a" }
