@@ -1090,6 +1090,27 @@ const LOVE_NOTE_COLLECTIBLE: CollectionItem = {
   description: "Your collectible digital Love Note — a keepsake marking that you were part of the original Love Notes. Open it to view, and download it to keep. This one is yours to treasure, not to trade."
 };
 
+// Exclusive music for original Love Note supporters. Hosted on UEN itself
+// (same-origin /music) so it streams + shows the waveform with no Shopify
+// dependency. Plays in the existing album player.
+const LOVE_NOTE_MUSIC: CollectionItem = {
+  id: "love-note-music",
+  type: "Digital Album",
+  assetType: "ALBUM",
+  title: "Filthy Coon",
+  artist: "Nubreed ft. Yawitazah",
+  source: "Nubreed ENT",
+  rarity: "Exclusive",
+  value: "Exclusive",
+  date: "2026",
+  status: "Owned",
+  artworkUrl: "/music/filthy-coon-cover.jpg",
+  description: "An exclusive track for original Love Note supporters — Nubreed ft. Yawitazah, “Filthy Coon.” Press play; it stays in your collection as part of the celebration.",
+  tracks: [
+    { id: "filthy-coon-1", title: "Filthy Coon", trackNumber: 1, fileUrl: "/music/filthy-coon.mp3", likeCount: 0, likedByHolder: false }
+  ]
+};
+
 const demoCollectionItems: CollectionItem[] = [
   {
     id: "demo-album",
@@ -4546,7 +4567,7 @@ function LiveHolderPortal({ token }: { token: string }) {
     description: `A Universal Exchange Note issued by ${hub.displayName}. This item stays in your collection as proof of support and can unlock value with participating merchants.`
   }));
   // Love Note supporters always get the collectible digital Love Note, pinned first.
-  const ownedItems: CollectionItem[] = holder.isLoveNoteSupporter ? [LOVE_NOTE_COLLECTIBLE, ...uenItems] : uenItems;
+  const ownedItems: CollectionItem[] = holder.isLoveNoteSupporter ? [LOVE_NOTE_COLLECTIBLE, LOVE_NOTE_MUSIC, ...uenItems] : uenItems;
   const holderCollectionItems = ownedItems.length > 0 ? ownedItems : demoCollectionItems;
 
   const formatOffer = (offer: any) => {
