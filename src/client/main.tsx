@@ -1070,6 +1070,8 @@ type CollectionItem = {
   downloadUrl?: string;
   downloadName?: string;
   tradable?: boolean;
+  // lyrics (optional) — newline-separated; auto-scrolls with playback
+  lyrics?: string;
 };
 
 // The collectible digital Love Note given to every original Love Note supporter.
@@ -1211,8 +1213,12 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const lyricsRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState("");
+  const [rightTab, setRightTab] = useState<"comments" | "lyrics">("comments");
+  const lyricLines = (item.lyrics ?? "").split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const currentLine = duration > 0 && lyricLines.length ? Math.min(lyricLines.length - 1, Math.floor((currentTime / duration) * lyricLines.length)) : 0;
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -1249,6 +1255,13 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     })();
     return () => { cancelled = true; };
   }, [portalToken, track?.id, item.id]);
+
+  // Auto-scroll lyrics so the current line stays centered as the song plays.
+  useEffect(() => {
+    if (rightTab !== "lyrics") return;
+    const el = lyricsRef.current?.querySelector<HTMLElement>(`[data-line="${currentLine}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [currentLine, rightTab]);
 
   const initAudioContext = useCallback(() => {
     if (!audioRef.current || waveformReady.current) return;
@@ -1502,9 +1515,8 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                 onChange={(e) => { setVolume(Number(e.target.value)); if (audioRef.current) audioRef.current.volume = Number(e.target.value); }} />
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar — full-width row with times below for easy scrubbing */}
             <div className="player-progress-wrap">
-              <span className="player-time">{formatTime(currentTime)}</span>
               <div className="player-progress-track" ref={progressRef} onPointerDown={onProgressPointerDown}>
                 <div className="player-progress-fill" style={{ width: `${progressPct}%` }} />
                 {comments.map((c) => (
@@ -1513,7 +1525,10 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                     title={`${formatTime(c.timestampSeconds)}: ${c.holder?.firstName} — ${c.body}`} />
                 ))}
               </div>
-              <span className="player-time">{formatTime(duration)}</span>
+              <div className="player-progress-times">
+                <span className="player-time">{formatTime(currentTime)}</span>
+                <span className="player-time">{formatTime(duration)}</span>
+              </div>
             </div>
           </div>
 
@@ -1536,9 +1551,25 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
               ))}
             </div>
 
-            {/* Comments */}
+            {/* Comments / Lyrics */}
             <div className="player-comments">
-              <h3 className="player-section-label">Community · {comments.length} comment{comments.length !== 1 ? "s" : ""}</h3>
+              <div className="player-tabs">
+                <button className={rightTab === "comments" ? "active" : ""} onClick={() => setRightTab("comments")}>Community · {comments.length}</button>
+                {lyricLines.length > 0 && (
+                  <button className={rightTab === "lyrics" ? "active" : ""} onClick={() => setRightTab("lyrics")}>Lyrics</button>
+                )}
+              </div>
+              {rightTab === "lyrics" ? (
+                <div className="player-lyrics" ref={lyricsRef}>
+                  {lyricLines.map((line, i) => (
+                    <p key={i} data-line={i} className={`player-lyric-line ${i === currentLine ? "active" : ""}`}
+                      onClick={() => { if (audioRef.current && duration) audioRef.current.currentTime = (i / lyricLines.length) * duration; }}>
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+              <>
               <div className="player-comments-list">
                 {comments.map((c) => (
                   <div key={c.id} className={`player-comment-item ${nearbyComment?.id === c.id ? "highlight" : ""}`}>
@@ -1577,6 +1608,8 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                 />
                 <button className="player-comment-submit" onClick={postComment} disabled={!commentInput.trim()}>Post</button>
               </div>
+              </>
+              )}
             </div>
           </div>
         </div>

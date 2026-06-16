@@ -5970,9 +5970,10 @@ html { background: #050e09; }
 .player-ctrl-btn:hover:not(:disabled){background:rgba(117,227,173,.15);color:#75e3ad}
 .player-ctrl-btn:disabled{cursor:default;opacity:.3}
 .player-volume{accent-color:#75e3ad;cursor:pointer;flex:1;max-width:80px}
-.player-progress-wrap{align-items:center;display:flex;gap:8px}
+.player-progress-wrap{display:flex;flex-direction:column;gap:6px;width:100%}
+.player-progress-times{display:flex;justify-content:space-between}
 .player-time{color:#4a6b5c;flex-shrink:0;font-size:11px}
-.player-progress-track{background:rgba(255,255,255,.08);border-radius:4px;cursor:pointer;flex:1;height:4px;position:relative}
+.player-progress-track{background:rgba(255,255,255,.08);border-radius:4px;cursor:pointer;width:100%;height:7px;position:relative}
 .player-progress-fill{background:linear-gradient(90deg,#1a6b42,#75e3ad);border-radius:4px;height:100%;position:relative;transition:width .1s linear}
 .player-progress-fill::after{background:#fff;border-radius:50%;content:'';height:10px;position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px}
 .player-comment-dot{background:#75e3ad;border-radius:50%;box-shadow:0 0 6px rgba(117,227,173,.8);cursor:pointer;height:8px;position:absolute;top:50%;transform:translate(-50%,-50%);width:8px}
@@ -7538,3 +7539,12 @@ html { background: #050e09; }
 .player-comment-edit input { flex: 1; min-width: 140px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(117, 227, 173, 0.35); border-radius: 8px; color: #fff; font-family: inherit; font-size: 13px; padding: 6px 10px; outline: none; }
 .player-comment-edit button { background: #75e3ad; border: none; color: #07120e; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
 .player-comment-edit button.ghost { background: rgba(255, 255, 255, 0.1); color: #cfe6da; }
+
+/* --- Player: lyrics panel + tabs --- */
+.player-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.player-tabs button { background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14); color: #cfe6da; border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.player-tabs button.active { background: #75e3ad; border-color: #75e3ad; color: #07120e; }
+.player-lyrics { overflow-y: auto; max-height: 300px; padding: 10px 6px; scroll-behavior: smooth; }
+.player-lyric-line { color: #6f8a7e; font-size: 15px; line-height: 1.5; margin: 0 0 11px; cursor: pointer; transition: color 0.25s, transform 0.25s, opacity 0.25s; opacity: 0.7; }
+.player-lyric-line.active { color: #fff; font-weight: 700; transform: scale(1.03); opacity: 1; text-shadow: 0 0 14px rgba(117, 227, 173, 0.4); }
+.player-lyric-line:hover { color: #cfe6da; opacity: 1; }
