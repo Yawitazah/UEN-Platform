@@ -1514,114 +1514,91 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
 }
 
 function HolderCollectionExperience({ holderName = "Holder", items = demoCollectionItems, portalToken = "" }: { holderName?: string; items?: CollectionItem[]; portalToken?: string }) {
+  const [opened, setOpened] = useState(false);
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [sortMode, setSortMode] = useState("Newest");
-  const [selected, setSelected] = useState(items[0]);
-  const [actionMessage, setActionMessage] = useState("");
   const [openAlbum, setOpenAlbum] = useState<CollectionItem | null>(null);
   const [openImage, setOpenImage] = useState<CollectionItem | null>(null);
-  useEffect(() => {
-    setSelected(items[0]);
-  }, [items]);
-  const filtered = items
-    .filter((item) => filter === "All" ? true : item.type.includes(filter) || item.rarity === filter)
-    .filter((item) => {
-      const haystack = `${item.title} ${item.type} ${item.source} ${item.rarity} ${item.status}`.toLowerCase();
-      return haystack.includes(query.trim().toLowerCase());
-    })
-    .sort((a, b) => {
-      if (sortMode === "Value") return (Number(b.value.replace(/[^0-9.]/g, "")) || 0) - (Number(a.value.replace(/[^0-9.]/g, "")) || 0);
-      if (sortMode === "Rarity") return a.rarity.localeCompare(b.rarity);
-      return b.date.localeCompare(a.date);
-    });
+  const [openDetail, setOpenDetail] = useState<CollectionItem | null>(null);
+
+  const isAlbum = (i: CollectionItem) => i.assetType === "ALBUM";
+  const isBadge = (i: CollectionItem) => i.type.includes("Badge") || i.type.includes("Achievement");
+  const isFuture = (i: CollectionItem) => i.type.includes("Future");
+  const isDownload = (i: CollectionItem) => (Boolean(i.imageUrl) || i.type.includes("Download")) && !isAlbum(i);
+  const isNote = (i: CollectionItem) => i.type.includes("Note") && !isAlbum(i);
+  const categories: { key: string; label: string; icon: React.ReactNode; test: (i: CollectionItem) => boolean }[] = [
+    { key: "Album", label: "Music", icon: <Play size={14} />, test: isAlbum },
+    { key: "Download", label: "Downloads", icon: <Download size={14} />, test: isDownload },
+    { key: "Note", label: "Notes", icon: <Ticket size={14} />, test: isNote },
+    { key: "Badge", label: "Badges", icon: <Star size={14} />, test: isBadge },
+    { key: "Future", label: "Future", icon: <Zap size={14} />, test: isFuture }
+  ];
+  const counts: Record<string, number> = Object.fromEntries(categories.map((c) => [c.key, items.filter(c.test).length]));
+  const present = categories.filter((c) => counts[c.key] > 0);
   const totalValue = items.reduce((sum, item) => sum + (Number(item.value.replace(/[^0-9.]/g, "")) || 0), 0);
-  const albumCount = items.filter((item) => item.assetType === "ALBUM").length;
-  const noteCount = items.filter((item) => item.type.includes("Note") && item.assetType !== "ALBUM").length;
-  const downloadCount = items.filter((item) => item.type.includes("Download")).length;
-  const badgeCount = items.filter((item) => item.type.includes("Badge")).length;
-  const futureCount = items.filter((item) => item.type.includes("Future")).length;
-  const typeSummary = [
-    albumCount > 0 ? `${albumCount} Album${albumCount !== 1 ? "s" : ""}` : "",
-    noteCount > 0 ? `${noteCount} Note${noteCount !== 1 ? "s" : ""}` : "",
-    downloadCount > 0 ? `${downloadCount} Download${downloadCount !== 1 ? "s" : ""}` : "",
-    badgeCount > 0 ? `${badgeCount} Badge${badgeCount !== 1 ? "s" : ""}` : "",
-    futureCount > 0 ? `${futureCount} Future` : ""
-  ].filter(Boolean).join(" · ");
-  const selectItem = (item: CollectionItem) => {
-    setSelected(item);
-    setActionMessage("");
-  };
-  const openItem = () => {
-    if (selected.assetType === "ALBUM" && selected.tracks?.length) {
-      setOpenAlbum(selected);
-      return;
+
+  const matches = (item: CollectionItem) => {
+    if (filter !== "All") {
+      const cat = categories.find((c) => c.key === filter);
+      if (cat && !cat.test(item)) return false;
     }
-    if (selected.imageUrl) {
-      setOpenImage(selected);
-      return;
-    }
-    setActionMessage(`${selected.title} is open. This is where the Holder would preview files, reward details, redemption utility, and the campaign memory attached to the item.`);
+    const hay = `${item.title} ${item.type} ${item.source} ${item.rarity} ${item.status}`.toLowerCase();
+    return hay.includes(query.trim().toLowerCase());
   };
-  const previewTrade = () => {
-    setActionMessage(`${selected.title} is not transferable yet. Future trade, gift, or resale controls can be enabled per item type when the network rules are ready.`);
+  const filtered = items.filter(matches);
+
+  // One tap opens the right experience: album player, image viewer, or details.
+  const open = (item: CollectionItem) => {
+    if (isAlbum(item) && item.tracks?.length) { setOpenAlbum(item); return; }
+    if (item.imageUrl) { setOpenImage(item); return; }
+    setOpenDetail(item);
   };
+  if (!opened) {
+    return (
+      <section className="collection-experience">
+        <div className="vault-cover">
+          <span className="eyebrow"><Wallet size={16} /> Holder Collection</span>
+          <h1>{holderName}'s Support Vault</h1>
+          <p>Your notes, music, downloads and badges all live here — proof of what you supported and the value it unlocked.</p>
+          <div className="vault-breakdown">
+            {present.length > 0
+              ? present.map((c) => <span key={c.key} className="vault-chip">{c.icon} {counts[c.key]} {c.label}</span>)
+              : <span className="vault-chip">Your collection is waiting</span>}
+          </div>
+          <div className="vault-meta">
+            {items.length} item{items.length !== 1 ? "s" : ""}{totalValue > 0 ? <> · <strong>${totalValue.toFixed(2)}</strong> in value</> : null}
+          </div>
+          <button className="vault-open-btn" onClick={() => setOpened(true)}>Open My Collection <span aria-hidden="true">→</span></button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="collection-experience">
-      <div className="collection-experience-head">
-        <div>
-          <span className="eyebrow dark"><Wallet size={16} /> Holder Collection</span>
-          <h1>{holderName}'s Support Vault</h1>
-          <p>Notes, downloads, badges, rewards, and future assets live together as proof of what a Holder supported and what value they unlocked.</p>
-        </div>
-        <div className="collection-total">
-          {totalValue > 0 ? (
-            <>
-              <span>Total collection value</span>
-              <strong><AnimatedNumber value={totalValue} prefix="$" suffix=".00" /></strong>
-            </>
-          ) : (
-            <>
-              <span>Your collection</span>
-              <strong>{items.length}</strong>
-            </>
-          )}
-          <small>{items.length} collection item{items.length !== 1 ? "s" : ""}</small>
-          {typeSummary && <span className="collection-type-summary">{typeSummary}</span>}
-        </div>
-      </div>
-      <div className="collection-console">
-        <div className="collection-console-toolbar">
-          <div className="collection-filter-buttons">
-            {["All", "Album", "Note", "Download", "Badge", "Future"].map((option) => (
-              <button key={option} className={filter === option ? "active" : ""} onClick={() => setFilter(option)}>{option}</button>
-            ))}
-          </div>
-          <label className="collection-search">
-            <span>Search</span>
-            <div><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find notes, badges, downloads..." /></div>
+      <div className="collection-open">
+        <div className="collection-open-head">
+          <button className="collection-back" onClick={() => setOpened(false)}>← Overview</button>
+          <h2>{holderName}'s Collection</h2>
+          <label className="collection-search collection-search-open">
+            <Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your collection..." />
           </label>
-          <label className="collection-sort">
-            <span>Sort</span>
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
-              <option>Newest</option>
-              <option>Value</option>
-              <option>Rarity</option>
-            </select>
-          </label>
+        </div>
+        <div className="collection-cat-tabs">
+          <button className={filter === "All" ? "active" : ""} onClick={() => setFilter("All")}>All <em>{items.length}</em></button>
+          {present.map((c) => (
+            <button key={c.key} className={filter === c.key ? "active" : ""} onClick={() => setFilter(c.key)}>{c.icon} {c.label} <em>{counts[c.key]}</em></button>
+          ))}
         </div>
         <div className="collection-inventory">
-          {filtered.map((item, index) => {
-            const sameTypeBefore = filtered.slice(0, index).filter((i) => i.type === item.type).length;
-            const totalOfType = filtered.filter((i) => i.type === item.type).length;
-            const typeLabel = totalOfType > 1 ? `${item.type} ${sameTypeBefore + 1} of ${totalOfType}` : item.type;
-            const isActive = selected.id === item.id;
+          {filtered.map((item) => {
+            const typeLabel = item.type;
 
             // ── Rich visual tile for items with artwork ──
             if (item.artworkUrl && item.assetType === "ALBUM") {
               return (
-                <div key={item.id} className={`tile-album-frame ${isActive ? "active" : ""}`}>
-                  <button className={`collection-tile-album ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                <div key={item.id} className={`tile-album-frame`}>
+                  <button className={`collection-tile-album`} onClick={() => open(item)}>
                     <img className="tile-art-img" src={item.artworkUrl} alt="" aria-hidden="true" />
                     <div className="tile-art-overlay" />
                     {/* Glass dome — static corner glints + silver film */}
@@ -1651,7 +1628,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             // ── Image collectible tile (e.g. the digital Love Note) ──
             if (item.imageUrl) {
               return (
-                <button key={item.id} className={`collection-tile-art ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                <button key={item.id} className={`collection-tile-art`} onClick={() => open(item)}>
                   <img className="tile-art-img" src={item.imageUrl} alt={item.title} />
                   <div className="tile-art-overlay" />
                   <div className="tile-glass-shimmer" />
@@ -1667,7 +1644,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             // ── Badge tile — PS4/PS5 style achievement ──
             if (item.type.includes("Badge") || item.type.includes("Achievement")) {
               return (
-                <button key={item.id} className={`collection-tile-badge ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                <button key={item.id} className={`collection-tile-badge`} onClick={() => open(item)}>
                   {item.artworkUrl ? (
                     // Exchange Hub custom artwork
                     <img className="tile-art-img" src={item.artworkUrl} alt="" aria-hidden="true" />
@@ -1703,7 +1680,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             // ── Future asset tile ──
             if (item.type.includes("Future")) {
               return (
-                <button key={item.id} className={`collection-tile collection-tile-future ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                <button key={item.id} className={`collection-tile collection-tile-future`} onClick={() => open(item)}>
                   <div className="tile-orb" />
                   <span>{typeLabel}</span>
                   <strong>{item.title}</strong>
@@ -1715,7 +1692,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             // ── UEN note tile ──
             if (item.type.includes("Note")) {
               return (
-                <button key={item.id} className={`collection-tile collection-tile-note ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+                <button key={item.id} className={`collection-tile collection-tile-note`} onClick={() => open(item)}>
                   <div className="tile-uen-chip">
                     <span>UEN</span>
                   </div>
@@ -1728,7 +1705,7 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
 
             // ── Default tile ──
             return (
-              <button key={item.id} className={`collection-tile ${isActive ? "active" : ""}`} onClick={() => selectItem(item)}>
+              <button key={item.id} className={`collection-tile`} onClick={() => open(item)}>
                 <span>{typeLabel}</span>
                 <strong>{item.title}</strong>
                 <small>{item.rarity} / {item.value}</small>
@@ -1743,31 +1720,34 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
             </div>
           )}
         </div>
-        <aside className="collection-detail">
-          <span>{selected.type}</span>
-          <h2>{selected.title}</h2>
-          <p>{selected.description}</p>
-          <dl>
-            <div><dt>Exchange Hub</dt><dd>{selected.source}</dd></div>
-            <div><dt>Received</dt><dd>{selected.date}</dd></div>
-            <div><dt>Rarity</dt><dd>{selected.rarity}</dd></div>
-            <div><dt>Status</dt><dd>{selected.status}</dd></div>
-            <div><dt>Value</dt><dd>{selected.value}</dd></div>
-          </dl>
-          {actionMessage && <div className="collection-action-message">{actionMessage}</div>}
-          <div className="collection-actions">
-            <button onClick={openItem}>
-              {selected.assetType === "ALBUM" ? "▶ Play Album" : selected.imageUrl ? "Open & View" : "Open Item"}
-            </button>
-            {selected.tradable === false
-              ? <span className="collection-keepsake-note">Keepsake — yours to treasure, not to trade</span>
-              : <button className="ghost" onClick={previewTrade}>Gift / Trade Preview</button>}
-          </div>
-        </aside>
       </div>
       {openAlbum && <AudioPlayerModal item={openAlbum} onClose={() => setOpenAlbum(null)} portalToken={portalToken} />}
       {openImage && <CollectibleViewer item={openImage} onClose={() => setOpenImage(null)} />}
+      {openDetail && <GenericDetailModal item={openDetail} onClose={() => setOpenDetail(null)} />}
     </section>
+  );
+}
+
+// Detail modal for non-media collectibles (notes, badges, future assets).
+function GenericDetailModal({ item, onClose }: { item: CollectionItem; onClose: () => void }) {
+  return (
+    <div className="ln-viewer-backdrop" onClick={onClose}>
+      <div className="ln-viewer" onClick={(e) => e.stopPropagation()}>
+        <button className="ln-viewer-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        <div className="ln-viewer-meta" style={{ paddingTop: 46 }}>
+          <span className="ln-viewer-kicker">{item.source} · {item.rarity}</span>
+          <h3>{item.title}</h3>
+          <p>{item.description}</p>
+          <dl className="collection-detail-dl">
+            <div><dt>Source</dt><dd>{item.source}</dd></div>
+            <div><dt>Received</dt><dd>{item.date}</dd></div>
+            <div><dt>Status</dt><dd>{item.status}</dd></div>
+            <div><dt>Value</dt><dd>{item.value}</dd></div>
+          </dl>
+          <span className="ln-viewer-note">{item.tradable === false ? "Keepsake — not tradable" : "Not transferable yet — gift / trade controls can be enabled later."}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 

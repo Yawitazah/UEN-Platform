@@ -7469,3 +7469,57 @@ html { background: #050e09; }
 }
 .ln-viewer-download:disabled { opacity: 0.7; cursor: default; }
 .ln-viewer-note { color: #9fb0cc; font-size: 12.5px; font-style: italic; }
+
+/* --- Collection: vault landing + open view --- */
+.vault-cover {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  max-width: 720px;
+  margin: 8px auto;
+  padding: 44px 28px 40px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(242, 193, 78, 0.10), transparent 60%),
+    linear-gradient(180deg, #0c1426 0%, #0a1020 100%);
+  isolation: isolate;
+}
+/* Signature traveling gold/purple border (reuses the banner's @property angle). */
+.vault-cover::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; border-radius: inherit; padding: 1.6px;
+  background: conic-gradient(from var(--ln-angle, 0deg), transparent 0deg, #f2c14e 55deg, #cba4ff 105deg, transparent 175deg, transparent 295deg, #f2c14e 350deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+  pointer-events: none; animation: ln-border-spin 5s linear infinite;
+}
+.vault-cover > * { position: relative; z-index: 1; }
+.vault-cover .eyebrow { justify-content: center; color: #f2c14e; }
+.vault-cover h1 { color: #fff; font-size: clamp(26px, 4vw, 40px); margin: 10px 0; }
+.vault-cover p { color: #b9c8e0; max-width: 480px; margin: 0 auto 22px; line-height: 1.55; font-size: 15px; }
+.vault-breakdown { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 18px; }
+.vault-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); color: #e8f1ff; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; }
+.vault-chip svg { color: #f2c14e; }
+.vault-meta { color: #9fb0cc; font-size: 13px; margin-bottom: 24px; }
+.vault-meta strong { color: #fff; }
+.vault-open-btn { display: inline-flex; align-items: center; gap: 9px; background: linear-gradient(95deg, #cba4ff, #f2c14e); color: #1a1330; border: none; font-weight: 800; font-size: 15px; padding: 14px 28px; border-radius: 12px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.vault-open-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(242, 193, 78, 0.28); }
+
+.collection-open-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.collection-open-head h2 { color: #fff; font-size: clamp(20px, 3vw, 28px); margin: 0; flex: 1; }
+.collection-back { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); color: #e8fbf1; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.collection-back:hover { background: rgba(255, 255, 255, 0.14); }
+.collection-search-open { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 8px 14px; color: #c7d9d0; }
+.collection-search-open input { background: transparent; border: none; color: #fff; font-family: inherit; font-size: 14px; outline: none; width: 180px; max-width: 46vw; }
+
+.collection-cat-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.collection-cat-tabs button { display: inline-flex; align-items: center; gap: 7px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); color: #e8fbf1; border-radius: 999px; padding: 8px 15px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.collection-cat-tabs button svg { color: #f2c14e; }
+.collection-cat-tabs button em { font-style: normal; opacity: 0.6; font-size: 12px; }
+.collection-cat-tabs button:hover { background: rgba(255, 255, 255, 0.12); }
+.collection-cat-tabs button.active { background: #75e3ad; border-color: #75e3ad; color: #07120e; }
+.collection-cat-tabs button.active svg, .collection-cat-tabs button.active em { color: #07120e; opacity: 0.7; }
+
+.collection-detail-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 4px 0 16px; }
+.collection-detail-dl div { display: flex; flex-direction: column; }
+.collection-detail-dl dt { color: #8aa0bd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.collection-detail-dl dd { color: #fff; margin: 0; font-size: 14px; }
