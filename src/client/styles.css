@@ -7427,7 +7427,7 @@ html { background: #050e09; }
   overflow: hidden;
   min-height: 220px;
   border-radius: 18px;
-  border: 1px solid rgba(242, 193, 78, 0.35);
+  border: 1px solid rgba(117, 227, 173, 0.35);
   background: #0a1208;
   cursor: pointer;
   display: flex;
@@ -7438,7 +7438,7 @@ html { background: #050e09; }
 .collection-tile-art .tile-art-img { animation: none; }
 .collection-tile-art.active { border-color: #75e3ad; box-shadow: 0 0 0 2px rgba(117, 227, 173, 0.4); }
 
-.collection-keepsake-note { color: #c98a3a; font-size: 12.5px; font-style: italic; align-self: center; }
+.collection-keepsake-note { color: #8fcdb0; font-size: 12.5px; font-style: italic; align-self: center; }
 
 .ln-viewer-backdrop {
   position: fixed; inset: 0; z-index: 1000;
@@ -7448,7 +7448,7 @@ html { background: #050e09; }
 }
 .ln-viewer {
   position: relative; width: 100%; max-width: 560px; max-height: 92vh; overflow: auto;
-  background: #0c1426; border: 1px solid rgba(242, 193, 78, 0.35); border-radius: 20px;
+  background: #0c1426; border: 1px solid rgba(117, 227, 173, 0.35); border-radius: 20px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
 }
 .ln-viewer-close {
@@ -7465,7 +7465,7 @@ html { background: #050e09; }
 .ln-viewer-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .ln-viewer-download {
   display: inline-flex; align-items: center; gap: 8px;
-  background: linear-gradient(95deg, #cba4ff, #f2c14e); color: #1a1330;
+  background: linear-gradient(95deg, #4cc99a, #75e3ad); color: #06140e;
   border: none; font-weight: 700; font-size: 14px; padding: 11px 20px; border-radius: 11px; cursor: pointer;
 }
 .ln-viewer-download:disabled { opacity: 0.7; cursor: default; }
@@ -7481,14 +7481,14 @@ html { background: #050e09; }
   padding: 44px 28px 40px;
   border-radius: 22px;
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(242, 193, 78, 0.10), transparent 60%),
+    radial-gradient(120% 90% at 50% 0%, rgba(117, 227, 173, 0.10), transparent 60%),
     linear-gradient(180deg, #0c1426 0%, #0a1020 100%);
   isolation: isolate;
 }
-/* Signature traveling gold/purple border (reuses the banner's @property angle). */
+/* Traveling emerald border (reuses the banner's @property angle). Gold/violet stays Love-Note-banner-only. */
 .vault-cover::before {
   content: ""; position: absolute; inset: 0; z-index: 0; border-radius: inherit; padding: 1.6px;
-  background: conic-gradient(from var(--ln-angle, 0deg), transparent 0deg, #f2c14e 55deg, #cba4ff 105deg, transparent 175deg, transparent 295deg, #f2c14e 350deg, transparent 360deg);
+  background: conic-gradient(from var(--ln-angle, 0deg), transparent 0deg, #4cc99a 55deg, #b8f5d6 105deg, transparent 175deg, transparent 295deg, #4cc99a 350deg, transparent 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
   pointer-events: none; animation: ln-border-spin 5s linear infinite;
@@ -7499,7 +7499,7 @@ html { background: #050e09; }
 .vault-cover p { color: #b9c8e0; max-width: 480px; margin: 0 auto 22px; line-height: 1.55; font-size: 15px; }
 .vault-breakdown { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 18px; }
 .vault-chip { display: inline-flex; align-items: center; gap: 7px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); color: #e8f1ff; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; }
-.vault-chip svg { color: #f2c14e; }
+.vault-chip svg { color: #75e3ad; }
 .vault-meta { color: #9fb0cc; font-size: 13px; margin-bottom: 24px; }
 .vault-meta strong { color: #fff; }
 .vault-open-btn { display: inline-flex; align-items: center; gap: 9px; background: linear-gradient(95deg, #4cc99a, #75e3ad); color: #06140e; border: none; font-weight: 800; font-size: 15px; padding: 14px 28px; border-radius: 12px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
@@ -7514,7 +7514,7 @@ html { background: #050e09; }
 
 .collection-cat-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 .collection-cat-tabs button { display: inline-flex; align-items: center; gap: 7px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16); color: #e8fbf1; border-radius: 999px; padding: 8px 15px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
-.collection-cat-tabs button svg { color: #f2c14e; }
+.collection-cat-tabs button svg { color: #75e3ad; }
 .collection-cat-tabs button em { font-style: normal; opacity: 0.6; font-size: 12px; }
 .collection-cat-tabs button:hover { background: rgba(255, 255, 255, 0.12); }
 .collection-cat-tabs button.active { background: #75e3ad; border-color: #75e3ad; color: #07120e; }
@@ -7581,8 +7581,62 @@ html { background: #050e09; }
 /* Player tabs on-brand (emerald) */
 .player-tabs button.active { background: linear-gradient(95deg, #4cc99a, #75e3ad); border-color: transparent; color: #06140e; }
 
-/* --- Asset detail meta (stats + Trade/Sell) — UEN emerald/navy --- */
-.asset-meta { margin-top: 6px; }
+/* --- Asset detail FLIP card (front button → back stats + Trade/Sell) — UEN emerald/navy --- */
+.asset-flip { margin-top: 16px; perspective: 1400px; }
+.asset-flip-inner {
+  position: relative; display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.62s cubic-bezier(0.22, 0.68, 0.2, 1);
+}
+.asset-flip.flipped .asset-flip-inner { transform: rotateY(180deg); }
+.asset-flip-face {
+  grid-area: 1 / 1;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border-radius: 16px;
+}
+.asset-flip-back { transform: rotateY(180deg); }
+
+/* FRONT — the tappable card */
+.asset-flip-front {
+  display: flex; align-items: center; gap: 13px;
+  width: 100%; text-align: left; cursor: pointer;
+  padding: 15px 18px;
+  border: 1px solid rgba(117, 227, 173, 0.32);
+  background: linear-gradient(150deg, rgba(76, 201, 154, 0.16), rgba(6, 20, 14, 0.4));
+  color: #eafff4;
+  transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
+}
+.asset-flip-front:hover { transform: translateY(-1px); border-color: rgba(117, 227, 173, 0.6); box-shadow: 0 10px 28px rgba(117, 227, 173, 0.16); }
+.asset-flip-front-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex: none; border-radius: 11px;
+  background: linear-gradient(95deg, #4cc99a, #75e3ad); color: #06140e;
+}
+.asset-flip-front-text { display: flex; flex-direction: column; flex: 1; line-height: 1.25; }
+.asset-flip-front-text strong { color: #fff; font-size: 14.5px; font-weight: 800; }
+.asset-flip-front-text em { color: #9fc7b4; font-size: 12px; font-style: normal; letter-spacing: 0.02em; }
+.asset-flip-cue {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #75e3ad;
+}
+
+/* BACK — stats + actions */
+.asset-flip-back {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(117, 227, 173, 0.28);
+  background: rgba(6, 20, 14, 0.42);
+}
+.asset-flip-back .collection-detail-dl { margin: 0; }
+.asset-flip-back-btn {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid rgba(117, 227, 173, 0.3);
+  color: #9fc7b4; font-weight: 700; font-size: 12.5px;
+  padding: 8px 14px; border-radius: 10px; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.asset-flip-back-btn:hover { border-color: rgba(117, 227, 173, 0.6); color: #eafff4; }
 .asset-trade-row { display: flex; flex-direction: column; gap: 8px; }
 .asset-trade-btn { display: inline-flex; align-items: center; gap: 9px; align-self: flex-start; background: linear-gradient(95deg, #4cc99a, #75e3ad); color: #06140e; border: none; font-weight: 800; font-size: 14px; padding: 11px 20px; border-radius: 11px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
 .asset-trade-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(117, 227, 173, 0.28); }

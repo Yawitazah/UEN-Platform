@@ -1936,26 +1936,52 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
 // every open-asset view so the stats and the (coming-soon) trade button are
 // consistent. Keepsakes (tradable === false) show a "not tradable" note instead.
 function AssetMeta({ item }: { item: CollectionItem }) {
+  const [flipped, setFlipped] = useState(false);
   const [soon, setSoon] = useState(false);
+  const keepsake = item.tradable === false;
   return (
-    <div className="asset-meta">
-      <dl className="collection-detail-dl">
-        <div><dt>Exchange Hub</dt><dd>{item.source}</dd></div>
-        <div><dt>Received</dt><dd>{item.date}</dd></div>
-        <div><dt>Rarity</dt><dd>{item.rarity}</dd></div>
-        <div><dt>Status</dt><dd>{item.status}</dd></div>
-        <div><dt>Value</dt><dd>{item.value}</dd></div>
-      </dl>
-      {item.tradable === false ? (
-        <span className="asset-keepsake">Keepsake — yours to treasure, not to trade</span>
-      ) : (
-        <div className="asset-trade-row">
-          <button className="asset-trade-btn" onClick={() => setSoon(true)}>
-            Trade / Sell <span className="asset-soon">Coming soon</span>
+    <div className={`asset-flip${flipped ? " flipped" : ""}`}>
+      <div className="asset-flip-inner">
+        {/* FRONT — tappable button that flips to the details */}
+        <button
+          type="button"
+          className="asset-flip-face asset-flip-front"
+          onClick={() => setFlipped(true)}
+          aria-hidden={flipped}
+          tabIndex={flipped ? -1 : 0}
+        >
+          <span className="asset-flip-front-icon"><Star size={18} /></span>
+          <span className="asset-flip-front-text">
+            <strong>Asset Details</strong>
+            <em>{keepsake ? "Keepsake · tap to view" : "Stats · trade · sell"}</em>
+          </span>
+          <span className="asset-flip-cue">Flip <RefreshCw size={13} /></span>
+        </button>
+
+        {/* BACK — the stat grid + trade/sell (or keepsake) + flip back */}
+        <div className="asset-flip-face asset-flip-back" aria-hidden={!flipped}>
+          <dl className="collection-detail-dl">
+            <div><dt>Exchange Hub</dt><dd>{item.source}</dd></div>
+            <div><dt>Received</dt><dd>{item.date}</dd></div>
+            <div><dt>Rarity</dt><dd>{item.rarity}</dd></div>
+            <div><dt>Status</dt><dd>{item.status}</dd></div>
+            <div><dt>Value</dt><dd>{item.value}</dd></div>
+          </dl>
+          {keepsake ? (
+            <span className="asset-keepsake">Keepsake — yours to treasure, not to trade</span>
+          ) : (
+            <div className="asset-trade-row">
+              <button type="button" className="asset-trade-btn" onClick={() => setSoon(true)} tabIndex={flipped ? 0 : -1}>
+                <Tag size={15} /> Trade / Sell <span className="asset-soon">Coming soon</span>
+              </button>
+              {soon && <p className="asset-meta-msg">Trading &amp; selling assets between holders is coming soon.</p>}
+            </div>
+          )}
+          <button type="button" className="asset-flip-back-btn" onClick={() => setFlipped(false)} tabIndex={flipped ? 0 : -1}>
+            <RefreshCw size={13} /> Flip back
           </button>
-          {soon && <p className="asset-meta-msg">Trading & selling assets between holders is coming soon.</p>}
         </div>
-      )}
+      </div>
     </div>
   );
 }
