@@ -80,6 +80,12 @@ router.get("/holder/wallet", async (req, res) => {
     const holder = await holderFromToken(token);
     if (!holder) return res.status(404).json({ error: "Holder not found or invalid portal token" });
 
+    // Original Love Note supporters are identified by grandfathered codes issued
+    // to their email (reserved or already claimed). Drives the celebration banner.
+    const loveNoteOrigins = await prisma.uenCodeInventory.count({
+      where: { source: "GRANDFATHERED", issuedToEmail: holder.email }
+    });
+
     const notifications = await prisma.holderNotification.findMany({
       where: { holderId: holder.id },
       orderBy: { createdAt: "desc" },
@@ -142,6 +148,7 @@ router.get("/holder/wallet", async (req, res) => {
         email: holder.email,
         phone: holder.phone ?? null,
         hasPassword: Boolean(holder.passwordHash),
+        isLoveNoteSupporter: loveNoteOrigins > 0,
         exchangeHub: {
           id: holder.exchangeHub.id,
           displayName: holder.exchangeHub.displayName,

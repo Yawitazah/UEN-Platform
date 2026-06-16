@@ -4330,6 +4330,56 @@ function HolderPasswordSection({ holder }: { holder: any }) {
   );
 }
 
+// Spectacular celebration banner shown only to original Love Note supporters.
+// Desktop: a multi-color glow tracks the cursor. Touch: the glow drifts on
+// scroll. The "Love Notes" wordmark runs an animated sky-blue -> green -> pink
+// -> purple gradient. Pure CSS/JS, no libraries.
+function LoveNoteSupporterBanner() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const finePointer = window.matchMedia("(pointer: fine)").matches;
+    if (finePointer) {
+      const onMove = (e: MouseEvent) => {
+        const r = el.getBoundingClientRect();
+        el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+        el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+      };
+      el.addEventListener("mousemove", onMove);
+      return () => el.removeEventListener("mousemove", onMove);
+    }
+    // Touch devices: the glow sweeps across as the supporter scrolls.
+    const onScroll = () => {
+      const p = Math.min(1, Math.max(0, window.scrollY / 500));
+      el.style.setProperty("--mx", `${15 + p * 70}%`);
+      el.style.setProperty("--my", `${25 + p * 50}%`);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return (
+    <div className="ln-banner" ref={ref}>
+      <div className="ln-banner-aurora" />
+      <div className="ln-banner-glow" />
+      <div className="ln-banner-sparkles" aria-hidden="true">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <span key={i} style={{ top: `${(i * 61) % 96}%`, left: `${(i * 37) % 94}%`, animationDelay: `${(i % 7) * 0.45}s` } as React.CSSProperties} />
+        ))}
+      </div>
+      <div className="ln-banner-content">
+        <span className="ln-banner-eyebrow">A celebration of you</span>
+        <h2 className="ln-banner-title">Welcome, <span className="ln-gradient">Love Note</span> Supporter</h2>
+        <p className="ln-banner-text">
+          <strong>Love Notes</strong> flourished because of you. Every note you hold is a thank-you —
+          and this wallet is our way of celebrating the supporters who made it all possible.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function LiveHolderPortal({ token }: { token: string }) {
   const wallet = useData<any>(() => portalApi("/api/holder/wallet"), [token]);
   const merchants = useData<any[]>(() => portalApi("/api/holder/merchants"), [token]);
@@ -4464,6 +4514,8 @@ function LiveHolderPortal({ token }: { token: string }) {
           )}
         </div>
       )}
+
+      {holder.isLoveNoteSupporter && <LoveNoteSupporterBanner />}
 
       {/* Hero / wallet overview */}
       <section className="portal-hero">

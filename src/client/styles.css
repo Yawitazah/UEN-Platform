@@ -7253,3 +7253,112 @@ html { background: #050e09; }
   white-space: nowrap;
 }
 .reg-back-link:hover { color: #fff; }
+
+/* --- Love Note Supporter celebration banner --- */
+.ln-banner {
+  --mx: 50%;
+  --my: 35%;
+  --ln-sky: #58c7ff;
+  --ln-green: #43e0a3;
+  --ln-pink: #ff5fa6;
+  --ln-purple: #a96bff;
+  position: relative;
+  overflow: hidden;
+  margin: 18px 16px 0;
+  border-radius: 22px;
+  background: #0a1224;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  isolation: isolate;
+  animation: ln-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (min-width: 720px) {
+  .ln-banner { margin: 22px auto 0; max-width: 1100px; }
+}
+
+.ln-banner-aurora {
+  position: absolute;
+  inset: -45%;
+  z-index: -2;
+  background:
+    radial-gradient(38% 50% at 22% 30%, color-mix(in srgb, var(--ln-sky) 70%, transparent), transparent 70%),
+    radial-gradient(40% 52% at 70% 26%, color-mix(in srgb, var(--ln-green) 65%, transparent), transparent 70%),
+    radial-gradient(45% 55% at 60% 78%, color-mix(in srgb, var(--ln-pink) 60%, transparent), transparent 72%),
+    radial-gradient(42% 50% at 30% 80%, color-mix(in srgb, var(--ln-purple) 60%, transparent), transparent 72%);
+  filter: blur(46px) saturate(135%);
+  opacity: 0.55;
+  animation: ln-aurora 16s ease-in-out infinite alternate;
+}
+
+.ln-banner-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(420px circle at var(--mx) var(--my),
+    color-mix(in srgb, var(--ln-pink) 38%, transparent),
+    color-mix(in srgb, var(--ln-purple) 22%, transparent) 35%,
+    transparent 62%);
+  transition: background 0.18s ease-out;
+}
+
+.ln-banner-content { position: relative; padding: 30px 26px 32px; }
+@media (min-width: 720px) { .ln-banner-content { padding: 44px 48px; } }
+
+.ln-banner-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #cfe2ff;
+  opacity: 0.85;
+  margin-bottom: 12px;
+}
+.ln-banner-title {
+  color: #fff;
+  font-size: clamp(28px, 5vw, 48px);
+  line-height: 1.05;
+  margin: 0 0 14px;
+  font-weight: 800;
+}
+.ln-banner-text {
+  color: #c6d6ee;
+  font-size: clamp(14px, 1.6vw, 17px);
+  line-height: 1.6;
+  max-width: 620px;
+  margin: 0;
+}
+.ln-banner-text strong { color: #fff; }
+
+.ln-gradient {
+  background: linear-gradient(100deg, var(--ln-sky), var(--ln-green), var(--ln-pink), var(--ln-purple), var(--ln-sky));
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: ln-text 7s linear infinite;
+}
+
+.ln-banner-sparkles { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.ln-banner-sparkles span {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.85);
+  animation: ln-sparkle 4.5s ease-in-out infinite;
+}
+
+@keyframes ln-rise { from { opacity: 0; transform: translateY(22px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes ln-aurora {
+  0% { transform: translate3d(-4%, -3%, 0) rotate(0deg) scale(1.05); }
+  100% { transform: translate3d(5%, 4%, 0) rotate(8deg) scale(1.15); }
+}
+@keyframes ln-text { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+@keyframes ln-sparkle { 0%, 100% { opacity: 0; transform: scale(0.5); } 50% { opacity: 0.9; transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ln-banner, .ln-banner-aurora, .ln-gradient, .ln-banner-sparkles span { animation: none; }
+}
