@@ -5978,7 +5978,8 @@ html { background: #050e09; }
 .np-art-play:hover{background:#34d399;color:#08130c}
 .np-art-flipbtn{align-items:center;background:rgba(8,17,9,.6);border:1px solid rgba(255,255,255,.16);border-radius:999px;bottom:10px;color:#cfe9dd;cursor:pointer;display:flex;font-size:11px;font-weight:700;gap:5px;padding:5px 11px;position:absolute;right:10px;transition:all .15s;backdrop-filter:blur(4px)}
 .np-art-flipbtn:hover{background:#34d399;border-color:#34d399;color:#08130c}
-.np-art-back{background:linear-gradient(160deg,#10261b,#0a1810);border:1px solid rgba(117,227,173,.22);display:flex;flex-direction:column;gap:10px;padding:18px 18px 16px;transform:rotateY(180deg)}
+.np-art-back{background:linear-gradient(160deg,#10261b,#0a1810);border:1px solid rgba(117,227,173,.22);display:flex;flex-direction:column;gap:9px;padding:16px 16px 14px;transform:rotateY(180deg);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.np-art-flipback{flex-shrink:0}
 .np-art-back-kicker{align-items:center;color:#34d399;display:flex;font-size:11px;font-weight:800;gap:6px;letter-spacing:.08em;text-transform:uppercase}
 .np-art-dl{display:flex;flex-direction:column;gap:0;margin:0}
 .np-art-dl>div{align-items:center;border-bottom:1px solid rgba(117,227,173,.1);display:flex;justify-content:space-between;padding:7px 0}
@@ -7620,7 +7621,7 @@ html { background: #050e09; }
 .np-immersive .player-left { gap: 20px; justify-content: center; padding: 18px 34px 32px; border-right: 1px solid rgba(255,255,255,.06); }
 
 /* Hero artwork — large, floating, album-glow */
-.np-immersive .np-art-flip { height: 300px; width: 300px; }
+.np-immersive .np-art-flip { height: 340px; width: 340px; }
 .np-immersive .np-art-front { box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 70px -10px var(--np-glow, rgba(52,211,153,.4)), 0 0 0 1px rgba(255,255,255,.08); animation: npFloat 6s ease-in-out infinite; }
 @keyframes npFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
 .np-art-shine { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,.18) 48%, transparent 60%); transform: translateX(-60%); }
@@ -7668,35 +7669,34 @@ html { background: #050e09; }
 
 /* Fullscreen immersive lyrics — pinned to the viewport, not the scrollable modal */
 .np-fs { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: linear-gradient(180deg, var(--np-bg1, #11241a), var(--np-bg2, #070f0a)); animation: plFade .3s ease; overflow: hidden; }
-/* Edge fades as real overlay layers (not a mask on the scroller) — Android-safe */
-.np-fs::before, .np-fs::after { content: ""; position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
-.np-fs::before { top: 58px; height: 64px; background: linear-gradient(180deg, var(--np-bg1, #11241a), transparent); }
-.np-fs::after { bottom: 70px; height: 96px; background: linear-gradient(0deg, var(--np-bg2, #070f0a), transparent); }
-.np-fs-head { position: relative; z-index: 3; align-items: center; display: flex; justify-content: space-between; padding: max(18px, env(safe-area-inset-top)) 22px 8px; }
+/* Header & footer sit ABOVE the lyrics with their own opaque-to-transparent
+   background, so scrolling lyrics fade out under them instead of covering the
+   artwork / title / close / transport. The gradient also provides the edge fade
+   (no mask on the scroller — Android-safe). */
+.np-fs-head { position: relative; z-index: 6; align-items: center; display: flex; justify-content: space-between; padding: max(18px, env(safe-area-inset-top)) 22px 30px; background: linear-gradient(180deg, var(--np-bg1, #11241a) 0%, var(--np-bg1, #11241a) 52%, transparent 100%); }
 .np-fs-now { align-items: center; display: flex; gap: 12px; }
 .np-fs-now img { border-radius: 10px; height: 52px; width: 52px; object-fit: cover; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
 .np-fs-now strong { color: #fff; display: block; font-size: 16px; font-weight: 800; }
 .np-fs-now span { color: rgba(255,255,255,.7); font-size: 13px; }
-.np-lyrics-fs { position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; text-align: left; padding: 4vh 8% 8vh; -webkit-overflow-scrolling: touch; }
+.np-lyrics-fs { position: relative; z-index: 1; flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; text-align: left; padding: 2vh 8% 4vh; }
 .np-lyrics-fs .np-lyric-line { font-size: clamp(26px, 5vw, 46px); margin: 0 0 24px; }
-.np-fs-foot { position: relative; z-index: 3; flex: 0 0 auto; align-items: center; display: flex; gap: 22px; justify-content: center; padding: 12px 0 max(22px, env(safe-area-inset-bottom)); }
+.np-fs-foot { position: relative; z-index: 6; flex: 0 0 auto; align-items: center; display: flex; gap: 22px; justify-content: center; padding: 28px 0 max(22px, env(safe-area-inset-bottom)); background: linear-gradient(0deg, var(--np-bg2, #070f0a) 0%, var(--np-bg2, #070f0a) 48%, transparent 100%); }
 
 @media (max-width: 760px) {
   .np-immersive .player-layout { grid-template-columns: 1fr; }
-  .np-immersive .np-art-flip { height: 230px; width: 230px; }
+  /* Bigger hero artwork on phones */
+  .np-immersive .np-art-flip { height: min(82vw, 360px); width: min(82vw, 360px); }
   .np-immersive .player-left { padding: 16px 20px 22px; }
   .np-seg { margin: 0 16px 12px; }
   .np-lyrics { max-height: 300px; padding: 22px 18px 44px; }
   .np-lyric-line { font-size: 20px; margin-bottom: 14px; }
   /* Fullscreen overlay must fill the screen, never inherit the panel's 300px cap */
-  .np-lyrics-fs { max-height: none; flex: 1 1 auto; padding: 3vh 7% 6vh; }
+  .np-lyrics-fs { max-height: none; flex: 1 1 auto; padding: 2vh 7% 4vh; }
   .np-fs-head { padding-left: 16px; padding-right: 16px; }
-  /* Kill continuously-animating GPU layers on real devices — an animated mesh /
-     blur / shine recompositing behind the scrolling lyrics is what glitches
-     Android mid-scroll. Static gradients look the same and scroll clean. */
+  /* Only the MESH animation churns behind the scrolling lyrics — keep that off on
+     mobile. The artwork float/shine are on a different screen (not visible during
+     lyric scroll), so keep them — Zah wants the artwork alive. */
   .np-mesh { animation: none; }
-  .np-immersive .np-art-front { animation: none; }
-  .np-art-shine { display: none; }
   /* backdrop-filter and big filter:blur layers flicker/blank during scroll on
      Android Chrome — drop them on mobile. The album color still reads from the
      static mesh + bg gradient, so it stays immersive. */
