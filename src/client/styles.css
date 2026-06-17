@@ -7646,8 +7646,15 @@ html { background: #050e09; }
 .np-lyrics-wrap { position: relative; }
 .np-lyrics-expand { position: absolute; top: -2px; right: 22px; z-index: 4; align-items: center; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; color: #cfe9dd; cursor: pointer; display: flex; gap: 5px; font-size: 10.5px; font-weight: 700; padding: 5px 10px; text-transform: uppercase; letter-spacing: .06em; transition: all .15s; }
 .np-lyrics-expand:hover { background: var(--np-accent, #34d399); border-color: transparent; color: #08130c; }
-.np-lyrics { max-height: 420px; overflow-y: auto; padding: 30px 26px 60px; scroll-behavior: smooth; scrollbar-width: none; -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 80%, transparent 100%); mask-image: linear-gradient(180deg, transparent, #000 14%, #000 80%, transparent 100%); }
+/* No mask-image on the scroll container — Android Chrome re-rasterizes masked
+   scrolling layers every frame and flickers. Use gradient overlay elements
+   (.np-lyrics-wrap::before/::after) layered on top instead. translateZ(0) +
+   touch scrolling give the list its own stable composited layer. */
+.np-lyrics { max-height: 420px; overflow-y: auto; padding: 30px 26px 60px; scroll-behavior: smooth; scrollbar-width: none; transform: translateZ(0); -webkit-overflow-scrolling: touch; }
 .np-lyrics::-webkit-scrollbar { display: none; }
+.np-lyrics-wrap::before, .np-lyrics-wrap::after { content: ""; position: absolute; left: 0; right: 0; height: 56px; z-index: 3; pointer-events: none; }
+.np-lyrics-wrap::before { top: 0; background: linear-gradient(180deg, var(--np-bg1, #0c1c14), transparent); }
+.np-lyrics-wrap::after { bottom: 0; background: linear-gradient(0deg, var(--np-bg2, #070f0a), transparent); }
 .np-lyric-line { color: rgba(255,255,255,.34); cursor: pointer; font-size: 23px; font-weight: 800; letter-spacing: -.01em; line-height: 1.28; margin: 0 0 18px; transition: color .3s, opacity .3s, transform .3s, filter .3s; transform-origin: left center; }
 .np-lyric-line.past { color: rgba(255,255,255,.22); }
 .np-lyric-line:hover { color: rgba(255,255,255,.7); }
@@ -7658,12 +7665,16 @@ html { background: #050e09; }
 
 /* Fullscreen immersive lyrics — pinned to the viewport, not the scrollable modal */
 .np-fs { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; background: linear-gradient(180deg, var(--np-bg1, #11241a), var(--np-bg2, #070f0a)); animation: plFade .3s ease; overflow: hidden; }
+/* Edge fades as real overlay layers (not a mask on the scroller) — Android-safe */
+.np-fs::before, .np-fs::after { content: ""; position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
+.np-fs::before { top: 58px; height: 64px; background: linear-gradient(180deg, var(--np-bg1, #11241a), transparent); }
+.np-fs::after { bottom: 70px; height: 96px; background: linear-gradient(0deg, var(--np-bg2, #070f0a), transparent); }
 .np-fs-head { position: relative; z-index: 3; align-items: center; display: flex; justify-content: space-between; padding: max(18px, env(safe-area-inset-top)) 22px 8px; }
 .np-fs-now { align-items: center; display: flex; gap: 12px; }
 .np-fs-now img { border-radius: 10px; height: 52px; width: 52px; object-fit: cover; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
 .np-fs-now strong { color: #fff; display: block; font-size: 16px; font-weight: 800; }
 .np-fs-now span { color: rgba(255,255,255,.7); font-size: 13px; }
-.np-lyrics-fs { position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; text-align: left; padding: 4vh 8% 8vh; -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 82%, transparent 100%); mask-image: linear-gradient(180deg, transparent, #000 14%, #000 82%, transparent 100%); }
+.np-lyrics-fs { position: relative; z-index: 3; flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; text-align: left; padding: 4vh 8% 8vh; transform: translateZ(0); -webkit-overflow-scrolling: touch; }
 .np-lyrics-fs .np-lyric-line { font-size: clamp(26px, 5vw, 46px); margin: 0 0 24px; }
 .np-fs-foot { position: relative; z-index: 3; flex: 0 0 auto; align-items: center; display: flex; gap: 22px; justify-content: center; padding: 12px 0 max(22px, env(safe-area-inset-bottom)); }
 
@@ -7677,6 +7688,13 @@ html { background: #050e09; }
   /* Fullscreen overlay must fill the screen, never inherit the panel's 300px cap */
   .np-lyrics-fs { max-height: none; flex: 1 1 auto; padding: 3vh 7% 6vh; }
   .np-fs-head { padding-left: 16px; padding-right: 16px; }
+  /* Kill continuously-animating GPU layers on real devices — an animated mesh /
+     blur / shine recompositing behind the scrolling lyrics is what glitches
+     Android mid-scroll. Static gradients look the same and scroll clean. */
+  .np-mesh { animation: none; }
+  .np-immersive .np-art-front { animation: none; }
+  .np-art-shine { display: none; }
+  .np-immersive .player-bg-blur, .np-fs .player-bg-blur { filter: blur(28px) saturate(1.4); }
 }
 
 /* --- Collection palette = UEN brand (emerald + navy). Gold/violet is Love-Notes-banner-ONLY. --- */
