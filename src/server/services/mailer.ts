@@ -172,6 +172,40 @@ function passwordChangedHtml() {
   </div>`;
 }
 
+function emailVerifyHtml(verifyUrl: string) {
+  return `
+  <div style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <div style="max-width:480px;margin:0 auto;padding:32px 20px;">
+      <div style="background:#ffffff;border-radius:16px;padding:36px 32px;border:1px solid #e7e9ee;">
+        <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#059669;font-weight:700;">UEN Platform</div>
+        <h1 style="margin:14px 0 8px;font-size:22px;color:#10182b;">Confirm your email</h1>
+        <p style="margin:0 0 22px;font-size:15px;line-height:1.55;color:#4a5160;">
+          Welcome to UENITE! Confirm this email address to finish setting up your account. This link works for the next 24 hours.
+        </p>
+        <a href="${verifyUrl}" style="display:inline-block;background:#059669;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:10px;">Confirm my email</a>
+        <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#8a909c;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <span style="color:#059669;word-break:break-all;">${verifyUrl}</span>
+        </p>
+        <hr style="border:none;border-top:1px solid #eceef2;margin:26px 0 18px;">
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#a2a8b4;">
+          If you didn't create a UENITE account, you can safely ignore this message.
+        </p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Sends a "confirm your email" link to a new merchant / Exchange Hub account.
+export async function sendEmailVerifyEmail(to: string, verifyUrl: string) {
+  await sendZeptoMail({
+    to,
+    subject: "Confirm your UENITE email",
+    html: emailVerifyHtml(verifyUrl),
+    text: `Welcome to UENITE! Confirm your email to finish setting up your account. This link works for 24 hours:\n\n${verifyUrl}\n\nIf you didn't create an account, you can ignore this email.`
+  });
+}
+
 // Security notice sent after any successful password change (reset or in-app).
 export async function sendPasswordChangedEmail(to: string) {
   await sendZeptoMail({

@@ -12,6 +12,11 @@ export async function ensureSchema() {
   if (!(process.env.DATABASE_URL ?? "").startsWith("postgres")) return;
   const statements = [
     'ALTER TABLE "Holder" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT',
+    // Email verification flag for merchant/hub accounts. DEFAULT true so every
+    // merchant that already exists is treated as verified (we never retroactively
+    // nag established accounts); new self-signups explicitly write false and must
+    // confirm their email.
+    'ALTER TABLE "Merchant" ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN NOT NULL DEFAULT true',
     // Digital-product (music) tables — never migrated to prod, so likes/comments
     // 500'd. Idempotent additive creation; no-op once they exist.
     `CREATE TABLE IF NOT EXISTS "DigitalProduct" (

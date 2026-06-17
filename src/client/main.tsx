@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, Eye, EyeOff, ExternalLink, Globe, Link2, Mail, Menu, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, Eye, EyeOff, ExternalLink, Globe, Heart, Link2, Mail, Menu, MessageCircle, Music, Pause, Pencil, Play, Repeat, Repeat1, RefreshCw, Search, Send, Shield, Shuffle, SkipBack, SkipForward, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, Trash2, TrendingUp, UploadCloud, Users, Volume1, Volume2, VolumeX, Wallet, X, Zap } from "lucide-react";
 import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
@@ -1271,6 +1271,9 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.85);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState<"off" | "all" | "one">("off");
+  const [artFlipped, setArtFlipped] = useState(false);
   const [liked, setLiked] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(tracks.map((t) => [t.id, t.likedByHolder ?? false]))
   );
@@ -1309,6 +1312,26 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const waveformReady = useRef(false);
 
   const track = tracks[trackIndex];
+
+  // Deterministic waveform peaks per track — the bars are stable across renders
+  // and seeks (a real song's waveform doesn't reshuffle). Seeded from the track
+  // id so every track has its own distinct silhouette, SoundCloud-style.
+  const BAR_COUNT = 72;
+  const peaks = useMemo(() => {
+    const seedStr = track?.id ?? "uen";
+    let seed = 0;
+    for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+    const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xffffffff; };
+    const out: number[] = [];
+    for (let i = 0; i < BAR_COUNT; i++) {
+      // Blend a couple of sines (musical "shape") with noise so it reads organic,
+      // with a gentle fade-in/out at the ends like a real track envelope.
+      const env = Math.sin((i / BAR_COUNT) * Math.PI);
+      const body = 0.35 + 0.4 * Math.abs(Math.sin(i * 0.5 + seed * 0.0001)) + 0.3 * Math.abs(Math.sin(i * 0.17));
+      out.push(Math.max(0.16, Math.min(1, body * (0.55 + 0.65 * env) * (0.7 + 0.6 * rand()))));
+    }
+    return out;
+  }, [track?.id]);
 
   // Load real comments + like state for this track (signed-in supporters).
   // Real comments are merged below the seed comments; demo albums just 404 here
@@ -1365,6 +1388,10 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     }
   }, []);
 
+  // SoundCloud-style waveform that IS the scrubber: the played portion is lit
+  // emerald, the rest is muted, and bars near the playhead breathe with the
+  // live audio energy while playing. Reads the clock straight off the <audio>
+  // element so the playhead stays smooth between React state ticks.
   const drawWaveform = useCallback((active: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1374,61 +1401,67 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    const barCount = 48;
-    const gap = 3;
-    const barW = (W - gap * (barCount - 1)) / barCount;
+    const gap = Math.max(2, W / BAR_COUNT * 0.34);
+    const barW = (W - gap * (BAR_COUNT - 1)) / BAR_COUNT;
     const centerY = H / 2;
 
-    let data: Uint8Array<ArrayBuffer>;
+    let freq: Uint8Array<ArrayBuffer> | null = null;
     if (active && analyserRef.current) {
-      data = new Uint8Array(analyserRef.current.frequencyBinCount) as Uint8Array<ArrayBuffer>;
-      analyserRef.current.getByteFrequencyData(data);
-    } else {
-      // Static idle waveform
-      const idle = new Uint8Array(barCount);
-      for (let i = 0; i < barCount; i++) idle[i] = Math.floor(28 + Math.abs(Math.sin(i * 0.45)) * 38);
-      data = idle;
+      freq = new Uint8Array(analyserRef.current.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+      analyserRef.current.getByteFrequencyData(freq);
     }
+    const el = audioRef.current;
+    const dur = el && el.duration && isFinite(el.duration) ? el.duration : 0;
+    const playRatio = dur ? el!.currentTime / dur : 0;
 
-    for (let i = 0; i < barCount; i++) {
-      const di = Math.floor((i / barCount) * (data.length));
-      const ratio = (data[di] ?? 0) / 255;
-      const barH = Math.max(3, ratio * (H * 0.46));
-
-      const grad = ctx.createLinearGradient(0, centerY - barH, 0, centerY + barH);
-      grad.addColorStop(0, `rgba(117,227,173,${0.55 + ratio * 0.45})`);
-      grad.addColorStop(0.5, `rgba(52,211,153,${0.7 + ratio * 0.3})`);
-      grad.addColorStop(1, `rgba(117,227,173,${0.55 + ratio * 0.45})`);
-
-      ctx.shadowBlur = active ? 10 + ratio * 14 : 4;
-      ctx.shadowColor = "rgba(117,227,173,0.55)";
-      ctx.fillStyle = grad;
-
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const base = peaks[i] ?? 0.3;
+      let amp = base;
+      if (freq) {
+        const fi = Math.floor((i / BAR_COUNT) * freq.length);
+        const energy = (freq[fi] ?? 0) / 255;
+        const near = 1 - Math.min(1, Math.abs(i / BAR_COUNT - playRatio) * 5);
+        amp = base * (1 + energy * 0.55 * Math.max(0, near));
+      }
+      const barH = Math.max(2, Math.min(H * 0.48, amp * (H * 0.46)));
       const x = i * (barW + gap);
+      const played = (i + 0.5) / BAR_COUNT <= playRatio;
+
+      if (played) {
+        const grad = ctx.createLinearGradient(0, centerY - barH, 0, centerY + barH);
+        grad.addColorStop(0, "#a8f5d0");
+        grad.addColorStop(0.5, "#34d399");
+        grad.addColorStop(1, "#178f5f");
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = active ? 8 : 3;
+        ctx.shadowColor = "rgba(52,211,153,.5)";
+      } else {
+        ctx.fillStyle = "rgba(150,185,170,.20)";
+        ctx.shadowBlur = 0;
+      }
       ctx.beginPath();
-      ctx.roundRect(x, centerY - barH, barW, barH, 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.roundRect(x, centerY, barW, barH, 2);
+      ctx.roundRect(x, centerY - barH, barW, barH * 2, Math.min(barW / 2, 3));
       ctx.fill();
     }
+    ctx.shadowBlur = 0;
 
     if (active) animRef.current = requestAnimationFrame(() => drawWaveform(true));
-  }, []);
-
-  useEffect(() => {
-    drawWaveform(false);
-  }, [drawWaveform]);
+  }, [peaks]);
 
   useEffect(() => {
     if (playing) {
       animRef.current = requestAnimationFrame(() => drawWaveform(true));
-    } else {
-      cancelAnimationFrame(animRef.current);
-      drawWaveform(false);
+      return () => cancelAnimationFrame(animRef.current);
     }
-    return () => cancelAnimationFrame(animRef.current);
+    cancelAnimationFrame(animRef.current);
+    drawWaveform(false);
   }, [playing, drawWaveform]);
+
+  // Repaint the played/unplayed split as the clock advances or after a seek
+  // (the RAF loop covers the playing case; this keeps paused state in sync).
+  useEffect(() => {
+    if (!playing) drawWaveform(false);
+  }, [currentTime, playing, drawWaveform]);
 
   // Find nearest comment as time progresses
   useEffect(() => {
@@ -1450,8 +1483,8 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     setPlaying(!playing);
   };
 
-  // Scrub with drag — works for mouse AND touch (pointer events). Tapping the
-  // thin bar on mobile was unreliable; now you can press anywhere and drag.
+  // Scrub by clicking/dragging anywhere on the waveform — works for mouse AND
+  // touch (pointer events). The whole waveform is the scrubber, SoundCloud-style.
   const seekToClientX = (clientX: number) => {
     const el = progressRef.current;
     if (!el || !audioRef.current || !duration) return;
@@ -1470,6 +1503,29 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+  };
+
+  // Where "next" goes depends on shuffle/repeat — used by the button AND by
+  // onEnded so auto-advance and manual skip behave identically.
+  const goToNext = (auto: boolean) => {
+    if (tracks.length <= 1) {
+      if (auto && repeat !== "off" && audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
+      return;
+    }
+    if (shuffle) {
+      let n = trackIndex;
+      while (n === trackIndex) n = Math.floor(Math.random() * tracks.length);
+      changeTrack(n, true);
+      return;
+    }
+    if (trackIndex < tracks.length - 1) changeTrack(trackIndex + 1, true);
+    else if (repeat === "all") changeTrack(0, true);
+    else setPlaying(false);
+  };
+  const goToPrev = () => {
+    // Restart the track if we're past the 3s mark, otherwise step back.
+    if (audioRef.current && audioRef.current.currentTime > 3) { audioRef.current.currentTime = 0; setCurrentTime(0); return; }
+    changeTrack(Math.max(0, trackIndex - 1), playing);
   };
 
   const deleteComment = async (c: DemoComment) => {
@@ -1492,8 +1548,10 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     }
   };
 
-  const changeTrack = (index: number) => {
+  const autoplayRef = useRef(false);
+  const changeTrack = (index: number, autoplay = false) => {
     cancelAnimationFrame(animRef.current);
+    autoplayRef.current = autoplay;
     setTrackIndex(index);
     setPlaying(false);
     setCurrentTime(0);
@@ -1550,7 +1608,8 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
     setComments((prev) => [...prev, { id: `local-${Date.now()}`, body, timestampSeconds: ts, holder: { firstName: "You", lastName: "" } }].sort(byTs));
   };
 
-  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const volIcon = volume === 0 ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />;
+  const curLiked = track ? liked[track.id] : false;
 
   return (
     <div className="player-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -1559,59 +1618,102 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
         {item.artworkUrl && <div className="player-bg-blur" style={{ backgroundImage: `url(${item.artworkUrl})` }} />}
         <div className="player-bg-dark" />
 
-        {/* Close */}
-        <button className="player-close" onClick={onClose}><X size={20} /></button>
+        {/* Top bar */}
+        <div className="player-topbar">
+          <span className="player-eyebrow"><span className={`player-eq ${playing ? "on" : ""}`}><i /><i /><i /></span>{playing ? "Now playing" : "Now playing"}</span>
+          <button className="player-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </div>
 
         <div className="player-layout">
-          {/* LEFT — Artwork + info */}
+          {/* LEFT — Flip artwork + transport */}
           <div className="player-left">
-            <div className="player-artwork-wrap">
-              {item.artworkUrl
-                ? <img className="player-artwork" src={item.artworkUrl} alt={item.title} />
-                : <div className="player-artwork player-artwork-placeholder"><Ticket size={64} /></div>
-              }
-              {playing && <div className="player-artwork-glow" />}
-            </div>
-            <div className="player-album-info">
-              <h2 className="player-album-title">{item.title}</h2>
-              <p className="player-album-artist">{item.artist ?? item.source}</p>
-              <p className="player-album-meta">{tracks.length} track{tracks.length !== 1 ? "s" : ""} · Exclusive drop</p>
-              <AssetMeta item={item} />
-            </div>
-
-            {/* Waveform */}
-            <div className="player-waveform-wrap">
-              <canvas ref={canvasRef} className="player-waveform" width={320} height={72} />
-            </div>
-
-            {/* Controls */}
-            <div className="player-controls">
-              <button className="player-ctrl-btn" onClick={() => changeTrack(Math.max(0, trackIndex - 1))} disabled={trackIndex === 0}>
-                ⏮
-              </button>
-              <button className="player-play-btn" onClick={togglePlay}>
-                {playing ? "⏸" : "▶"}
-              </button>
-              <button className="player-ctrl-btn" onClick={() => changeTrack(Math.min(tracks.length - 1, trackIndex + 1))} disabled={trackIndex === tracks.length - 1}>
-                ⏭
-              </button>
-              <input className="player-volume" type="range" min={0} max={1} step={0.02} value={volume}
-                onChange={(e) => { setVolume(Number(e.target.value)); if (audioRef.current) audioRef.current.volume = Number(e.target.value); }} />
-            </div>
-
-            {/* Progress bar — full-width row with times below for easy scrubbing */}
-            <div className="player-progress-wrap">
-              <div className="player-progress-track" ref={progressRef} onPointerDown={onProgressPointerDown}>
-                <div className="player-progress-fill" style={{ width: `${progressPct}%` }} />
-                {comments.map((c) => (
-                  <div key={c.id} className="player-comment-dot"
-                    style={{ left: `${duration > 0 ? (c.timestampSeconds / duration) * 100 : 0}%` }}
-                    title={`${formatTime(c.timestampSeconds)}: ${c.holder?.firstName} — ${c.body}`} />
-                ))}
+            {/* Artwork is the flip card: front = art, back = asset details */}
+            <div className={`np-art-flip${artFlipped ? " flipped" : ""}`}>
+              <div className="np-art-inner">
+                {/* FRONT */}
+                <div className="np-art-face np-art-front">
+                  {item.artworkUrl
+                    ? <img className="np-art-img" src={item.artworkUrl} alt={item.title} />
+                    : <div className="np-art-img np-art-placeholder"><Music size={56} /></div>}
+                  {playing && <div className="player-artwork-glow" />}
+                  <button className="np-art-play" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+                    {playing ? <Pause size={26} /> : <Play size={26} style={{ marginLeft: 3 }} />}
+                  </button>
+                  <button className="np-art-flipbtn" onClick={() => setArtFlipped(true)} aria-label="Asset details">
+                    <RefreshCw size={13} /> Details
+                  </button>
+                </div>
+                {/* BACK — asset details */}
+                <div className="np-art-face np-art-back">
+                  <span className="np-art-back-kicker"><Star size={13} /> Asset Details</span>
+                  <dl className="np-art-dl">
+                    <div><dt>Exchange Hub</dt><dd>{item.source}</dd></div>
+                    <div><dt>Received</dt><dd>{item.date}</dd></div>
+                    <div><dt>Rarity</dt><dd>{item.rarity}</dd></div>
+                    <div><dt>Status</dt><dd>{item.status}</dd></div>
+                    <div><dt>Est. value</dt><dd>{item.value}</dd></div>
+                  </dl>
+                  {item.tradable === false
+                    ? <span className="np-art-keepsake">Keepsake — yours to treasure, not to trade</span>
+                    : <button className="np-art-trade" onClick={() => setArtFlipped(false)}><Tag size={14} /> Trade / Sell <span className="asset-soon">Soon</span></button>}
+                  <button className="np-art-flipback" onClick={() => setArtFlipped(false)}><RefreshCw size={13} /> Back to artwork</button>
+                </div>
               </div>
-              <div className="player-progress-times">
-                <span className="player-time">{formatTime(currentTime)}</span>
-                <span className="player-time">{formatTime(duration)}</span>
+            </div>
+
+            <div className="player-album-info">
+              <h2 className="player-album-title">{track?.title ?? item.title}</h2>
+              <p className="player-album-artist">{item.artist ?? item.source}</p>
+              <p className="player-album-meta">{item.title} · {tracks.length} track{tracks.length !== 1 ? "s" : ""}</p>
+            </div>
+
+            {/* Waveform IS the scrubber */}
+            <div className="player-waveform-wrap" ref={progressRef} onPointerDown={onProgressPointerDown}>
+              <canvas ref={canvasRef} className="player-waveform" width={560} height={120} />
+              {comments.map((c) => (
+                <span key={c.id} className="player-wave-marker"
+                  style={{ left: `${duration > 0 ? Math.min(99, (c.timestampSeconds / duration) * 100) : 0}%` }}
+                  title={`${formatTime(c.timestampSeconds)} · ${c.holder?.firstName}: ${c.body}`}
+                  onPointerDown={(e) => { e.stopPropagation(); if (audioRef.current) { audioRef.current.currentTime = c.timestampSeconds; setCurrentTime(c.timestampSeconds); } }} />
+              ))}
+            </div>
+            <div className="player-progress-times">
+              <span className="player-time">{formatTime(currentTime)}</span>
+              <span className="player-time">-{formatTime(Math.max(0, duration - currentTime))}</span>
+            </div>
+
+            {/* Transport */}
+            <div className="player-controls">
+              <button className={`player-ctrl-btn ${shuffle ? "on" : ""}`} onClick={() => setShuffle((s) => !s)} aria-label="Shuffle" title="Shuffle">
+                <Shuffle size={17} />
+              </button>
+              <button className="player-ctrl-btn" onClick={goToPrev} aria-label="Previous">
+                <SkipBack size={19} fill="currentColor" />
+              </button>
+              <button className="player-play-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+                {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{ marginLeft: 2 }} />}
+              </button>
+              <button className="player-ctrl-btn" onClick={() => goToNext(false)} aria-label="Next">
+                <SkipForward size={19} fill="currentColor" />
+              </button>
+              <button className={`player-ctrl-btn ${repeat !== "off" ? "on" : ""}`}
+                onClick={() => setRepeat((r) => (r === "off" ? "all" : r === "all" ? "one" : "off"))}
+                aria-label="Repeat" title={`Repeat: ${repeat}`}>
+                {repeat === "one" ? <Repeat1 size={17} /> : <Repeat size={17} />}
+              </button>
+            </div>
+
+            {/* Secondary row: like + volume */}
+            <div className="player-subrow">
+              <button className={`player-heart ${curLiked ? "liked" : ""}`} onClick={() => track && toggleLike(track.id)} aria-label="Like">
+                <Heart size={16} fill={curLiked ? "currentColor" : "none"} />
+                <span>{track ? (likeCounts[track.id] ?? 0) : 0}</span>
+              </button>
+              <div className="player-vol-group">
+                <button className="player-vol-icon" onClick={() => { const v = volume === 0 ? 0.85 : 0; setVolume(v); if (audioRef.current) audioRef.current.volume = v; }} aria-label="Mute">{volIcon}</button>
+                <input className="player-volume" type="range" min={0} max={1} step={0.02} value={volume}
+                  style={{ ["--vol" as string]: `${volume * 100}%` }}
+                  onChange={(e) => { setVolume(Number(e.target.value)); if (audioRef.current) audioRef.current.volume = Number(e.target.value); }} />
               </div>
             </div>
           </div>
@@ -1619,15 +1721,18 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
           {/* RIGHT — Tracklist + Comments */}
           <div className="player-right">
             <div className="player-tracklist">
-              <h3 className="player-section-label">Tracklist</h3>
+              <h3 className="player-section-label">Up Next · {tracks.length}</h3>
               {tracks.map((t, i) => (
-                <button key={t.id} className={`player-track-row ${i === trackIndex ? "active" : ""}`} onClick={() => changeTrack(i)}>
-                  <span className="player-track-num">{i === trackIndex && playing ? "▶" : t.trackNumber}</span>
+                <button key={t.id} className={`player-track-row ${i === trackIndex ? "active" : ""}`} onClick={() => changeTrack(i, true)}>
+                  <span className="player-track-num">
+                    {i === trackIndex && playing ? <span className="player-eq on small"><i /><i /><i /></span> : <span className="player-track-no">{t.trackNumber}</span>}
+                    <Play className="player-track-hoverplay" size={13} fill="currentColor" />
+                  </span>
                   <span className="player-track-title">{t.title}</span>
                   <div className="player-track-actions">
                     <button className={`player-like-btn ${liked[t.id] ? "liked" : ""}`}
-                      onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }}>
-                      ♥ {likeCounts[t.id] ?? 0}
+                      onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }} aria-label="Like track">
+                      <Heart size={13} fill={liked[t.id] ? "currentColor" : "none"} /> {likeCounts[t.id] ?? 0}
                     </button>
                     {t.durationSeconds && <span className="player-track-dur">{formatTime(t.durationSeconds)}</span>}
                   </div>
@@ -1638,9 +1743,9 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
             {/* Comments / Lyrics */}
             <div className="player-comments">
               <div className="player-tabs">
-                <button className={rightTab === "comments" ? "active" : ""} onClick={() => setRightTab("comments")}>Community · {comments.length}</button>
+                <button className={rightTab === "comments" ? "active" : ""} onClick={() => setRightTab("comments")}><MessageCircle size={13} /> Community · {comments.length}</button>
                 {lyricLines.length > 0 && (
-                  <button className={rightTab === "lyrics" ? "active" : ""} onClick={() => setRightTab("lyrics")}>Lyrics</button>
+                  <button className={rightTab === "lyrics" ? "active" : ""} onClick={() => setRightTab("lyrics")}><Music size={13} /> Lyrics</button>
                 )}
               </div>
               {rightTab === "lyrics" ? (
@@ -1675,8 +1780,8 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                     </div>
                     {c.isMine && editingId !== c.id && (
                       <div className="player-comment-actions">
-                        <button onClick={() => { setEditingId(c.id); setEditInput(c.body); }} aria-label="Edit comment">✎</button>
-                        <button onClick={() => deleteComment(c)} aria-label="Delete comment">🗑</button>
+                        <button onClick={() => { setEditingId(c.id); setEditInput(c.body); }} aria-label="Edit comment"><Pencil size={13} /></button>
+                        <button onClick={() => deleteComment(c)} aria-label="Delete comment"><Trash2 size={13} /></button>
                       </div>
                     )}
                   </div>
@@ -1690,7 +1795,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                   onChange={(e) => setCommentInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") postComment(); }}
                 />
-                <button className="player-comment-submit" onClick={postComment} disabled={!commentInput.trim()}>Post</button>
+                <button className="player-comment-submit" onClick={postComment} disabled={!commentInput.trim()} aria-label="Post comment"><Send size={15} /></button>
               </div>
               </>
               )}
@@ -1706,10 +1811,18 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
             crossOrigin="anonymous"
             preload="metadata"
             onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
-            onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+            onLoadedMetadata={() => {
+              setDuration(audioRef.current?.duration ?? 0);
+              if (audioRef.current) audioRef.current.volume = volume;
+              if (autoplayRef.current) {
+                autoplayRef.current = false;
+                initAudioContext();
+                audioRef.current?.play().then(() => setPlaying(true)).catch(() => {});
+              }
+            }}
             onEnded={() => {
-              if (trackIndex < tracks.length - 1) changeTrack(trackIndex + 1);
-              else setPlaying(false);
+              if (repeat === "one" && audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); return; }
+              goToNext(true);
             }}
           />
         )}
@@ -2676,6 +2789,42 @@ function ShopifyMerchantPortal() {
   const [acctSaving, setAcctSaving] = useState(false);
   const [acctMsg, setAcctMsg] = useState("");
   const [acctErr, setAcctErr] = useState("");
+
+  // Change password (Settings tab)
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
+  const [pwShow, setPwShow] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState("");
+  const [pwErr, setPwErr] = useState("");
+  const changePassword = async () => {
+    setPwErr(""); setPwMsg("");
+    if (!(pwForm.newPassword.length >= 8 && /[A-Za-z]/.test(pwForm.newPassword) && /[0-9]/.test(pwForm.newPassword))) {
+      setPwErr("New password must be at least 8 characters, including a letter and a number."); return;
+    }
+    if (pwForm.newPassword !== pwForm.confirm) { setPwErr("New passwords don't match."); return; }
+    setPwSaving(true);
+    try {
+      const r = await fetch("/api/merchant/change-password", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword }) });
+      const data = await r.json();
+      if (!r.ok) { setPwErr(data.error ?? "Could not change password."); }
+      else { setPwMsg("Password updated. We emailed you a confirmation."); setPwForm({ currentPassword: "", newPassword: "", confirm: "" }); }
+    } catch { setPwErr("Could not connect. Try again."); }
+    finally { setPwSaving(false); }
+  };
+
+  // Email verification banner (non-blocking nudge for new accounts)
+  const [verifyConfirmed] = useState(() => new URLSearchParams(window.location.search).get("verified") === "1");
+  const [verifyResent, setVerifyResent] = useState(false);
+  const [verifyErr, setVerifyErr] = useState("");
+  const resendVerification = async () => {
+    setVerifyErr("");
+    try {
+      const r = await fetch("/api/merchant/resend-verification", { method: "POST", credentials: "include" });
+      const data = await r.json();
+      if (!r.ok) { setVerifyErr(data.error ?? "Could not resend the link."); return; }
+      setVerifyResent(true);
+    } catch { setVerifyErr("Could not connect. Try again."); }
+  };
   useEffect(() => {
     if (merchant) setAcctForm({ businessName: merchant.businessName ?? "", contactEmail: merchant.contactEmail ?? "" });
   }, [merchant?.businessName, merchant?.contactEmail]);
@@ -2964,6 +3113,32 @@ function ShopifyMerchantPortal() {
           <span className="mp-workspace-pill">{isHub ? "Issues UEN notes" : "Accepts UEN notes"}</span>
         </div>
 
+        {/* Email confirmed toast (returning from the verify link) */}
+        {verifyConfirmed && (
+          <div className="mp-workspace-banner" style={{ background: "#ecfdf5", border: "1px solid #6ee7b7" }}>
+            <div className="mp-workspace-mark" style={{ background: "transparent", color: "#059669" }}><CheckCircle size={18} /></div>
+            <div className="mp-workspace-copy"><strong>Email confirmed</strong><span>Thanks — your account is fully verified.</span></div>
+          </div>
+        )}
+
+        {/* Confirm-your-email reminder (non-blocking) */}
+        {!isPreview && merchant?.contactEmail && merchant?.emailVerified === false && (
+          <div className="mp-workspace-banner" style={{ background: "#fffbeb", border: "1px solid #fcd34d" }}>
+            <div className="mp-workspace-mark" style={{ background: "transparent", color: "#b45309" }}><Mail size={18} /></div>
+            <div className="mp-workspace-copy">
+              <strong>Confirm your email</strong>
+              <span>
+                {verifyResent
+                  ? `Sent again to ${merchant.contactEmail} — check your inbox and spam.`
+                  : verifyErr
+                    ? verifyErr
+                    : `We sent a confirmation link to ${merchant.contactEmail}.`}
+              </span>
+            </div>
+            {!verifyResent && <button className="mp-btn" onClick={resendVerification}>Resend link</button>}
+          </div>
+        )}
+
         {/* Dashboard */}
         {nav === "dashboard" && (
           <div className="mp-section">
@@ -3166,6 +3341,22 @@ function ShopifyMerchantPortal() {
               {!merchant?.shopDomain && !shop && (
                 <p className="mp-muted-note">No Shopify store is connected to this account yet. Store connections are set up with the UENITE team — email <a href="mailto:work@zahbrandsolutions.com?subject=Connect my Shopify store">work@zahbrandsolutions.com</a> and we'll link your store, load your notes, and switch on order tracking.</p>
               )}
+            </div>
+
+            <div className="mp-form-card">
+              <h2>Password</h2>
+              {pwMsg && <p className="mp-notice">{pwMsg}</p>}
+              {pwErr && <p className="mp-error">{pwErr}</p>}
+              <div className="mp-form-grid">
+                <label style={{ gridColumn: "1 / -1" }}>Current password<input type={pwShow ? "text" : "password"} autoComplete="current-password" value={pwForm.currentPassword} onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })} /></label>
+                <label>New password<input type={pwShow ? "text" : "password"} autoComplete="new-password" value={pwForm.newPassword} onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })} /></label>
+                <label>Confirm new password<input type={pwShow ? "text" : "password"} autoComplete="new-password" value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} /></label>
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, margin: "10px 0 0", cursor: "pointer" }}>
+                <input type="checkbox" checked={pwShow} onChange={(e) => setPwShow(e.target.checked)} style={{ width: "auto", margin: 0 }} /> Show passwords
+              </label>
+              <p className="mp-muted-note" style={{ margin: "6px 0 0" }}>At least 8 characters, including a letter and a number.</p>
+              <button className="mp-btn" style={{ marginTop: 14 }} disabled={pwSaving || !pwForm.currentPassword || !pwForm.newPassword} onClick={changePassword}>{pwSaving ? "Saving…" : "Update password"}</button>
             </div>
 
             <div className={`mp-form-card mp-hub-card ${merchant?.hubStatus === "APPROVED" ? "mp-hub-active" : merchant?.hubStatus === "PENDING" ? "mp-hub-pending" : "mp-hub-apply"}`}>

@@ -9,10 +9,11 @@ import {
   createPasswordResetToken,
   verifyPasswordResetToken,
   passwordFingerprint,
-  createHolderLoginToken
+  createHolderLoginToken,
+  verifyEmailVerifyToken
 } from "../security";
 import { passwordRule } from "../validators";
-import { loginRateLimited, publicBaseUrl } from "../util/http";
+import { loginRateLimited, tooManyAttempts, publicBaseUrl } from "../util/http";
 import { sendPasswordResetEmail, sendPasswordChangedEmail, sendHolderLoginEmail } from "../services/mailer";
 
 const router = express.Router();
@@ -68,7 +69,7 @@ router.post("/login", async (req, res) => {
     // Throttle brute-force attempts, keyed by IP + email so one attacker can't
     // grind a single account and one IP can't spray many accounts.
     if (loginRateLimited(`login:${req.ip}:${email}`)) {
-      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+      return tooManyAttempts(res, `login:${req.ip}:${email}`);
     }
 
     // 1) Admin account (requires a password)
@@ -241,7 +242,7 @@ router.get("/reset-password/validate", async (req, res) => {
 router.post("/reset-password", async (req, res) => {
   try {
     if (loginRateLimited(`reset:${req.ip}`, 10, 15 * 60 * 1000)) {
-      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+      return tooManyAttempts(res, `reset:${req.ip}`, 10, 15 * 60 * 1000);
     }
     const data = z.object({ token: z.string().min(1), password: passwordRule }).parse(req.body);
     const resolved = await resolveResetToken(data.token);
@@ -280,6 +281,29 @@ router.post("/reset-password", async (req, res) => {
     }
     console.error(error);
     res.status(500).json({ error: "Unexpected server error" });
+  }
+});
+
+// Confirms a merchant/hub email from the link in the verification email. Marks
+// the account verified only when the token's email still matches the account's
+// current email, then bounces to the portal with a friendly flag. Non-blocking:
+// unverified accounts can still sign in — this just clears the reminder banner.
+router.get("/verify-email", async (req, res) => {
+  const parsed = verifyEmailVerifyToken(String(req.query.token ?? ""));
+  const dest = (ok: boolean) => `/shopify/merchant?${ok ? "verified=1" : "verifyError=1"}`;
+  if (!parsed) return res.redirect(dest(false));
+  try {
+    const merchant = await prisma.merchant.findUnique({ where: { id: parsed.merchantId } });
+    if (!merchant || (merchant.contactEmail ?? "").toLowerCase() !== parsed.email.toLowerCase()) {
+      return res.redirect(dest(false));
+    }
+    if (!merchant.emailVerified) {
+      await prisma.merchant.update({ where: { id: merchant.id }, data: { emailVerified: true } });
+    }
+    return res.redirect(dest(true));
+  } catch (error) {
+    console.error(error);
+    return res.redirect(dest(false));
   }
 });
 

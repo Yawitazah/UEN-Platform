@@ -196,6 +196,44 @@ export function verifyPasswordResetToken(value?: string) {
   }
 }
 
+// Confirms a merchant/hub account's email address after signup. Stateless,
+// signed, and bound to the merchant id + email so the link only verifies the
+// address it was issued for. 24-hour expiry.
+export function createEmailVerifyToken(input: { merchantId: string; email: string }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      merchantId: input.merchantId,
+      email: input.email,
+      kind: "merchant-email-verify",
+      exp: Date.now() + 1000 * 60 * 60 * 24
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyEmailVerifyToken(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      merchantId: string;
+      email: string;
+      kind: string;
+      exp: number;
+    };
+    if (parsed.kind !== "merchant-email-verify") return null;
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    if (!parsed.merchantId || !parsed.email) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function createMerchantSession(input: { id: string; merchantId: string }) {
   const payload = Buffer.from(
     JSON.stringify({

@@ -9,7 +9,9 @@ import { config } from "../config";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import bcrypt from "bcryptjs";
-import { createMerchantSession, hashSecret, requireMerchantAccess, requireRole } from "../security";
+import { createMerchantSession, createEmailVerifyToken, hashSecret, requireMerchantAccess, requireRole } from "../security";
+import { publicBaseUrl } from "../util/http";
+import { sendEmailVerifyEmail } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
@@ -302,9 +304,19 @@ router.post("/exchange-hub/register", async (req, res) => {
         platformType: "SHOPIFY",
         status: "ACTIVE",
         contactEmail: normalizedEmail,
-        passwordHash
+        passwordHash,
+        emailVerified: false
       }
     });
+
+    // Send a "confirm your email" link. Non-blocking — the account is usable
+    // immediately; the portal just shows a reminder until it's confirmed.
+    try {
+      const verifyToken = createEmailVerifyToken({ merchantId: merchant.id, email: normalizedEmail });
+      await sendEmailVerifyEmail(normalizedEmail, `${publicBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`);
+    } catch (mailError) {
+      console.error("[hub-register] verification email failed", mailError);
+    }
 
     const slug = data.displayName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const hub = await prisma.exchangeHub.create({

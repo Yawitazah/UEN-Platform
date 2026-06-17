@@ -2,9 +2,10 @@ import bcrypt from "bcryptjs";
 import express from "express";
 import { z, ZodError } from "zod";
 import { prisma } from "../db";
-import { createMerchantSession } from "../security";
+import { createMerchantSession, createEmailVerifyToken } from "../security";
 import { passwordRule } from "../validators";
-import { loginRateLimited } from "../util/http";
+import { loginRateLimited, tooManyAttempts, publicBaseUrl } from "../util/http";
+import { sendPasswordChangedEmail, sendEmailVerifyEmail } from "../services/mailer";
 
 const router = express.Router();
 
@@ -64,9 +65,19 @@ router.post("/setup", async (req, res) => {
       data: {
         businessName: data.businessName,
         contactEmail: data.email.toLowerCase(),
-        passwordHash
+        passwordHash,
+        emailVerified: false
       }
     });
+
+    // Confirm-your-email link. Non-blocking: setup completes and they're signed
+    // in right away; the portal just nudges them to confirm.
+    try {
+      const verifyToken = createEmailVerifyToken({ merchantId: merchant.id, email: merchant.contactEmail! });
+      await sendEmailVerifyEmail(merchant.contactEmail!, `${publicBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`);
+    } catch (mailError) {
+      console.error("[merchant-setup] verification email failed", mailError);
+    }
 
     const token = createMerchantSession({ id: merchant.id, merchantId: merchant.id });
     res.cookie("uen_merchant_session", token, cookieOptions(req));
@@ -82,7 +93,7 @@ router.post("/login", async (req, res) => {
     const data = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);
     const email = data.email.toLowerCase();
     if (loginRateLimited(`mlogin:${req.ip}:${email}`)) {
-      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+      return tooManyAttempts(res, `mlogin:${req.ip}:${email}`);
     }
     const merchant = await prisma.merchant.findUnique({ where: { contactEmail: email } });
     if (!merchant?.passwordHash || !(await bcrypt.compare(data.password, merchant.passwordHash))) {
@@ -128,6 +139,7 @@ router.get("/me", async (req, res) => {
       id: merchant.id,
       businessName: merchant.businessName,
       contactEmail: merchant.contactEmail,
+      emailVerified: merchant.emailVerified,
       status: merchant.status,
       shopDomain: merchant.shopifyConnections[0]?.shopDomain ?? null,
       isExchangeHub: merchant.isExchangeHub,
@@ -201,6 +213,56 @@ router.post("/apply-hub", async (req, res) => {
 
     res.status(201).json({ id: hub.id, displayName: hub.displayName, status: hub.status });
   } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Resend the "confirm your email" link to the signed-in merchant's current
+// address. No-op (still 200) if already verified, so the UI stays simple.
+router.post("/resend-verification", async (req, res) => {
+  try {
+    if (!req.auth || req.auth.actorType !== "merchant") return res.status(401).json({ error: "Not signed in" });
+    if (loginRateLimited(`verify:${req.ip}:${req.auth.merchantId}`, 3, 15 * 60 * 1000)) {
+      return tooManyAttempts(res, `verify:${req.ip}:${req.auth.merchantId}`, 3, 15 * 60 * 1000);
+    }
+    const merchant = await prisma.merchant.findUnique({ where: { id: req.auth.merchantId } });
+    if (!merchant?.contactEmail) return res.status(400).json({ error: "No email on file to verify." });
+    if (merchant.emailVerified) return res.json({ ok: true, alreadyVerified: true });
+    const verifyToken = createEmailVerifyToken({ merchantId: merchant.id, email: merchant.contactEmail });
+    await sendEmailVerifyEmail(merchant.contactEmail, `${publicBaseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(verifyToken)}`);
+    res.json({ ok: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Change password from account settings. Requires the current password (so a
+// hijacked open session can't silently swap it), enforces the shared strength
+// rule, and emails a confirmation like every other password change.
+router.post("/change-password", async (req, res) => {
+  try {
+    if (!req.auth || req.auth.actorType !== "merchant") return res.status(401).json({ error: "Not signed in" });
+    const data = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: passwordRule
+    }).parse(req.body);
+
+    const merchant = await prisma.merchant.findUnique({ where: { id: req.auth.merchantId } });
+    if (!merchant?.passwordHash) return res.status(400).json({ error: "No password is set on this account yet." });
+    if (!(await bcrypt.compare(data.currentPassword, merchant.passwordHash))) {
+      return res.status(400).json({ error: "Your current password is incorrect." });
+    }
+    if (await bcrypt.compare(data.newPassword, merchant.passwordHash)) {
+      return res.status(400).json({ error: "Your new password must be different from your current one." });
+    }
+
+    await prisma.merchant.update({ where: { id: merchant.id }, data: { passwordHash: await bcrypt.hash(data.newPassword, 12) } });
+    if (merchant.contactEmail) {
+      void sendPasswordChangedEmail(merchant.contactEmail).catch((e) => console.error("[change-password] notice failed", e));
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    if (error instanceof ZodError) return res.status(400).json({ error: error.issues[0]?.message ?? "Validation failed" });
     handleError(res, error);
   }
 });
