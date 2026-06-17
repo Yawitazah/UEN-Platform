@@ -3474,9 +3474,12 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("admin@uen.local");
   const [password, setPassword] = useState("change-me");
   const [error, setError] = useState("");
+  const [walletHint, setWalletHint] = useState(false);
   const [loading, setLoading] = useState(false);
+  const walletHref = `/holder/register?email=${encodeURIComponent(email.trim())}`;
   const login = async () => {
     setError("");
+    setWalletHint(false);
     setLoading(true);
     try {
       const response = await fetch("/api/auth/login", {
@@ -3487,6 +3490,9 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       });
       const loginData = await response.json();
       if (!response.ok) {
+        // The server flags emails that belong to a wallet account so we can send
+        // the user to the right sign-in door instead of a dead error.
+        setWalletHint(Boolean(loginData.walletAccount));
         setError(loginData.error ?? "Could not sign in");
         return;
       }
@@ -3510,10 +3516,23 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       <h1>Sign in</h1>
       <p>Access your UENITE workspace, merchant tools, Exchange Hub controls, and platform dashboard.</p>
       {error && <Notice tone="bad">{error}</Notice>}
+      {walletHint && (
+        <div style={{ margin: "0 0 12px", padding: "12px 14px", border: "1px solid #c7d2fe", background: "#eef2ff", borderRadius: 10 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 14, color: "#3730a3" }}>
+            This looks like a <strong>wallet / shopper</strong> account, which signs in on a different page.
+          </p>
+          <a href={walletHref} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 14, color: "#4f46e5", textDecoration: "none" }}>
+            <Wallet size={15} /> Sign in to your wallet →
+          </a>
+        </div>
+      )}
       <Input label="Email" value={email} onChange={setEmail} />
       <PasswordInput label="Password" value={password} onChange={setPassword} />
       <button onClick={login} disabled={loading}>{loading ? "Signing In..." : "Sign In"}</button>
       <a href="/forgot-password" style={{ display: "block", marginTop: 14, fontSize: 14, color: "#64748b", textDecoration: "none" }}>Forgot your password?</a>
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #e2e8f0", fontSize: 14, color: "#64748b" }}>
+        Shopper or wallet member? <a href={walletHref} style={{ color: "#4f46e5", fontWeight: 600, textDecoration: "none" }}>Sign in to your wallet →</a>
+      </div>
     </section>
   );
 }
@@ -4430,6 +4449,7 @@ function HolderRegister() {
   // The hub is normally known (passed by the widget, or resolved from the email),
   // so the picker stays hidden until the server says it genuinely needs one.
   const [showHubPicker, setShowHubPicker] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   // Hide the bootstrap/test hub from the public picker.
   const hubOptions = (hubs.data ?? []).filter((h: any) => h.displayName !== "Exchange Hub A");
 
@@ -4528,14 +4548,26 @@ function HolderRegister() {
 
                 <label className="holder-reg-label">
                   Password
-                  <input
-                    className="holder-reg-input"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="Leave blank to get a sign-in link"
-                    onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
-                  />
+                  <span style={{ position: "relative", display: "block" }}>
+                    <input
+                      className="holder-reg-input"
+                      type={showPw ? "text" : "password"}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="Leave blank to get a sign-in link"
+                      onKeyDown={(e) => { if (e.key === "Enter") signIn(); }}
+                      style={{ paddingRight: 42 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((prev) => !prev)}
+                      aria-label={showPw ? "Hide password" : "Show password"}
+                      title={showPw ? "Hide password" : "Show password"}
+                      style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", justifyContent: "center", width: "auto", background: "transparent", border: "none", padding: 4, margin: 0, cursor: "pointer", color: "#94a3b8" }}
+                    >
+                      {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </span>
                 </label>
 
                 <button className="holder-reg-btn" onClick={signIn} disabled={loading}>

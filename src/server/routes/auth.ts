@@ -88,6 +88,21 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // 3) Neither an admin nor a merchant matched. If this email belongs to a
+    // wallet (holder) account, the person is simply on the wrong door: the
+    // wallet lives behind the storefront overlay / wallet sign-in, not this
+    // merchant+admin portal. Tell the client so it can point them to the right
+    // place instead of a dead "invalid password" — that exact confusion is what
+    // makes the login feel broken.
+    const holder = await prisma.holder.findFirst({ where: { email } });
+    if (holder) {
+      return res.status(401).json({
+        error: "This email is registered as a wallet account — sign in to your wallet instead.",
+        walletAccount: true,
+        email
+      });
+    }
+
     return res.status(401).json({ error: "Invalid email or password" });
   } catch (error) {
     if (error instanceof ZodError) {
