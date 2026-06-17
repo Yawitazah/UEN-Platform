@@ -3471,36 +3471,41 @@ function MerchantInstall() {
 }
 
 function LoginPanel({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = useState("admin@uen.local");
-  const [password, setPassword] = useState("change-me");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [walletHint, setWalletHint] = useState(false);
+  const [linkSentTo, setLinkSentTo] = useState("");
   const [loading, setLoading] = useState(false);
-  const walletHref = `/holder/register?email=${encodeURIComponent(email.trim())}`;
+  // One sign-in for everyone — admin, merchant/hub, or wallet member. The server
+  // figures out which kind of account the email is and either signs them in or
+  // (for a wallet with no/incorrect password) emails a one-time link.
   const login = async () => {
     setError("");
-    setWalletHint(false);
+    setLinkSentTo("");
+    if (!email.trim()) { setError("Enter your email to sign in."); return; }
     setLoading(true);
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: email.trim(), password })
       });
       const loginData = await response.json();
       if (!response.ok) {
-        // The server flags emails that belong to a wallet account so we can send
-        // the user to the right sign-in door instead of a dead error.
-        setWalletHint(Boolean(loginData.walletAccount));
         setError(loginData.error ?? "Could not sign in");
         return;
       }
+      // Wallet member without a matching password: the server emailed them a
+      // secure sign-in link instead of failing.
+      if (loginData.linkSent) {
+        setLinkSentTo(loginData.email ?? email.trim());
+        return;
+      }
       if (loginData.token) localStorage.setItem("uen_admin_token", loginData.token);
-      // Merchants / creators authenticate against the merchant directory and
-      // belong in the merchant portal, not the admin dashboard. Honor the
-      // destination the server picked for this account type.
-      if (loginData.actorType === "merchant" && loginData.redirect) {
+      // Merchants and wallet members go to their own destination; admins refresh
+      // in place into the dashboard.
+      if (loginData.actorType !== "admin" && loginData.redirect) {
         window.location.href = loginData.redirect;
         return;
       }
@@ -3511,28 +3516,31 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       setLoading(false);
     }
   };
+
+  if (linkSentTo) {
+    return (
+      <section className="login-panel">
+        <h1>Check your email</h1>
+        <Notice>We sent a secure sign-in link to <strong>{linkSentTo}</strong>. Open it to access your wallet — the link works for 15 minutes.</Notice>
+        <p style={{ fontSize: 14, color: "#64748b", marginTop: 12 }}>
+          Didn't get it? Check spam, or <button className="button-link" style={{ padding: 0 }} onClick={() => setLinkSentTo("")}>try again</button>.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="login-panel">
       <h1>Sign in</h1>
-      <p>Access your UENITE workspace, merchant tools, Exchange Hub controls, and platform dashboard.</p>
+      <p>One sign-in for your wallet, merchant tools, Exchange Hub, and platform dashboard.</p>
       {error && <Notice tone="bad">{error}</Notice>}
-      {walletHint && (
-        <div style={{ margin: "0 0 12px", padding: "12px 14px", border: "1px solid #c7d2fe", background: "#eef2ff", borderRadius: 10 }}>
-          <p style={{ margin: "0 0 8px", fontSize: 14, color: "#3730a3" }}>
-            This looks like a <strong>wallet / shopper</strong> account, which signs in on a different page.
-          </p>
-          <a href={walletHref} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 14, color: "#4f46e5", textDecoration: "none" }}>
-            <Wallet size={15} /> Sign in to your wallet →
-          </a>
-        </div>
-      )}
-      <Input label="Email" value={email} onChange={setEmail} />
+      <Input label="Email" value={email} onChange={setEmail} type="email" />
       <PasswordInput label="Password" value={password} onChange={setPassword} />
       <button onClick={login} disabled={loading}>{loading ? "Signing In..." : "Sign In"}</button>
-      <a href="/forgot-password" style={{ display: "block", marginTop: 14, fontSize: 14, color: "#64748b", textDecoration: "none" }}>Forgot your password?</a>
-      <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #e2e8f0", fontSize: 14, color: "#64748b" }}>
-        Shopper or wallet member? <a href={walletHref} style={{ color: "#4f46e5", fontWeight: 600, textDecoration: "none" }}>Sign in to your wallet →</a>
-      </div>
+      <p style={{ fontSize: 13, color: "#94a3b8", margin: "10px 0 0" }}>
+        Wallet member without a password? Leave it blank and we'll email you a secure sign-in link.
+      </p>
+      <a href="/forgot-password" style={{ display: "block", marginTop: 12, fontSize: 14, color: "#64748b", textDecoration: "none" }}>Forgot your password?</a>
     </section>
   );
 }
