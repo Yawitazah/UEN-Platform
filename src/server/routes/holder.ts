@@ -11,29 +11,11 @@ import {
 import { claimReservedCodesForHolder } from "../services/grandfather";
 import { sendHolderLoginEmail, sendEmailChangeVerification } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount } from "../services/sync";
+import { loginRateLimited, publicBaseUrl } from "../util/http";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const router = express.Router();
-
-// Lightweight in-memory rate limiter for the email-sending login endpoints.
-// Keyed by IP: caps how often we'll fire verification emails so the endpoint
-// can't be abused to spam an inbox or probe which emails have accounts. Single
-// instance only, which matches the current Railway deployment.
-const loginAttempts = new Map<string, number[]>();
-function loginRateLimited(key: string, max = 5, windowMs = 10 * 60 * 1000) {
-  const now = Date.now();
-  const hits = (loginAttempts.get(key) ?? []).filter((t) => now - t < windowMs);
-  hits.push(now);
-  loginAttempts.set(key, hits);
-  return hits.length > max;
-}
-
-// Builds the public base URL (https://host) from the incoming request. With
-// `trust proxy` enabled this honours Railway's X-Forwarded-Proto/Host headers.
-function publicBaseUrl(req: express.Request) {
-  return `${req.protocol}://${req.get("host")}`;
-}
 
 async function holderFromToken(token: string) {
   if (!token) return null;

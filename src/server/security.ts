@@ -143,6 +143,59 @@ export function verifyEmailChangeToken(value?: string) {
   }
 }
 
+// Fingerprint of the current password hash, embedded in reset links so each
+// link becomes single-use: the moment the password changes the fingerprint no
+// longer matches and any still-outstanding reset link stops working.
+export function passwordFingerprint(passwordHash?: string | null) {
+  return createHash("sha256").update(passwordHash ?? "none").digest("hex").slice(0, 16);
+}
+
+// One-time password-reset link, emailed to a merchant/admin who forgot their
+// password. Stateless and signed with the session secret like the holder magic
+// link (see createHolderLoginToken) — no DB row or migration needed. It carries
+// which account directory + id it is for plus a password-hash fingerprint, and
+// expires after 60 minutes. Possession of the link (i.e. access to the inbox)
+// plus a still-matching fingerprint is what authorises the reset.
+export function createPasswordResetToken(input: { accountType: "admin" | "merchant"; id: string; email: string; pwd: string }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      accountType: input.accountType,
+      id: input.id,
+      email: input.email,
+      pwd: input.pwd,
+      kind: "password-reset",
+      exp: Date.now() + 1000 * 60 * 60
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+export function verifyPasswordResetToken(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      accountType: "admin" | "merchant";
+      id: string;
+      email: string;
+      pwd: string;
+      kind: string;
+      exp: number;
+    };
+    if (parsed.kind !== "password-reset") return null;
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    if (!parsed.id || !parsed.email) return null;
+    if (parsed.accountType !== "admin" && parsed.accountType !== "merchant") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export function createMerchantSession(input: { id: string; merchantId: string }) {
   const payload = Buffer.from(
     JSON.stringify({

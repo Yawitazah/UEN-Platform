@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+// Single source of truth for password strength, reused everywhere a password is
+// set (signup, setup, reset). Industry-standard baseline: at least 8 characters
+// with at least one letter and one number. Keep the message in sync with the
+// client-side hint in main.tsx so users see the same rule on both sides.
+export const PASSWORD_MIN_MESSAGE = "Use at least 8 characters, including a letter and a number.";
+export const passwordRule = z
+  .string()
+  .min(8, PASSWORD_MIN_MESSAGE)
+  .regex(/[A-Za-z]/, PASSWORD_MIN_MESSAGE)
+  .regex(/[0-9]/, PASSWORD_MIN_MESSAGE);
+
 export const createHubSchema = z.object({
   name: z.string().min(2),
   displayName: z.string().min(2),

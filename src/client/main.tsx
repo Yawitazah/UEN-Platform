@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, ExternalLink, Globe, Link2, Mail, Menu, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, Eye, EyeOff, ExternalLink, Globe, Link2, Mail, Menu, Pause, Play, RefreshCw, Search, Shield, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, TrendingUp, UploadCloud, Users, Wallet, X, Zap } from "lucide-react";
 import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
@@ -399,7 +399,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/faq" || window.location.pathname === "/login" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/faq" || window.location.pathname === "/login" || window.location.pathname === "/forgot-password" || window.location.pathname === "/reset-password" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
   const refreshAuth = async () => {
     try {
       const storedToken = localStorage.getItem("uen_admin_token");
@@ -432,6 +432,8 @@ function Shell() {
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/faq" element={<FaqPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
           <Route path="/holder/portal" element={<HolderPortal />} />
@@ -2427,6 +2429,145 @@ function LoginPage() {
   );
 }
 
+// Step 1 of password recovery: request a reset link. Always shows the same
+// "if an account exists..." confirmation so the page never reveals which
+// emails have accounts (matches the server's anti-enumeration response).
+function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim() })
+      });
+      setSent(true);
+    } catch {
+      setError("Could not reach the app server. Refresh the page and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <main className="admin-login-screen">
+      <div className="admin-login-card">
+        <a className="admin-login-brand" href="/"><Shield size={24} /><BrandWord /></a>
+        <section className="login-panel">
+          <h1>Reset your password</h1>
+          {sent ? (
+            <>
+              <p>If an account exists for <strong>{email.trim()}</strong>, we've sent a link to choose a new password. It works for the next 60 minutes.</p>
+              <Notice>Check your inbox — and your spam folder — for an email from UEN.</Notice>
+              <a className="login-page-signup-btn" href="/login" style={{ marginTop: 16 }}>Back to sign in</a>
+            </>
+          ) : (
+            <>
+              <p>Enter the email on your account and we'll send you a link to set a new password.</p>
+              {error && <Notice tone="bad">{error}</Notice>}
+              <Input label="Email" value={email} onChange={setEmail} type="email" />
+              <button onClick={submit} disabled={loading || !email.trim()}>{loading ? "Sending..." : "Send reset link"}</button>
+              <a href="/login" style={{ display: "block", marginTop: 16, fontSize: 14, color: "#64748b" }}>Back to sign in</a>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+// Step 2: land here from the emailed link. Validate the token first so an
+// expired/used link shows a clear message instead of a dead form; on success
+// the server signs the user straight in and returns where to send them.
+function ResetPasswordPage() {
+  const token = new URLSearchParams(window.location.search).get("token") ?? "";
+  const [status, setStatus] = useState<"checking" | "valid" | "invalid">("checking");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch(`/api/auth/reset-password/validate?token=${encodeURIComponent(token)}`);
+        const data = await response.json();
+        if (data.valid) {
+          setAccountEmail(data.email ?? "");
+          setStatus("valid");
+        } else {
+          setStatus("invalid");
+        }
+      } catch {
+        setStatus("invalid");
+      }
+    })();
+  }, []);
+
+  const strong = password.length >= 8 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
+  const submit = async () => {
+    setError("");
+    if (!strong) { setError("Use at least 8 characters, including a letter and a number."); return; }
+    if (password !== confirm) { setError("Those passwords don't match."); return; }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, password })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? "Could not reset your password.");
+        setLoading(false);
+        return;
+      }
+      if (data.token) localStorage.setItem("uen_admin_token", data.token);
+      window.location.href = data.redirect ?? "/login";
+    } catch {
+      setError("Could not reach the app server. Refresh the page and try again.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="admin-login-screen">
+      <div className="admin-login-card">
+        <a className="admin-login-brand" href="/"><Shield size={24} /><BrandWord /></a>
+        <section className="login-panel">
+          {status === "checking" && <p>Checking your link…</p>}
+          {status === "invalid" && (
+            <>
+              <h1>Link expired</h1>
+              <Notice tone="bad">This password reset link is invalid or has already been used.</Notice>
+              <a className="login-page-signup-btn" href="/forgot-password" style={{ marginTop: 16 }}>Request a new link</a>
+            </>
+          )}
+          {status === "valid" && (
+            <>
+              <h1>Choose a new password</h1>
+              <p>Setting a new password{accountEmail ? <> for <strong>{accountEmail}</strong></> : null}.</p>
+              {error && <Notice tone="bad">{error}</Notice>}
+              <PasswordInput label="New password" value={password} onChange={setPassword} />
+              <PasswordInput label="Confirm new password" value={confirm} onChange={setConfirm} />
+              <p style={{ margin: "8px 0 14px", fontSize: 13, color: strong ? "#059669" : "#94a3b8" }}>
+                At least 8 characters, including a letter and a number.
+              </p>
+              <button onClick={submit} disabled={loading}>{loading ? "Saving…" : "Save new password"}</button>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
 type MpNav = "dashboard" | "offer" | "sync" | "settings" | "help";
 
 // Preview/demo data so the Public Page Studio can render the real merchant and
@@ -3370,8 +3511,9 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       <p>Access your UENITE workspace, merchant tools, Exchange Hub controls, and platform dashboard.</p>
       {error && <Notice tone="bad">{error}</Notice>}
       <Input label="Email" value={email} onChange={setEmail} />
-      <Input label="Password" value={password} onChange={setPassword} type="password" />
+      <PasswordInput label="Password" value={password} onChange={setPassword} />
       <button onClick={login} disabled={loading}>{loading ? "Signing In..." : "Sign In"}</button>
+      <a href="/forgot-password" style={{ display: "block", marginTop: 14, fontSize: 14, color: "#64748b", textDecoration: "none" }}>Forgot your password?</a>
     </section>
   );
 }
@@ -4194,6 +4336,51 @@ function Input({ label, value, onChange, type = "text" }: { label: string; value
     <label>
       {label}
       <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+// Password field with the standard eyeball reveal toggle. Mirrors Input's label
+// wrapper so it inherits the same form styling; the input is wrapped in a
+// relative span so the icon button stays centered on the field regardless of
+// the label text above it.
+function PasswordInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [show, setShow] = useState(false);
+  return (
+    <label>
+      {label}
+      <span style={{ position: "relative", display: "block" }}>
+        <input
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          style={{ width: "100%", paddingRight: 42 }}
+        />
+        <button
+          type="button"
+          onClick={() => setShow((prev) => !prev)}
+          aria-label={show ? "Hide password" : "Show password"}
+          title={show ? "Hide password" : "Show password"}
+          style={{
+            position: "absolute",
+            right: 8,
+            top: "50%",
+            transform: "translateY(-50%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "auto",
+            background: "transparent",
+            border: "none",
+            padding: 4,
+            margin: 0,
+            cursor: "pointer",
+            color: "#94a3b8"
+          }}
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </span>
     </label>
   );
 }

@@ -24,6 +24,7 @@ import {
   createOfferSchema,
   merchantOnboardingSchema,
   createUenSchema,
+  passwordRule,
   updateHubSchema,
   validateUenSchema
 } from "../validators";
@@ -284,7 +285,7 @@ router.post("/exchange-hub/register", async (req, res) => {
       contactEmail: z.string().email(),
       website: z.string().max(300).optional(),
       description: z.string().max(800).optional(),
-      password: z.string().min(8)
+      password: passwordRule
     }).parse(req.body);
 
     const normalizedEmail = data.contactEmail.toLowerCase();

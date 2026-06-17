@@ -3,6 +3,8 @@ import express from "express";
 import { z, ZodError } from "zod";
 import { prisma } from "../db";
 import { createMerchantSession } from "../security";
+import { passwordRule } from "../validators";
+import { loginRateLimited } from "../util/http";
 
 const router = express.Router();
 
@@ -43,7 +45,7 @@ router.post("/setup", async (req, res) => {
       shopDomain: z.string().min(1),
       businessName: z.string().min(2).max(120),
       email: z.string().email(),
-      password: z.string().min(8)
+      password: passwordRule
     }).parse(req.body);
 
     const connection = await prisma.shopifyConnection.findUnique({
@@ -78,7 +80,11 @@ router.post("/setup", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const data = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);
-    const merchant = await prisma.merchant.findUnique({ where: { contactEmail: data.email.toLowerCase() } });
+    const email = data.email.toLowerCase();
+    if (loginRateLimited(`mlogin:${req.ip}:${email}`)) {
+      return res.status(429).json({ error: "Too many attempts. Please wait a few minutes and try again." });
+    }
+    const merchant = await prisma.merchant.findUnique({ where: { contactEmail: email } });
     if (!merchant?.passwordHash || !(await bcrypt.compare(data.password, merchant.passwordHash))) {
       return res.status(401).json({ error: "Invalid email or password." });
     }

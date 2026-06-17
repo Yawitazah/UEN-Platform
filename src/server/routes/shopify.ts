@@ -7,6 +7,7 @@ import { config } from "../config";
 import { AuditAction, MerchantStatus } from "../constants";
 import { prisma } from "../db";
 import { hashSecret } from "../security";
+import { sendPasswordChangedEmail } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncMerchantUensToShopify } from "../services/sync";
 import { createOfferSchema, platformConnectionSchema } from "../validators";
 
@@ -921,7 +922,12 @@ router.post("/merchant/reset-credentials", async (req, res) => {
       message: `Merchant credentials reset from embedded app (${session.shop})`
     });
 
-    res.json({ ok: true, contactEmail: newEmail?.trim().toLowerCase() ?? connection.merchant.contactEmail ?? null });
+    const notifyEmail = newEmail?.trim().toLowerCase() ?? connection.merchant.contactEmail ?? null;
+    if (notifyEmail) {
+      void sendPasswordChangedEmail(notifyEmail).catch((e) => console.error("[reset-credentials] notice failed", e));
+    }
+
+    res.json({ ok: true, contactEmail: notifyEmail });
   } catch (error) {
     handleError(res, error);
   }
