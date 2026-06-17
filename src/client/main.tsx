@@ -2554,8 +2554,8 @@ function ResetPasswordPage() {
               <h1>Choose a new password</h1>
               <p>Setting a new password{accountEmail ? <> for <strong>{accountEmail}</strong></> : null}.</p>
               {error && <Notice tone="bad">{error}</Notice>}
-              <PasswordInput label="New password" value={password} onChange={setPassword} />
-              <PasswordInput label="Confirm new password" value={confirm} onChange={setConfirm} />
+              <PasswordInput label="New password" value={password} onChange={setPassword} autoComplete="new-password" />
+              <PasswordInput label="Confirm new password" value={confirm} onChange={setConfirm} autoComplete="new-password" />
               <p style={{ margin: "8px 0 14px", fontSize: 13, color: strong ? "#059669" : "#94a3b8" }}>
                 At least 8 characters, including a letter and a number.
               </p>
@@ -3473,6 +3473,7 @@ function MerchantInstall() {
 function LoginPanel({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [linkSentTo, setLinkSentTo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3489,7 +3490,7 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password })
+        body: JSON.stringify({ email: email.trim(), password, remember })
       });
       const loginData = await response.json();
       if (!response.ok) {
@@ -3534,9 +3535,15 @@ function LoginPanel({ onLogin }: { onLogin: () => void }) {
       <h1>Sign in</h1>
       <p>One sign-in for your wallet, merchant tools, Exchange Hub, and platform dashboard.</p>
       {error && <Notice tone="bad">{error}</Notice>}
-      <Input label="Email" value={email} onChange={setEmail} type="email" />
-      <PasswordInput label="Password" value={password} onChange={setPassword} />
-      <button onClick={login} disabled={loading}>{loading ? "Signing In..." : "Sign In"}</button>
+      <form onSubmit={(event) => { event.preventDefault(); if (!loading) login(); }}>
+        <Input label="Email" value={email} onChange={setEmail} type="email" autoComplete="email" name="email" autoFocus />
+        <PasswordInput label="Password" value={password} onChange={setPassword} autoComplete="current-password" />
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#475569", margin: "4px 0 12px", cursor: "pointer" }}>
+          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} style={{ width: "auto", margin: 0 }} />
+          Remember me on this device
+        </label>
+        <button type="submit" disabled={loading}>{loading ? "Signing In..." : "Sign In"}</button>
+      </form>
       <p style={{ fontSize: 13, color: "#94a3b8", margin: "10px 0 0" }}>
         Wallet member without a password? Leave it blank and we'll email you a secure sign-in link.
       </p>
@@ -4358,11 +4365,11 @@ function ShopifyApp({ user }: { user: any }) {
   );
 }
 
-function Input({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function Input({ label, value, onChange, type = "text", autoComplete, name, autoFocus }: { label: string; value: string; onChange: (value: string) => void; type?: string; autoComplete?: string; name?: string; autoFocus?: boolean }) {
   return (
     <label>
       {label}
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} autoComplete={autoComplete} name={name} autoFocus={autoFocus} />
     </label>
   );
 }
@@ -4371,8 +4378,12 @@ function Input({ label, value, onChange, type = "text" }: { label: string; value
 // wrapper so it inherits the same form styling; the input is wrapped in a
 // relative span so the icon button stays centered on the field regardless of
 // the label text above it.
-function PasswordInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function PasswordInput({ label, value, onChange, autoComplete = "current-password", name = "password" }: { label: string; value: string; onChange: (value: string) => void; autoComplete?: string; name?: string }) {
   const [show, setShow] = useState(false);
+  const [capsOn, setCapsOn] = useState(false);
+  const checkCaps = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (typeof event.getModifierState === "function") setCapsOn(event.getModifierState("CapsLock"));
+  };
   return (
     <label>
       {label}
@@ -4381,6 +4392,10 @@ function PasswordInput({ label, value, onChange }: { label: string; value: strin
           type={show ? "text" : "password"}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onKeyUp={checkCaps}
+          onKeyDown={checkCaps}
+          autoComplete={autoComplete}
+          name={name}
           style={{ width: "100%", paddingRight: 42 }}
         />
         <button
@@ -4408,6 +4423,7 @@ function PasswordInput({ label, value, onChange }: { label: string; value: strin
           {show ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </span>
+      {capsOn && <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "#b45309" }}>⚠ Caps Lock is on</span>}
     </label>
   );
 }

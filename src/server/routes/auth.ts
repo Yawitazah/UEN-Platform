@@ -22,10 +22,15 @@ const router = express.Router();
 // still need a password — they simply won't match without one.
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().optional()
+  password: z.string().optional(),
+  remember: z.boolean().optional()
 });
 
-function cookieOptions(req: express.Request) {
+// "Remember me" controls cookie persistence: when true the cookie carries a
+// maxAge so it survives browser restarts; when false we omit maxAge, making it a
+// session cookie that the browser clears on close. The signed token's own expiry
+// is the upper bound either way.
+function cookieOptions(req: express.Request, remember = true) {
   const secure = req.secure || req.header("x-forwarded-proto") === "https";
   return {
     httpOnly: true,
@@ -33,17 +38,17 @@ function cookieOptions(req: express.Request) {
     // so Lax is correct and works in all browsers without third-party cookie issues.
     sameSite: "lax" as const,
     secure,
-    maxAge: 1000 * 60 * 60 * 24 * 7
+    ...(remember ? { maxAge: 1000 * 60 * 60 * 24 * 7 } : {})
   };
 }
 
-function merchantCookieOptions(req: express.Request) {
+function merchantCookieOptions(req: express.Request, remember = true) {
   const secure = req.secure || req.header("x-forwarded-proto") === "https";
   return {
     httpOnly: true,
     sameSite: (secure ? "none" : "lax") as "none" | "lax",
     secure,
-    maxAge: 1000 * 60 * 60 * 24 * 30
+    ...(remember ? { maxAge: 1000 * 60 * 60 * 24 * 30 } : {})
   };
 }
 
@@ -58,6 +63,7 @@ router.post("/login", async (req, res) => {
     const data = loginSchema.parse(req.body);
     const email = data.email.toLowerCase();
     const password = data.password ?? "";
+    const remember = data.remember !== false; // default to staying signed in
 
     // Throttle brute-force attempts, keyed by IP + email so one attacker can't
     // grind a single account and one IP can't spray many accounts.
@@ -69,7 +75,7 @@ router.post("/login", async (req, res) => {
     const admin = password ? await prisma.adminUser.findUnique({ where: { email } }) : null;
     if (admin && (await bcrypt.compare(password, admin.passwordHash))) {
       const sessionToken = createAdminSession(admin);
-      res.cookie("uen_session", sessionToken, cookieOptions(req));
+      res.cookie("uen_session", sessionToken, cookieOptions(req, remember));
       return res.json({
         actorType: "admin",
         redirect: "/admin",
@@ -87,7 +93,7 @@ router.post("/login", async (req, res) => {
       : null;
     if (merchant?.passwordHash && (await bcrypt.compare(password, merchant.passwordHash))) {
       const merchantToken = createMerchantSession({ id: merchant.id, merchantId: merchant.id });
-      res.cookie("uen_merchant_session", merchantToken, merchantCookieOptions(req));
+      res.cookie("uen_merchant_session", merchantToken, merchantCookieOptions(req, remember));
       const shopDomain = merchant.shopifyConnections[0]?.shopDomain ?? null;
       return res.json({
         actorType: "merchant",
