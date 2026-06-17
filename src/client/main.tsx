@@ -1198,6 +1198,7 @@ const demoCollectionItems: CollectionItem[] = [
     status: "Owned",
     artworkUrl: "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?q=80&w=900&auto=format&fit=crop",
     description: "An exclusive trap / melodic rap instrumental drop issued to founding supporters of Nubreed Global Truth. Stream every track, drop timed comments, and share the moment with other holders.",
+    lyricsTimed: [{"t":0,"text":"Lights down low, the city's calling out my name"},{"t":4,"text":"Every note I wrote was a promise, not a game"},{"t":8,"text":"We built this from the ground, no shortcuts on the way"},{"t":12,"text":"Hold the moment close, let the rhythm have its say"},{"t":16,"text":"Run it back, run it back, let the bassline ride"},{"t":20,"text":"Everybody in the room got that fire inside"},{"t":24,"text":"This the kind of feeling that you cannot fake"},{"t":28,"text":"Every move we make is a move we make to elevate"}],
     tracks: [
       { id: "demo-t1", title: "If You (Gunna x Future Type Beat)", trackNumber: 1, fileUrl: "https://cdn.shopify.com/s/files/1/0566/5367/6659/files/FREE_Gunna_x_Future_Type_Beat_2026_-_If_You.mp3?v=1780289598", likeCount: 12, likedByHolder: false }
     ]
@@ -1290,7 +1291,12 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const lyricsRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState("");
-  const [rightTab, setRightTab] = useState<"comments" | "lyrics">("comments");
+  const hasLyrics = Boolean((item.lyricsTimed && item.lyricsTimed.length) || (item.lyrics ?? "").trim().length);
+  const [panel, setPanel] = useState<"lyrics" | "queue" | "community">(hasLyrics ? "lyrics" : "queue");
+  const [lyricsFs, setLyricsFs] = useState(false);
+  // Dominant colors pulled from the artwork drive the whole immersive surface
+  // (Spotify/Apple-Music style ambient color), with an emerald-brand fallback.
+  const [palette, setPalette] = useState({ accent: "#34d399", bg1: "#11241a", bg2: "#070f0a", glow: "rgba(52,211,153,.5)" });
   const timedLyrics = item.lyricsTimed && item.lyricsTimed.length ? item.lyricsTimed : null;
   const lyricLines = timedLyrics ? timedLyrics.map((l) => l.text) : (item.lyrics ?? "").split(/\n/).map((l) => l.trim()).filter(Boolean);
   // With real timestamps, highlight the last line whose start time has passed
@@ -1364,10 +1370,53 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
 
   // Auto-scroll lyrics so the current line stays centered as the song plays.
   useEffect(() => {
-    if (rightTab !== "lyrics") return;
-    const el = lyricsRef.current?.querySelector<HTMLElement>(`[data-line="${currentLine}"]`);
+    if (panel !== "lyrics" && !lyricsFs) return;
+    const scope = lyricsFs ? document : lyricsRef.current;
+    const el = scope?.querySelector<HTMLElement>(`.np-lyric-line[data-line="${currentLine}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [currentLine, rightTab]);
+  }, [currentLine, panel, lyricsFs]);
+
+  // Pull the dominant + most-vivid colors out of the artwork so the whole
+  // player glows in the album's own palette. Falls back to emerald if the
+  // image taints the canvas (cross-origin) or fails to load.
+  useEffect(() => {
+    if (!item.artworkUrl) return;
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const S = 28;
+        const c = document.createElement("canvas");
+        c.width = S; c.height = S;
+        const cx = c.getContext("2d");
+        if (!cx) return;
+        cx.drawImage(img, 0, 0, S, S);
+        const d = cx.getImageData(0, 0, S, S).data;
+        let vr = 0, vg = 0, vb = 0, vBest = -1; // most vivid (saturation*brightness)
+        let ar = 0, ag = 0, ab = 0, n = 0;       // running average for the backdrop
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          ar += r; ag += g; ab += b; n++;
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          const sat = mx === 0 ? 0 : (mx - mn) / mx;
+          const score = sat * (mx / 255) * (mx > 40 ? 1 : 0.2);
+          if (score > vBest) { vBest = score; vr = r; vg = g; vb = b; }
+        }
+        ar = ar / n; ag = ag / n; ab = ab / n;
+        const accent = `rgb(${vr},${vg},${vb})`;
+        const dark = (r: number, g: number, b: number, f: number) => `rgb(${Math.round(r * f)},${Math.round(g * f)},${Math.round(b * f)})`;
+        if (!cancelled) setPalette({
+          accent,
+          bg1: dark(vr * 0.5 + ar * 0.5, vg * 0.5 + ag * 0.5, vb * 0.5 + ab * 0.5, 0.42),
+          bg2: dark(ar, ag, ab, 0.12),
+          glow: `rgba(${vr},${vg},${vb},.55)`,
+        });
+      } catch { /* tainted canvas — keep emerald fallback */ }
+    };
+    img.src = item.artworkUrl;
+    return () => { cancelled = true; };
+  }, [item.artworkUrl]);
 
   const initAudioContext = useCallback(() => {
     if (!audioRef.current || waveformReady.current) return;
@@ -1611,39 +1660,57 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const volIcon = volume === 0 ? <VolumeX size={18} /> : volume < 0.5 ? <Volume1 size={18} /> : <Volume2 size={18} />;
   const curLiked = track ? liked[track.id] : false;
 
+  const paletteVars = {
+    ["--np-accent" as string]: palette.accent,
+    ["--np-bg1" as string]: palette.bg1,
+    ["--np-bg2" as string]: palette.bg2,
+    ["--np-glow" as string]: palette.glow,
+  } as React.CSSProperties;
+
+  const lyricBody = (fs: boolean) => (
+    <div className={fs ? "np-lyrics np-lyrics-fs" : "np-lyrics"} ref={fs ? undefined : lyricsRef}>
+      {lyricLines.map((line, i) => (
+        <p key={i} data-line={i} className={`np-lyric-line${i === currentLine ? " active" : ""}${i < currentLine ? " past" : ""}`}
+          onClick={() => { if (audioRef.current) audioRef.current.currentTime = timedLyrics ? timedLyrics[i].t : (duration ? (i / lyricLines.length) * duration : 0); }}>
+          {line || "♪"}
+        </p>
+      ))}
+    </div>
+  );
+
   return (
     <div className="player-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="player-modal">
-        {/* Blurred background art */}
+      <div className="player-modal np-immersive" style={paletteVars}>
+        {/* Immersive album-color backdrop */}
         {item.artworkUrl && <div className="player-bg-blur" style={{ backgroundImage: `url(${item.artworkUrl})` }} />}
+        <div className="np-mesh" />
         <div className="player-bg-dark" />
+        <div className="np-grain" />
 
         {/* Top bar */}
         <div className="player-topbar">
-          <span className="player-eyebrow"><span className={`player-eq ${playing ? "on" : ""}`}><i /><i /><i /></span>{playing ? "Now playing" : "Now playing"}</span>
+          <span className="player-eyebrow"><span className={`player-eq ${playing ? "on" : ""}`}><i /><i /><i /></span>Now playing</span>
           <button className="player-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
 
         <div className="player-layout">
-          {/* LEFT — Flip artwork + transport */}
+          {/* LEFT — Hero artwork + transport */}
           <div className="player-left">
-            {/* Artwork is the flip card: front = art, back = asset details */}
+            {/* Artwork is the hero + flip card (front = art, back = asset details) */}
             <div className={`np-art-flip${artFlipped ? " flipped" : ""}`}>
               <div className="np-art-inner">
-                {/* FRONT */}
                 <div className="np-art-face np-art-front">
                   {item.artworkUrl
                     ? <img className="np-art-img" src={item.artworkUrl} alt={item.title} />
-                    : <div className="np-art-img np-art-placeholder"><Music size={56} /></div>}
-                  {playing && <div className="player-artwork-glow" />}
+                    : <div className="np-art-img np-art-placeholder"><Music size={72} /></div>}
+                  <div className={`np-art-shine${playing ? " on" : ""}`} />
                   <button className="np-art-play" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
-                    {playing ? <Pause size={26} /> : <Play size={26} style={{ marginLeft: 3 }} />}
+                    {playing ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" style={{ marginLeft: 4 }} />}
                   </button>
                   <button className="np-art-flipbtn" onClick={() => setArtFlipped(true)} aria-label="Asset details">
-                    <RefreshCw size={13} /> Details
+                    <Star size={13} /> Asset
                   </button>
                 </div>
-                {/* BACK — asset details */}
                 <div className="np-art-face np-art-back">
                   <span className="np-art-back-kicker"><Star size={13} /> Asset Details</span>
                   <dl className="np-art-dl">
@@ -1688,13 +1755,13 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
                 <Shuffle size={17} />
               </button>
               <button className="player-ctrl-btn" onClick={goToPrev} aria-label="Previous">
-                <SkipBack size={19} fill="currentColor" />
+                <SkipBack size={20} fill="currentColor" />
               </button>
               <button className="player-play-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
-                {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{ marginLeft: 2 }} />}
+                {playing ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" style={{ marginLeft: 2 }} />}
               </button>
               <button className="player-ctrl-btn" onClick={() => goToNext(false)} aria-label="Next">
-                <SkipForward size={19} fill="currentColor" />
+                <SkipForward size={20} fill="currentColor" />
               </button>
               <button className={`player-ctrl-btn ${repeat !== "off" ? "on" : ""}`}
                 onClick={() => setRepeat((r) => (r === "off" ? "all" : r === "all" ? "one" : "off"))}
@@ -1718,90 +1785,117 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
             </div>
           </div>
 
-          {/* RIGHT — Tracklist + Comments */}
+          {/* RIGHT — glass panel: Lyrics / Up Next / Community */}
           <div className="player-right">
-            <div className="player-tracklist">
-              <h3 className="player-section-label">Up Next · {tracks.length}</h3>
-              {tracks.map((t, i) => (
-                <button key={t.id} className={`player-track-row ${i === trackIndex ? "active" : ""}`} onClick={() => changeTrack(i, true)}>
-                  <span className="player-track-num">
-                    {i === trackIndex && playing ? <span className="player-eq on small"><i /><i /><i /></span> : <span className="player-track-no">{t.trackNumber}</span>}
-                    <Play className="player-track-hoverplay" size={13} fill="currentColor" />
-                  </span>
-                  <span className="player-track-title">{t.title}</span>
-                  <div className="player-track-actions">
-                    <button className={`player-like-btn ${liked[t.id] ? "liked" : ""}`}
-                      onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }} aria-label="Like track">
-                      <Heart size={13} fill={liked[t.id] ? "currentColor" : "none"} /> {likeCounts[t.id] ?? 0}
-                    </button>
-                    {t.durationSeconds && <span className="player-track-dur">{formatTime(t.durationSeconds)}</span>}
-                  </div>
-                </button>
-              ))}
+            <div className="np-seg">
+              {hasLyrics && (
+                <button className={panel === "lyrics" ? "active" : ""} onClick={() => setPanel("lyrics")}><Music size={14} /> Lyrics</button>
+              )}
+              <button className={panel === "queue" ? "active" : ""} onClick={() => setPanel("queue")}><Menu size={14} /> Up Next</button>
+              <button className={panel === "community" ? "active" : ""} onClick={() => setPanel("community")}><MessageCircle size={14} /> Community</button>
             </div>
 
-            {/* Comments / Lyrics */}
-            <div className="player-comments">
-              <div className="player-tabs">
-                <button className={rightTab === "comments" ? "active" : ""} onClick={() => setRightTab("comments")}><MessageCircle size={13} /> Community · {comments.length}</button>
-                {lyricLines.length > 0 && (
-                  <button className={rightTab === "lyrics" ? "active" : ""} onClick={() => setRightTab("lyrics")}><Music size={13} /> Lyrics</button>
-                )}
+            {panel === "lyrics" && hasLyrics && (
+              <div className="np-panel-body np-lyrics-wrap">
+                <button className="np-lyrics-expand" onClick={() => setLyricsFs(true)} title="Fullscreen lyrics"><Eye size={13} /> Immersive</button>
+                {lyricBody(false)}
               </div>
-              {rightTab === "lyrics" ? (
-                <div className="player-lyrics" ref={lyricsRef}>
-                  {lyricLines.map((line, i) => (
-                    <p key={i} data-line={i} className={`player-lyric-line ${i === currentLine ? "active" : ""}`}
-                      onClick={() => { if (audioRef.current) audioRef.current.currentTime = timedLyrics ? timedLyrics[i].t : (duration ? (i / lyricLines.length) * duration : 0); }}>
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-              <>
-              <div className="player-comments-list">
-                {comments.map((c) => (
-                  <div key={c.id} className={`player-comment-item ${nearbyComment?.id === c.id ? "highlight" : ""}`}>
-                    <button className="player-comment-ts" onClick={() => { if (audioRef.current) audioRef.current.currentTime = c.timestampSeconds; }}>
-                      {formatTime(c.timestampSeconds)}
-                    </button>
-                    <div className="player-comment-body">
-                      <strong>{c.holder?.firstName} {c.holder?.lastName}</strong>
-                      {editingId === c.id ? (
-                        <div className="player-comment-edit">
-                          <input value={editInput} autoFocus onChange={(e) => setEditInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") saveEdit(c); if (e.key === "Escape") setEditingId(null); }} />
-                          <button onClick={() => saveEdit(c)}>Save</button>
-                          <button className="ghost" onClick={() => setEditingId(null)}>Cancel</button>
-                        </div>
-                      ) : (
-                        <span>{c.body}</span>
-                      )}
+            )}
+
+            {panel === "queue" && (
+              <div className="np-panel-body player-tracklist">
+                {tracks.map((t, i) => (
+                  <div key={t.id} role="button" tabIndex={0} className={`player-track-row ${i === trackIndex ? "active" : ""}`}
+                    onClick={() => changeTrack(i, true)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); changeTrack(i, true); } }}>
+                    <span className="player-track-num">
+                      {i === trackIndex && playing ? <span className="player-eq on small"><i /><i /><i /></span> : <span className="player-track-no">{t.trackNumber}</span>}
+                      <Play className="player-track-hoverplay" size={13} fill="currentColor" />
+                    </span>
+                    <span className="player-track-title">{t.title}</span>
+                    <div className="player-track-actions">
+                      <button className={`player-like-btn ${liked[t.id] ? "liked" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); toggleLike(t.id); }} aria-label="Like track">
+                        <Heart size={13} fill={liked[t.id] ? "currentColor" : "none"} /> {likeCounts[t.id] ?? 0}
+                      </button>
+                      {t.durationSeconds && <span className="player-track-dur">{formatTime(t.durationSeconds)}</span>}
                     </div>
-                    {c.isMine && editingId !== c.id && (
-                      <div className="player-comment-actions">
-                        <button onClick={() => { setEditingId(c.id); setEditInput(c.body); }} aria-label="Edit comment"><Pencil size={13} /></button>
-                        <button onClick={() => deleteComment(c)} aria-label="Delete comment"><Trash2 size={13} /></button>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
-              <div className="player-comment-input-row">
-                <input
-                  className="player-comment-input"
-                  placeholder={`Comment at ${formatTime(Math.floor(currentTime))}…`}
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") postComment(); }}
-                />
-                <button className="player-comment-submit" onClick={postComment} disabled={!commentInput.trim()} aria-label="Post comment"><Send size={15} /></button>
+            )}
+
+            {panel === "community" && (
+              <div className="np-panel-body player-comments">
+                <div className="player-comments-list">
+                  {comments.map((c) => (
+                    <div key={c.id} className={`player-comment-item ${nearbyComment?.id === c.id ? "highlight" : ""}`}>
+                      <button className="player-comment-ts" onClick={() => { if (audioRef.current) audioRef.current.currentTime = c.timestampSeconds; }}>
+                        {formatTime(c.timestampSeconds)}
+                      </button>
+                      <div className="player-comment-body">
+                        <strong>{c.holder?.firstName} {c.holder?.lastName}</strong>
+                        {editingId === c.id ? (
+                          <div className="player-comment-edit">
+                            <input value={editInput} autoFocus onChange={(e) => setEditInput(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") saveEdit(c); if (e.key === "Escape") setEditingId(null); }} />
+                            <button onClick={() => saveEdit(c)}>Save</button>
+                            <button className="ghost" onClick={() => setEditingId(null)}>Cancel</button>
+                          </div>
+                        ) : (
+                          <span>{c.body}</span>
+                        )}
+                      </div>
+                      {c.isMine && editingId !== c.id && (
+                        <div className="player-comment-actions">
+                          <button onClick={() => { setEditingId(c.id); setEditInput(c.body); }} aria-label="Edit comment"><Pencil size={13} /></button>
+                          <button onClick={() => deleteComment(c)} aria-label="Delete comment"><Trash2 size={13} /></button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="player-comment-input-row">
+                  <input
+                    className="player-comment-input"
+                    placeholder={`Comment at ${formatTime(Math.floor(currentTime))}…`}
+                    value={commentInput}
+                    onChange={(e) => setCommentInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") postComment(); }}
+                  />
+                  <button className="player-comment-submit" onClick={postComment} disabled={!commentInput.trim()} aria-label="Post comment"><Send size={15} /></button>
+                </div>
               </div>
-              </>
-              )}
-            </div>
+            )}
           </div>
         </div>
+
+        {/* Immersive fullscreen lyrics overlay */}
+        {lyricsFs && (
+          <div className="np-fs" style={paletteVars}>
+            {item.artworkUrl && <div className="player-bg-blur" style={{ backgroundImage: `url(${item.artworkUrl})` }} />}
+            <div className="np-mesh" />
+            <div className="player-bg-dark" />
+            <div className="np-fs-head">
+              <div className="np-fs-now">
+                {item.artworkUrl && <img src={item.artworkUrl} alt="" />}
+                <div>
+                  <strong>{track?.title ?? item.title}</strong>
+                  <span>{item.artist ?? item.source}</span>
+                </div>
+              </div>
+              <button className="player-close" onClick={() => setLyricsFs(false)} aria-label="Close lyrics"><X size={18} /></button>
+            </div>
+            {lyricBody(true)}
+            <div className="np-fs-foot">
+              <button className="player-ctrl-btn" onClick={goToPrev} aria-label="Previous"><SkipBack size={20} fill="currentColor" /></button>
+              <button className="player-play-btn" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+                {playing ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" style={{ marginLeft: 2 }} />}
+              </button>
+              <button className="player-ctrl-btn" onClick={() => goToNext(false)} aria-label="Next"><SkipForward size={20} fill="currentColor" /></button>
+            </div>
+          </div>
+        )}
 
         {/* Hidden audio element */}
         {track && (
