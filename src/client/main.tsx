@@ -1289,6 +1289,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const lyricsRef = useRef<HTMLDivElement>(null);
+  const fsLyricsRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState("");
   const hasLyrics = Boolean((item.lyricsTimed && item.lyricsTimed.length) || (item.lyrics ?? "").trim().length);
@@ -1369,11 +1370,20 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   }, [portalToken, track?.id, item.id]);
 
   // Auto-scroll lyrics so the current line stays centered as the song plays.
+  // Scroll the specific container's own scrollTop (NOT scrollIntoView, which on
+  // mobile can scroll the whole page) and target the line *inside that container*
+  // — there are two lyric copies in the DOM when fullscreen is open, so a global
+  // querySelector would grab the hidden panel copy and the overlay would never move.
   useEffect(() => {
     if (panel !== "lyrics" && !lyricsFs) return;
-    const scope = lyricsFs ? document : lyricsRef.current;
-    const el = scope?.querySelector<HTMLElement>(`.np-lyric-line[data-line="${currentLine}"]`);
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const container = lyricsFs ? fsLyricsRef.current : lyricsRef.current;
+    if (!container) return;
+    const el = container.querySelector<HTMLElement>(`.np-lyric-line[data-line="${currentLine}"]`);
+    if (!el) return;
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    const delta = (eRect.top - cRect.top) - (container.clientHeight / 2 - eRect.height / 2);
+    container.scrollBy({ top: delta, behavior: "smooth" });
   }, [currentLine, panel, lyricsFs]);
 
   // Pull the dominant + most-vivid colors out of the artwork so the whole
@@ -1668,7 +1678,7 @@ function AudioPlayerModal({ item, onClose, portalToken = "" }: { item: Collectio
   } as React.CSSProperties;
 
   const lyricBody = (fs: boolean) => (
-    <div className={fs ? "np-lyrics np-lyrics-fs" : "np-lyrics"} ref={fs ? undefined : lyricsRef}>
+    <div className={fs ? "np-lyrics np-lyrics-fs" : "np-lyrics"} ref={fs ? fsLyricsRef : lyricsRef}>
       {lyricLines.map((line, i) => (
         <p key={i} data-line={i} className={`np-lyric-line${i === currentLine ? " active" : ""}${i < currentLine ? " past" : ""}`}
           onClick={() => { if (audioRef.current) audioRef.current.currentTime = timedLyrics ? timedLyrics[i].t : (duration ? (i / lyricLines.length) * duration : 0); }}>
