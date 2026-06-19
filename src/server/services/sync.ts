@@ -4,6 +4,22 @@ import { prisma } from "../db";
 import { getValidUensForMerchant } from "./uens";
 import { addShopifyDiscountCodes, createShopifyDiscountCode, findShopifyDiscountNodeByCode } from "./shopifyGraphql";
 
+// Heavy Shopify syncs each hold database connections while doing bulk
+// discount-code writes. Several running at once — e.g. multiple merchant
+// installs firing AUTO_INSTALL syncs together, or a background sync overlapping
+// a manual one — can gang up on the small connection pool and starve normal
+// requests. Serialize them so at most one heavy sync runs at a time. This only
+// affects timing, never correctness, and was a contributing factor in the
+// 2026-06-17 connection-exhaustion outage.
+let syncQueue: Promise<unknown> = Promise.resolve();
+function runSerialized<T>(task: () => Promise<T>): Promise<T> {
+  const result = syncQueue.then(task, task);
+  // Keep the chain alive even if a task throws (a failed sync must not wedge
+  // every later sync), but still surface this task's own result/rejection.
+  syncQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 type GroupedDiscountOffer = {
   discountType: string;
   discountValue: unknown;
@@ -261,7 +277,11 @@ export async function syncCodesToGroupedShopifyDiscount(input: {
   return { created, skipped, errors };
 }
 
-export async function syncMerchantUensToShopify(merchantId: string, shopDomain: string, syncType = "MANUAL") {
+export function syncMerchantUensToShopify(merchantId: string, shopDomain: string, syncType = "MANUAL") {
+  return runSerialized(() => syncMerchantUensToShopifyImpl(merchantId, shopDomain, syncType));
+}
+
+async function syncMerchantUensToShopifyImpl(merchantId: string, shopDomain: string, syncType = "MANUAL") {
   const connection = await prisma.shopifyConnection.findFirst({
     where: { merchantId, shopDomain, status: "ACTIVE" },
     include: { merchant: true }
@@ -346,7 +366,11 @@ function sleep(ms: number) {
  * shop-wide anyway. Otherwise the full list is bulk-added to the merchant's
  * offer-keyed discount group in chunks, honoring the merchant's UEN offer.
  */
-export async function syncGrandfatheredCodesToMerchant(merchantId: string, shopDomain: string, syncType = "AUTO_INSTALL") {
+export function syncGrandfatheredCodesToMerchant(merchantId: string, shopDomain: string, syncType = "AUTO_INSTALL") {
+  return runSerialized(() => syncGrandfatheredCodesToMerchantImpl(merchantId, shopDomain, syncType));
+}
+
+async function syncGrandfatheredCodesToMerchantImpl(merchantId: string, shopDomain: string, syncType = "AUTO_INSTALL") {
   const connection = await prisma.shopifyConnection.findFirst({
     where: { merchantId, shopDomain, status: "ACTIVE" },
     include: {

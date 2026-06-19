@@ -14,6 +14,20 @@ import digitalRoutes from "./routes/digital";
 import holderRoutes from "./routes/holder";
 import shopifyRoutes from "./routes/shopify";
 
+// A single rejected promise from a fire-and-forget background job (e.g. a
+// Shopify sync that hit a transient database error) must never take the whole
+// server down. Log it and keep serving — the request paths have their own
+// try/catch, so reaching here means an operational blip, not corrupt state.
+// (An uncaught *exception* is riskier, but during a launch a crash-and-stay-
+// down is worse than a logged anomaly; Railway's restart policy is the
+// backstop for genuinely fatal states.)
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection] keeping process alive:", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[uncaughtException] keeping process alive:", error);
+});
+
 const app = express();
 
 // Railway (and most reverse proxies) terminate SSL and forward HTTP.
