@@ -978,32 +978,39 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
       ? { merchantId, redeemedAt: { gte: since } }
       : { merchantId };
 
+    // Count + sum entirely in the database (aggregate) instead of pulling every
+    // redemption row into memory and reducing in JS. The old findMany approach
+    // grew unbounded with a merchant's history — a heavy, connection-hogging
+    // query that contributed to the 2026-06-17 pile-up. These aggregates return
+    // one row each regardless of volume.
     const [
       totalSynced,
-      redemptionsInPeriod,
-      allTimeRedemptions,
-      allTimeRevenue,
-      historicalInPeriod,
-      allTimeHistorical,
+      livePeriod,
+      liveAllTime,
+      histPeriod,
+      histAllTime,
       syncLogs
     ] = await Promise.all([
       prisma.shopifySyncedNote.count({ where: { merchantId, syncStatus: "SYNCED" } }),
-      prisma.shopifySyncedNote.findMany({
+      prisma.shopifySyncedNote.aggregate({
         where: redemptionFilter,
-        select: { redeemedOrderAmount: true }
+        _count: true,
+        _sum: { redeemedOrderAmount: true }
       }),
-      prisma.shopifySyncedNote.count({ where: { merchantId, redeemedAt: { not: null } } }),
-      prisma.shopifySyncedNote.findMany({
+      prisma.shopifySyncedNote.aggregate({
         where: { merchantId, redeemedAt: { not: null } },
-        select: { redeemedOrderAmount: true }
+        _count: true,
+        _sum: { redeemedOrderAmount: true }
       }),
-      prisma.merchantHistoricalRedemption.findMany({
+      prisma.merchantHistoricalRedemption.aggregate({
         where: historicalFilter,
-        select: { orderAmount: true }
+        _count: true,
+        _sum: { orderAmount: true }
       }),
-      prisma.merchantHistoricalRedemption.findMany({
+      prisma.merchantHistoricalRedemption.aggregate({
         where: { merchantId },
-        select: { orderAmount: true }
+        _count: true,
+        _sum: { orderAmount: true }
       }),
       prisma.syncLog.findMany({
         where: { merchantId },
@@ -1013,20 +1020,21 @@ router.get("/analytics", requireMerchantSession, async (req, res) => {
       })
     ]);
 
-    const liveRevenueInPeriod = redemptionsInPeriod.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0);
-    const liveAllTimeRevenue = allTimeRevenue.reduce((sum, r) => sum + (r.redeemedOrderAmount ? Number(r.redeemedOrderAmount) : 0), 0);
-    const histRevenueInPeriod = historicalInPeriod.reduce((sum, r) => sum + (r.orderAmount ? Number(r.orderAmount) : 0), 0);
-    const histAllTimeRevenue = allTimeHistorical.reduce((sum, r) => sum + (r.orderAmount ? Number(r.orderAmount) : 0), 0);
+    const num = (v: unknown) => (v ? Number(v) : 0);
+    const liveRevenueInPeriod = num(livePeriod._sum.redeemedOrderAmount);
+    const liveAllTimeRevenue = num(liveAllTime._sum.redeemedOrderAmount);
+    const histRevenueInPeriod = num(histPeriod._sum.orderAmount);
+    const histAllTimeRevenue = num(histAllTime._sum.orderAmount);
 
     res.json({
       totalSyncedUens: totalSynced,
       // Live + historical combined
-      allTimeRedemptions: allTimeRedemptions + allTimeHistorical.length,
+      allTimeRedemptions: liveAllTime._count + histAllTime._count,
       allTimeRevenue: liveAllTimeRevenue + histAllTimeRevenue,
-      redemptionsInPeriod: redemptionsInPeriod.length + historicalInPeriod.length,
+      redemptionsInPeriod: livePeriod._count + histPeriod._count,
       revenueInPeriod: liveRevenueInPeriod + histRevenueInPeriod,
       // Breakdown for transparency
-      historicalRedemptions: allTimeHistorical.length,
+      historicalRedemptions: histAllTime._count,
       historicalRevenue: histAllTimeRevenue,
       recentSyncLogs: syncLogs
     });
