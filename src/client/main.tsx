@@ -416,6 +416,20 @@ function Shell() {
     }
   };
   useEffect(() => {
+    // Seed history so the browser Back button always stays in-app.
+    // Covers magic-link arrivals, shared preview URLs, and bookmarks.
+    const isExternalEntry =
+      !document.referrer || !document.referrer.includes(window.location.hostname);
+
+    if (isExternalEntry && window.history.length <= 2) {
+      const currentUrl =
+        window.location.pathname + window.location.search + window.location.hash;
+      // Replace the shallow/external entry with home, then re-push the real page.
+      window.history.replaceState({ seeded: true }, "", "/");
+      window.history.pushState({ seeded: true }, "", currentUrl);
+    }
+  }, []);
+  useEffect(() => {
     authRefresh = refreshAuth;
     void refreshAuth();
     return () => {
