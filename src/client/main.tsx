@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { NavLink, Route, BrowserRouter as Router, Routes } from "react-router-dom";
-import { BarChart3, Bell, CheckCircle, Copy, DollarSign, Download, Eye, EyeOff, ExternalLink, Globe, Heart, Link2, Mail, Menu, MessageCircle, Music, Pause, Pencil, Play, Repeat, Repeat1, RefreshCw, Search, Send, Shield, Shuffle, SkipBack, SkipForward, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, Trash2, TrendingUp, UploadCloud, Users, Volume1, Volume2, VolumeX, Wallet, X, Zap } from "lucide-react";
+import { BarChart3, Bell, CheckCircle, ChevronDown, Copy, DollarSign, Download, Eye, EyeOff, ExternalLink, Globe, Heart, HelpCircle, Link2, Mail, Menu, MessageCircle, Music, Pause, Pencil, Play, Repeat, Repeat1, RefreshCw, Search, Send, Shield, Shuffle, SkipBack, SkipForward, SlidersHorizontal, ShoppingBag, Star, Tag, Ticket, Trash2, TrendingUp, UploadCloud, Users, Volume1, Volume2, VolumeX, Wallet, X, Zap } from "lucide-react";
 import creatorLiveSupport from "./assets/creator-live-support.png";
 import "./styles.css";
 
@@ -399,7 +399,7 @@ function AnimatedMoney({ amount }: { amount: string }) {
 function Shell() {
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/faq" || window.location.pathname === "/login" || window.location.pathname === "/forgot-password" || window.location.pathname === "/reset-password" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
+  const isPublicRoute = window.location.pathname === "/" || window.location.pathname === "/about" || window.location.pathname === "/privacy" || window.location.pathname === "/faq" || window.location.pathname === "/login" || window.location.pathname === "/forgot-password" || window.location.pathname === "/reset-password" || window.location.pathname === "/merchants/register" || window.location.pathname.startsWith("/merchant/install/") || window.location.pathname === "/holder/portal" || window.location.pathname === "/holder/help" || window.location.pathname === "/holder/collection" || window.location.pathname === "/holder/register" || window.location.pathname === "/signup" || window.location.pathname === "/exchange-hub/register" || window.location.pathname === "/widget-preview" || window.location.pathname === "/shopify/merchant";
   const refreshAuth = async () => {
     try {
       const storedToken = localStorage.getItem("uen_admin_token");
@@ -451,6 +451,7 @@ function Shell() {
           <Route path="/merchants/register" element={<MerchantRegister />} />
           <Route path="/merchant/install/:token" element={<MerchantInstall />} />
           <Route path="/holder/portal" element={<HolderPortal />} />
+          <Route path="/holder/help" element={<HolderHelp />} />
           <Route path="/holder/collection" element={<HolderCollectionDemo />} />
           <Route path="/holder/register" element={<HolderRegister />} />
           <Route path="/signup" element={<SignupGateway />} />
@@ -5305,6 +5306,8 @@ function LiveHolderPortal({ token }: { token: string }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [helpExpanded, setHelpExpanded] = useState(false);
   const signOut = () => {
     localStorage.removeItem("uen_portal_token");
     window.location.href = "/";
@@ -5380,6 +5383,9 @@ function LiveHolderPortal({ token }: { token: string }) {
           <span className="portal-brand-text">UENITE<small>Universal Exchange Note</small><small className="portal-brand-sub">the original Love Note</small></span>
         </div>
         <div className="portal-nav-actions">
+          <button className="portal-notif-btn portal-tour-btn" onClick={() => { setTourOpen(true); setNotifOpen(false); setMenuOpen(false); }} aria-label="Take a tour" title="Take a tour">
+            <HelpCircle size={20} />
+          </button>
           <button className="portal-notif-btn" onClick={() => { setNotifOpen(!notifOpen); setMenuOpen(false); }}>
             <Bell size={20} />
             {unreadCount > 0 && <span className="portal-notif-badge">{unreadCount}</span>}
@@ -5394,6 +5400,16 @@ function LiveHolderPortal({ token }: { token: string }) {
       {menuOpen && (
         <div className="portal-menu-drawer">
           <button onClick={() => { setEditOpen(true); setMenuOpen(false); }}>Edit my details</button>
+          <button className="portal-menu-help-toggle" onClick={() => setHelpExpanded(!helpExpanded)} aria-expanded={helpExpanded}>
+            <span><HelpCircle size={15} /> Help</span>
+            <ChevronDown size={15} className={helpExpanded ? "portal-help-chev open" : "portal-help-chev"} />
+          </button>
+          {helpExpanded && (
+            <div className="portal-menu-submenu">
+              <button onClick={() => { setTourOpen(true); setMenuOpen(false); }}>Take a Tour</button>
+              <a href="/holder/help">FAQ / Help</a>
+            </div>
+          )}
           <a href={`mailto:work@zahbrandsolutions.com?subject=UENITE help request&body=Wallet email: ${encodeURIComponent(holder.email)}`}>Help &amp; contact</a>
           <a href={`mailto:work@zahbrandsolutions.com?subject=Something is missing from my wallet&body=Wallet email: ${encodeURIComponent(holder.email)}%0AWhat's missing: `}>Report something missing</a>
           <a href={`mailto:work@zahbrandsolutions.com?subject=Delete my UENITE account&body=Please delete the account for: ${encodeURIComponent(holder.email)}`}>Request account deletion</a>
@@ -5435,7 +5451,9 @@ function LiveHolderPortal({ token }: { token: string }) {
         </div>
       )}
 
-      {holder.isLoveNoteSupporter && <LoveNoteSupporterBanner />}
+      <div id="tour-welcome">
+        {holder.isLoveNoteSupporter && <LoveNoteSupporterBanner />}
+      </div>
 
       {/* Hero / wallet overview */}
       <section className="portal-hero">
@@ -5445,7 +5463,7 @@ function LiveHolderPortal({ token }: { token: string }) {
             <h1 className="portal-name">{holderHasName ? `${holder.firstName} ${holder.lastName}`.trim() : "Let's finish setting up"}</h1>
             {!profileComplete && <HolderProfilePrompt holder={holder} onSaved={wallet.reload} />}
             <div className="portal-stats-row">
-              <div className="portal-stat">
+              <div className="portal-stat" id="tour-active">
                 <Wallet size={18} />
                 <div>
                   <strong>{totalActive}</strong>
@@ -5453,7 +5471,7 @@ function LiveHolderPortal({ token }: { token: string }) {
                 </div>
               </div>
               {estimatedTotalValue > 0 && (
-                <div className="portal-stat">
+                <div className="portal-stat" id="tour-value">
                   <DollarSign size={18} />
                   <div>
                     <strong>${Number(estimatedTotalValue).toFixed(2)}</strong>
@@ -5461,7 +5479,7 @@ function LiveHolderPortal({ token }: { token: string }) {
                   </div>
                 </div>
               )}
-              <div className="portal-stat">
+              <div className="portal-stat" id="tour-redeemed">
                 <CheckCircle size={18} />
                 <div>
                   <strong>{totalRedeemed}</strong>
@@ -5507,14 +5525,14 @@ function LiveHolderPortal({ token }: { token: string }) {
 
       {/* Tab bar — redemption features unlock once the profile is verified */}
       <div className="portal-tabs">
-        <button className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}>
+        <button id="tour-tab-collection" className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}>
           <Star size={16} /> Collection
         </button>
-        <button className={`portal-tab ${activeTab === "merchants" ? "active" : ""} ${!profileComplete ? "portal-tab-locked" : ""}`} onClick={() => profileComplete && setActiveTab("merchants")}>
-          <Globe size={16} /> Where to Redeem {!profileComplete && <Shield size={12} />}
+        <button id="tour-tab-merchants" className={`portal-tab ${activeTab === "merchants" ? "active" : ""} ${!profileComplete ? "portal-tab-locked" : ""}`} onClick={() => profileComplete && setActiveTab("merchants")}>
+          <Globe size={16} /> <span className="portal-tab-label-full">Where to Redeem</span><span className="portal-tab-label-short">Redeem</span> {!profileComplete && <Shield size={12} />}
         </button>
-        <button className={`portal-tab ${activeTab === "wallet" ? "active" : ""} ${!profileComplete ? "portal-tab-locked" : ""}`} onClick={() => profileComplete && setActiveTab("wallet")}>
-          <Wallet size={16} /> My Codes {!profileComplete && <Shield size={12} />}
+        <button id="tour-tab-wallet" className={`portal-tab ${activeTab === "wallet" ? "active" : ""} ${!profileComplete ? "portal-tab-locked" : ""}`} onClick={() => profileComplete && setActiveTab("wallet")}>
+          <Wallet size={16} /> <span className="portal-tab-label-full">My Codes</span><span className="portal-tab-label-short">Codes</span> {!profileComplete && <Shield size={12} />}
         </button>
       </div>
       {!profileComplete && (
@@ -5623,6 +5641,169 @@ function LiveHolderPortal({ token }: { token: string }) {
           </div>
         </section>
       )}
+
+      <footer className="portal-footer">
+        <Shield size={16} />
+        <span>Powered by UENITE (Universal Exchange Note)</span>
+      </footer>
+
+      {tourOpen && (
+        <PortalTour
+          steps={PORTAL_TOUR_STEPS}
+          onBeforeStep={(step) => {
+            // Reveal the right tab before spotlighting code/merchant steps so the
+            // target is mounted and the highlight lands on the real content.
+            if (step.target === "tour-tab-merchants" && profileComplete) setActiveTab("merchants");
+            else if (step.target === "tour-tab-wallet" && profileComplete) setActiveTab("wallet");
+            else if (step.target === "tour-tab-collection") setActiveTab("collection");
+          }}
+          onClose={() => setTourOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// --- Holder portal guided tour ---
+
+type TourStep = { target: string; title: string; description: string };
+
+const PORTAL_TOUR_STEPS: TourStep[] = [
+  { target: "tour-welcome", title: "Your Love Note", description: "This celebrates you as an original Love Note supporter. Your notes are a thank-you from the artists." },
+  { target: "tour-active", title: "Universal Exchange Notes", description: "Each UEN is a digital note that holds value you can redeem at participating merchants." },
+  { target: "tour-value", title: "Your Wallet Value", description: "The total discount value your notes are worth across all participating merchants right now." },
+  { target: "tour-redeemed", title: "Redemption History", description: "How many times you've used your notes at merchants so far." },
+  { target: "tour-tab-collection", title: "Your Collection", description: "View your digital collectibles, exclusive music, and special content unlocked by your notes." },
+  { target: "tour-tab-merchants", title: "Participating Merchants", description: "See which stores accept your UENs and how much you can save at each one." },
+  { target: "tour-tab-wallet", title: "Your Codes", description: "Your unique UEN codes. Copy and paste one at checkout to redeem your discount." },
+];
+
+function PortalTour({ steps, onClose, onBeforeStep }: { steps: TourStep[]; onClose: () => void; onBeforeStep?: (step: TourStep) => void }) {
+  const [i, setI] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const step = steps[i];
+  const last = i === steps.length - 1;
+
+  // Let the host reveal/mount the target (e.g. switch tabs) before measuring.
+  useEffect(() => {
+    onBeforeStep?.(step);
+  }, [i]);
+
+  useEffect(() => {
+    const measure = () => {
+      const el = document.getElementById(step.target);
+      if (!el) { setRect(null); return; }
+      const r = el.getBoundingClientRect();
+      // An empty placeholder (e.g. the welcome banner for non-supporters) has no
+      // real height — treat it as absent so the tooltip just centers instead.
+      setRect(r.height < 12 ? null : r);
+    };
+    const el = document.getElementById(step.target);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    measure();
+    // Re-measure a few times to catch the end of the smooth scroll.
+    const t1 = window.setTimeout(measure, 220);
+    const t2 = window.setTimeout(measure, 460);
+    const t3 = window.setTimeout(measure, 720);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [i, step.target]);
+
+  const cardWidth = 320;
+  let cardStyle: React.CSSProperties;
+  if (!rect) {
+    cardStyle = { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+  } else {
+    const left = Math.min(Math.max(rect.left, 12), Math.max(12, window.innerWidth - cardWidth - 12));
+    const placeBelow = window.innerHeight - rect.bottom > 230;
+    cardStyle = placeBelow
+      ? { top: rect.bottom + 14, left }
+      : { top: rect.top - 14, left, transform: "translateY(-100%)" };
+  }
+
+  return (
+    <div className="portal-tour">
+      {/* Click-catcher: clicking outside the tooltip closes the tour. */}
+      <div className="portal-tour-catch" onClick={onClose} />
+      {rect ? (
+        <div
+          className="portal-tour-spot"
+          style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12 }}
+        />
+      ) : (
+        <div className="portal-tour-dim" />
+      )}
+      <div className="portal-tour-card" style={cardStyle} onClick={(e) => e.stopPropagation()}>
+        <button className="portal-tour-close" onClick={onClose} aria-label="Close tour"><X size={16} /></button>
+        <span className="portal-tour-step">{i + 1} of {steps.length}</span>
+        <h3>{step.title}</h3>
+        <p>{step.description}</p>
+        <div className="portal-tour-actions">
+          <button className="portal-tour-prev" disabled={i === 0} onClick={() => setI((n) => Math.max(0, n - 1))}>← Previous</button>
+          {last ? (
+            <button className="portal-tour-next" onClick={onClose}>Done</button>
+          ) : (
+            <button className="portal-tour-next" onClick={() => setI((n) => Math.min(steps.length - 1, n + 1))}>Next →</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Holder Help / FAQ page ---
+
+const HOLDER_HELP_ITEMS: { q: string; a: string }[] = [
+  { q: "What is a UEN?", a: "A Universal Exchange Note is a digital note that holds value you can use like a discount at participating merchants." },
+  { q: "What is my wallet?", a: "Your wallet shows all your active UENs, their estimated value, and your redemption history." },
+  { q: "How do I redeem my UEN?", a: "Go to \"Where to Redeem\", pick a merchant, copy your code from \"My Codes\", and paste it at checkout." },
+  { q: "What is Estimated Value?", a: "The estimated discount your notes are worth right now based on current merchant offers (e.g. 15% off a $100 purchase = $15)." },
+  { q: "What are collectibles?", a: "Special digital items tied to your notes — artwork, music, and exclusive content from the artists." },
+  { q: "What is the Love Note campaign?", a: "You're an original supporter of the Love Notes campaign. Your UENs are a thank-you from Nubreed & Yawitazah." },
+  { q: "Why is my code showing \"Already Redeemed\"?", a: "Each code can only be used once per merchant. Check your redemption history for details." },
+  { q: "How do I get more UENs?", a: "UENs are distributed through campaigns and purchases. Check with participating merchants for new opportunities." },
+];
+
+function HolderHelp() {
+  return (
+    <div className="holder-help-root">
+      <nav className="portal-nav">
+        <div className="portal-nav-brand">
+          <div className="portal-hub-dot portal-hub-dot-pulse" />
+          <span className="portal-brand-text">UENITE<small>Universal Exchange Note</small><small className="portal-brand-sub">Help &amp; FAQ</small></span>
+        </div>
+        <div className="portal-nav-actions">
+          <a className="holder-help-back" href="/holder/portal"><Wallet size={16} /> Back to wallet</a>
+        </div>
+      </nav>
+
+      <header className="holder-help-hero">
+        <span className="holder-help-eyebrow"><HelpCircle size={16} /> Help Center</span>
+        <h1>Questions about your UENs</h1>
+        <p>Everything you need to know about your Universal Exchange Notes, your wallet, and how to redeem.</p>
+      </header>
+
+      <section className="holder-help-grid">
+        {HOLDER_HELP_ITEMS.map((item) => (
+          <article key={item.q} className="holder-help-card">
+            <h2>{item.q}</h2>
+            <p>{item.a}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="holder-help-contact">
+        <h2>Still need help?</h2>
+        <p>Reach out and we'll get back to you.</p>
+        <a className="holder-help-contact-btn" href="mailto:work@zahbrandsolutions.com?subject=UENITE help request">Email support</a>
+      </section>
 
       <footer className="portal-footer">
         <Shield size={16} />

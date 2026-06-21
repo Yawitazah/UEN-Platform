@@ -4113,6 +4113,16 @@ html { background: #050e09; }
 
 .portal-menu-signout { border-top: 1px solid rgba(255, 255, 255, 0.08) !important; border-radius: 0 0 9px 9px !important; color: #ff9999 !important; margin-top: 4px; }
 
+/* Expandable Help group inside the account menu */
+.portal-menu-help-toggle { align-items: center; display: flex !important; justify-content: space-between; }
+.portal-menu-help-toggle > span { align-items: center; display: inline-flex; gap: 8px; }
+.portal-help-chev { transition: transform 160ms ease; }
+.portal-help-chev.open { transform: rotate(180deg); }
+.portal-menu-submenu { display: flex; flex-direction: column; margin: 2px 0 2px 8px; border-left: 2px solid rgba(117, 227, 173, 0.22); padding-left: 4px; }
+.portal-menu-submenu a,
+.portal-menu-submenu button { font-size: 13px; padding: 9px 12px; }
+.portal-tour-btn svg { color: #75e3ad; }
+
 .portal-modal-backdrop {
   align-items: center;
   background: rgba(4, 12, 8, 0.7);
@@ -4488,7 +4498,15 @@ html { background: #050e09; }
   position: sticky;
   top: 56px;
   z-index: 50;
+  /* Never let the rightmost tab clip off-screen on narrow phones: scroll instead. */
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+
+.portal-tabs::-webkit-scrollbar { display: none; }
 
 .portal-tab {
   align-items: center;
@@ -4499,6 +4517,7 @@ html { background: #050e09; }
   color: #3d6b58;
   cursor: pointer;
   display: inline-flex;
+  flex-shrink: 0;
   font-size: 13px;
   font-weight: 700;
   gap: 7px;
@@ -4506,7 +4525,11 @@ html { background: #050e09; }
   min-height: auto;
   padding: 15px 20px;
   transition: color 150ms, border-color 150ms;
+  white-space: nowrap;
 }
+
+/* Short labels are a mobile-only swap; default to the full label. */
+.portal-tab-label-short { display: none; }
 
 .portal-tab.active {
   border-bottom-color: #75e3ad;
@@ -4931,8 +4954,18 @@ html { background: #050e09; }
   }
 
   .portal-tabs {
-    padding: 0 12px;
+    padding: 0 10px;
   }
+
+  .portal-tab {
+    font-size: 12px;
+    gap: 5px;
+    padding: 14px 14px;
+  }
+
+  /* Swap to the compact labels so all three tabs fit without clipping. */
+  .portal-tab-label-full { display: none; }
+  .portal-tab-label-short { display: inline; }
 
   .portal-section-inner {
     padding: 0 16px;
@@ -7799,3 +7832,91 @@ html { background: #050e09; }
 .asset-soon { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(6, 20, 14, 0.2); color: #06140e; padding: 3px 8px; border-radius: 999px; font-weight: 800; }
 .asset-meta-msg { color: #9fb6ab; font-size: 12.5px; margin: 2px 0 0; }
 .asset-keepsake { display: inline-block; color: #b8f5d6; font-size: 12.5px; font-style: italic; border: 1px solid rgba(117, 227, 173, 0.3); background: rgba(117, 227, 173, 0.08); border-radius: 999px; padding: 7px 14px; }
+
+/* ------------------------------------------------------------------------------------------------------------------------------------------
+   HOLDER PORTAL GUIDED TOUR
+------------------------------------------------------------------------------------------------------------------------------------------ */
+
+.portal-tour { position: fixed; inset: 0; z-index: 9000; }
+
+/* Transparent layer: clicking anywhere outside the tooltip closes the tour. */
+.portal-tour-catch { position: fixed; inset: 0; z-index: 9001; }
+
+/* Spotlight: the giant box-shadow dims the whole page except this cut-out. */
+.portal-tour-spot {
+  position: fixed;
+  z-index: 9002;
+  border-radius: 12px;
+  border: 2px solid #75e3ad;
+  box-shadow: 0 0 0 9999px rgba(3, 10, 7, 0.74), 0 0 24px rgba(117, 227, 173, 0.55);
+  pointer-events: none;
+  transition: top 180ms ease, left 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+/* Fallback dim when the step's target isn't on screen (e.g. empty welcome banner). */
+.portal-tour-dim { position: fixed; inset: 0; z-index: 9002; background: rgba(3, 10, 7, 0.74); pointer-events: none; }
+
+.portal-tour-card {
+  position: fixed;
+  z-index: 9003;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  background: #0e261d;
+  border: 1px solid rgba(117, 227, 173, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  padding: 20px 20px 18px;
+  color: #d1fae5;
+}
+
+.portal-tour-close { position: absolute; top: 12px; right: 12px; background: none; border: none; color: #6b8f7d; cursor: pointer; padding: 2px; }
+.portal-tour-close:hover { color: #d1fae5; }
+.portal-tour-step { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #75e3ad; margin-bottom: 8px; }
+.portal-tour-card h3 { margin: 0 0 8px; font-size: 18px; color: #ffffff; }
+.portal-tour-card p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: #b8d4c8; }
+.portal-tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.portal-tour-prev { background: none; border: 1px solid rgba(117, 227, 173, 0.25); border-radius: 9px; color: #b8d4c8; cursor: pointer; font-size: 13px; font-weight: 700; padding: 9px 14px; }
+.portal-tour-prev:hover:not(:disabled) { background: rgba(117, 227, 173, 0.1); }
+.portal-tour-prev:disabled { opacity: 0.35; cursor: not-allowed; }
+.portal-tour-next { background: linear-gradient(95deg, #4cc99a, #75e3ad); border: none; border-radius: 9px; color: #06140e; cursor: pointer; font-size: 13px; font-weight: 800; padding: 9px 18px; }
+.portal-tour-next:hover { box-shadow: 0 8px 22px rgba(117, 227, 173, 0.28); }
+
+/* ------------------------------------------------------------------------------------------------------------------------------------------
+   HOLDER HELP / FAQ PAGE
+------------------------------------------------------------------------------------------------------------------------------------------ */
+
+.holder-help-root {
+  min-height: 100vh;
+  color: #d1fae5;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(31, 111, 91, 0.28), transparent 38%),
+    radial-gradient(circle at 88% 8%, rgba(117, 227, 173, 0.12), transparent 32%),
+    linear-gradient(160deg, #07120e 0%, #0a1d15 100%);
+}
+
+.holder-help-back { display: inline-flex; align-items: center; gap: 7px; color: #b8d4c8; font-size: 14px; font-weight: 700; text-decoration: none; padding: 8px 14px; border: 1px solid rgba(117, 227, 173, 0.25); border-radius: 10px; }
+.holder-help-back:hover { background: rgba(117, 227, 173, 0.1); color: #ffffff; }
+
+.holder-help-hero { max-width: 880px; margin: 0 auto; padding: 56px 24px 24px; text-align: center; }
+.holder-help-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #75e3ad; }
+.holder-help-hero h1 { margin: 14px 0 10px; font-size: 34px; color: #ffffff; }
+.holder-help-hero p { margin: 0 auto; max-width: 560px; font-size: 15px; line-height: 1.6; color: #9fb6ab; }
+
+.holder-help-grid { max-width: 880px; margin: 24px auto 0; padding: 0 24px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.holder-help-card { background: rgba(14, 38, 29, 0.7); border: 1px solid rgba(117, 227, 173, 0.16); border-radius: 16px; padding: 22px; }
+.holder-help-card h2 { margin: 0 0 10px; font-size: 16px; color: #ffffff; }
+.holder-help-card p { margin: 0; font-size: 14px; line-height: 1.55; color: #b8d4c8; }
+
+.holder-help-contact { max-width: 880px; margin: 40px auto 0; padding: 0 24px; text-align: center; }
+.holder-help-contact h2 { margin: 0 0 8px; font-size: 22px; color: #ffffff; }
+.holder-help-contact p { margin: 0 0 18px; color: #9fb6ab; font-size: 14px; }
+.holder-help-contact-btn { display: inline-block; background: linear-gradient(95deg, #4cc99a, #75e3ad); color: #06140e; font-weight: 800; font-size: 14px; padding: 12px 26px; border-radius: 11px; text-decoration: none; }
+.holder-help-contact-btn:hover { box-shadow: 0 8px 22px rgba(117, 227, 173, 0.28); }
+
+.holder-help-root .portal-footer { margin-top: 48px; }
+
+@media (max-width: 700px) {
+  .holder-help-grid { grid-template-columns: 1fr; }
+  .holder-help-hero { padding-top: 36px; }
+  .holder-help-hero h1 { font-size: 26px; }
+}

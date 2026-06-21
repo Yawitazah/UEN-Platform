@@ -5,6 +5,7 @@ declare module "lucide-react" {
   export const BarChart3: LucideIcon;
   export const Bell: LucideIcon;
   export const CheckCircle: LucideIcon;
+  export const ChevronDown: LucideIcon;
   export const Copy: LucideIcon;
   export const DollarSign: LucideIcon;
   export const Download: LucideIcon;
@@ -13,6 +14,7 @@ declare module "lucide-react" {
   export const EyeOff: LucideIcon;
   export const Globe: LucideIcon;
   export const Heart: LucideIcon;
+  export const HelpCircle: LucideIcon;
   export const Link2: LucideIcon;
   export const Mail: LucideIcon;
   export const Menu: LucideIcon;
