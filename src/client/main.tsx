@@ -5308,6 +5308,11 @@ function LiveHolderPortal({ token }: { token: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [helpExpanded, setHelpExpanded] = useState(false);
+  const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem("uen_tip_dismissed") === "1");
+  const dismissTip = () => {
+    localStorage.setItem("uen_tip_dismissed", "1");
+    setTipDismissed(true);
+  };
   const signOut = () => {
     localStorage.removeItem("uen_portal_token");
     window.location.href = "/";
@@ -5386,11 +5391,11 @@ function LiveHolderPortal({ token }: { token: string }) {
           <button className="portal-notif-btn portal-tour-btn" onClick={() => { setTourOpen(true); setNotifOpen(false); setMenuOpen(false); }} aria-label="Take a tour" title="Take a tour">
             <HelpCircle size={20} />
           </button>
-          <button className="portal-notif-btn" onClick={() => { setNotifOpen(!notifOpen); setMenuOpen(false); }}>
+          <button id="tour-bell" className="portal-notif-btn" onClick={() => { setNotifOpen(!notifOpen); setMenuOpen(false); }}>
             <Bell size={20} />
             {unreadCount > 0 && <span className="portal-notif-badge">{unreadCount}</span>}
           </button>
-          <button className="portal-notif-btn" onClick={() => { setMenuOpen(!menuOpen); setNotifOpen(false); }} aria-label="Account menu">
+          <button id="tour-menu" className="portal-notif-btn" onClick={() => { setMenuOpen(!menuOpen); setNotifOpen(false); }} aria-label="Account menu">
             <Menu size={20} />
           </button>
         </div>
@@ -5451,9 +5456,7 @@ function LiveHolderPortal({ token }: { token: string }) {
         </div>
       )}
 
-      <div id="tour-welcome">
-        {holder.isLoveNoteSupporter && <LoveNoteSupporterBanner />}
-      </div>
+      {holder.isLoveNoteSupporter && <LoveNoteSupporterBanner />}
 
       {/* Hero / wallet overview */}
       <section className="portal-hero">
@@ -5523,8 +5526,21 @@ function LiveHolderPortal({ token }: { token: string }) {
         </div>
       )}
 
+      {/* Did-you-know tip — dismissible, remembered in localStorage */}
+      {!tipDismissed && (
+        <div className="portal-tip">
+          <div className="portal-tip-inner">
+            <span className="portal-tip-bulb" aria-hidden="true">💡</span>
+            <p className="portal-tip-text">
+              <strong>Did you know?</strong> Your Love Notes are Universal Exchange Notes. Use them at participating merchants to unlock discounts — each merchant sets their own value, so check "Where to Redeem" to see what you can save.
+            </p>
+            <button className="portal-tip-close" onClick={dismissTip} aria-label="Dismiss tip"><X size={16} /></button>
+          </div>
+        </div>
+      )}
+
       {/* Tab bar — redemption features unlock once the profile is verified */}
-      <div className="portal-tabs">
+      <div className="portal-tabs" id="tour-tabs">
         <button id="tour-tab-collection" className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}>
           <Star size={16} /> Collection
         </button>
@@ -5669,13 +5685,15 @@ function LiveHolderPortal({ token }: { token: string }) {
 type TourStep = { target: string; title: string; description: string };
 
 const PORTAL_TOUR_STEPS: TourStep[] = [
-  { target: "tour-welcome", title: "Your Love Note", description: "This celebrates you as an original Love Note supporter. Your notes are a thank-you from the artists." },
-  { target: "tour-active", title: "Universal Exchange Notes", description: "Each UEN is a digital note that holds value you can redeem at participating merchants." },
-  { target: "tour-value", title: "Your Wallet Value", description: "The total discount value your notes are worth across all participating merchants right now." },
+  { target: "tour-bell", title: "Notifications", description: "The bell shows updates from merchants and the platform — new offers, redemptions, and important announcements about your notes." },
+  { target: "tour-menu", title: "Your Menu", description: "Open the menu for your profile and account details, Help & the guided tour, support contacts, and to sign out." },
+  { target: "tour-active", title: "Universal Exchange Notes", description: "Your Love Notes are Universal Exchange Notes (UENs) — they hold real value you can spend at participating merchants." },
+  { target: "tour-value", title: "Your Wallet Value", description: "Each merchant assigns their own value to your UEN — the total shown is an estimate across all participating merchants. Value may vary per store." },
   { target: "tour-redeemed", title: "Redemption History", description: "How many times you've used your notes at merchants so far." },
   { target: "tour-tab-collection", title: "Your Collection", description: "View your digital collectibles, exclusive music, and special content unlocked by your notes." },
   { target: "tour-tab-merchants", title: "Participating Merchants", description: "See which stores accept your UENs and how much you can save at each one." },
   { target: "tour-tab-wallet", title: "Your Codes", description: "Your unique UEN codes. Copy and paste one at checkout to redeem your discount." },
+  { target: "tour-tabs", title: "How to Redeem", description: "Go to \"Where to Redeem\", pick a merchant, then go to \"My Codes\", copy your code and paste it at checkout. Each code can be used once per merchant." },
 ];
 
 function PortalTour({ steps, onClose, onBeforeStep }: { steps: TourStep[]; onClose: () => void; onBeforeStep?: (step: TourStep) => void }) {
@@ -5760,11 +5778,13 @@ function PortalTour({ steps, onClose, onBeforeStep }: { steps: TourStep[]; onClo
 
 // --- Holder Help / FAQ page ---
 
-const HOLDER_HELP_ITEMS: { q: string; a: string }[] = [
+const HOLDER_HELP_ITEMS: { q: string; a: string; steps?: string[] }[] = [
   { q: "What is a UEN?", a: "A Universal Exchange Note is a digital note that holds value you can use like a discount at participating merchants." },
+  { q: "What is a Love Note?", a: "A Love Note IS a Universal Exchange Note (UEN). They're the same thing — Love Notes was the campaign name for when your UENs were originally distributed." },
   { q: "What is my wallet?", a: "Your wallet shows all your active UENs, their estimated value, and your redemption history." },
-  { q: "How do I redeem my UEN?", a: "Go to \"Where to Redeem\", pick a merchant, copy your code from \"My Codes\", and paste it at checkout." },
+  { q: "How do I redeem my UEN?", a: "Redeeming takes just a few steps:", steps: ["Go to \"Where to Redeem\"", "Pick a merchant", "Go to \"My Codes\"", "Copy your code", "Paste it at checkout"] },
   { q: "What is Estimated Value?", a: "The estimated discount your notes are worth right now based on current merchant offers (e.g. 15% off a $100 purchase = $15)." },
+  { q: "Why does my estimated value change?", a: "Each merchant sets their own value for UENs. The total estimated value reflects what your notes are worth across all current participating merchants." },
   { q: "What are collectibles?", a: "Special digital items tied to your notes — artwork, music, and exclusive content from the artists." },
   { q: "What is the Love Note campaign?", a: "You're an original supporter of the Love Notes campaign. Your UENs are a thank-you from Nubreed & Yawitazah." },
   { q: "Why is my code showing \"Already Redeemed\"?", a: "Each code can only be used once per merchant. Check your redemption history for details." },
@@ -5795,6 +5815,11 @@ function HolderHelp() {
           <article key={item.q} className="holder-help-card">
             <h2>{item.q}</h2>
             <p>{item.a}</p>
+            {item.steps && (
+              <ol className="holder-help-steps">
+                {item.steps.map((s) => <li key={s}>{s}</li>)}
+              </ol>
+            )}
           </article>
         ))}
       </section>

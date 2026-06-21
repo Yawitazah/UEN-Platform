@@ -7834,6 +7834,32 @@ html { background: #050e09; }
 .asset-keepsake { display: inline-block; color: #b8f5d6; font-size: 12.5px; font-style: italic; border: 1px solid rgba(117, 227, 173, 0.3); background: rgba(117, 227, 173, 0.08); border-radius: 999px; padding: 7px 14px; }
 
 /* ------------------------------------------------------------------------------------------------------------------------------------------
+   HOLDER PORTAL "DID YOU KNOW" TIP
+------------------------------------------------------------------------------------------------------------------------------------------ */
+
+.portal-tip { max-width: 1120px; margin: 0 auto; padding: 16px 24px 0; }
+.portal-tip-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(95deg, rgba(0, 229, 204, 0.12), rgba(0, 229, 204, 0.05));
+  border: 1px solid rgba(0, 229, 204, 0.35);
+  border-radius: 14px;
+  padding: 13px 14px 13px 16px;
+  box-shadow: 0 0 0 1px rgba(0, 229, 204, 0.06), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.portal-tip-bulb { font-size: 18px; line-height: 1.4; flex-shrink: 0; filter: drop-shadow(0 0 6px rgba(0, 229, 204, 0.5)); }
+.portal-tip-text { margin: 0; font-size: 13.5px; line-height: 1.5; color: #cdeee8; }
+.portal-tip-text strong { color: #00e5cc; }
+.portal-tip-close { flex-shrink: 0; background: none; border: none; color: #6fbfb4; cursor: pointer; padding: 2px; margin-left: auto; }
+.portal-tip-close:hover { color: #00e5cc; }
+
+@media (max-width: 700px) {
+  .portal-tip { padding: 12px 14px 0; }
+  .portal-tip-text { font-size: 12.5px; }
+}
+
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    HOLDER PORTAL GUIDED TOUR
 ------------------------------------------------------------------------------------------------------------------------------------------ */
 
@@ -7906,6 +7932,9 @@ html { background: #050e09; }
 .holder-help-card { background: rgba(14, 38, 29, 0.7); border: 1px solid rgba(117, 227, 173, 0.16); border-radius: 16px; padding: 22px; }
 .holder-help-card h2 { margin: 0 0 10px; font-size: 16px; color: #ffffff; }
 .holder-help-card p { margin: 0; font-size: 14px; line-height: 1.55; color: #b8d4c8; }
+.holder-help-steps { margin: 12px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.holder-help-steps li { font-size: 14px; line-height: 1.4; color: #b8d4c8; }
+.holder-help-steps li::marker { color: #00e5cc; font-weight: 800; }
 
 .holder-help-contact { max-width: 880px; margin: 40px auto 0; padding: 0 24px; text-align: center; }
 .holder-help-contact h2 { margin: 0 0 8px; font-size: 22px; color: #ffffff; }
