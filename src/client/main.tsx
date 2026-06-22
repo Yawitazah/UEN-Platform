@@ -416,12 +416,24 @@ function Shell() {
     }
   };
   useEffect(() => {
+    // If a holder hit Back to the home page but still has a saved portal session,
+    // bounce them straight back into their wallet instead of the logged-out home.
+    // Use replace() (not push) so Back from the portal doesn't loop right back here.
+    try {
+      const savedToken = sessionStorage.getItem("uen_portal_token");
+      const path = window.location.pathname;
+      if (savedToken && (path === "/" || path === "")) {
+        window.location.replace(`/holder/portal?token=${encodeURIComponent(savedToken)}`);
+        return;
+      }
+    } catch { /* storage may be blocked */ }
+
     // Seed history so the browser Back button always stays in-app.
     // Covers magic-link arrivals, shared preview URLs, and bookmarks.
     const isExternalEntry =
       !document.referrer || !document.referrer.includes(window.location.hostname);
 
-    if (isExternalEntry && window.history.length <= 2) {
+    if (isExternalEntry && window.history.length <= 5) {
       const currentUrl =
         window.location.pathname + window.location.search + window.location.hash;
       // Replace the shallow/external entry with home, then re-push the real page.
@@ -5118,6 +5130,15 @@ function HolderPortal() {
   const token = portalToken();
   const demoMode = new URLSearchParams(window.location.search).get("demo") === "1";
 
+  // Persist the portal token so it survives navigation. On Android, hitting Back
+  // lands on "/" (which has no ?token=) and would otherwise look like a logout;
+  // Shell reads this saved token and bounces the holder back into their wallet.
+  useEffect(() => {
+    if (token && !demoMode) {
+      try { sessionStorage.setItem("uen_portal_token", token); } catch { /* storage may be blocked */ }
+    }
+  }, [token, demoMode]);
+
   if (!token && demoMode) {
     return <DemoHolderPortal />;
   }
@@ -5341,6 +5362,9 @@ function LiveHolderPortal({ token }: { token: string }) {
   };
   const signOut = () => {
     localStorage.removeItem("uen_portal_token");
+    // Clear the persisted session token too, otherwise Shell would immediately
+    // bounce the holder back into the portal instead of letting them sign out.
+    try { sessionStorage.removeItem("uen_portal_token"); } catch { /* storage may be blocked */ }
     window.location.href = "/";
   };
 
