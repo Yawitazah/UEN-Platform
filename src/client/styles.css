@@ -7834,29 +7834,64 @@ html { background: #050e09; }
 .asset-keepsake { display: inline-block; color: #b8f5d6; font-size: 12.5px; font-style: italic; border: 1px solid rgba(117, 227, 173, 0.3); background: rgba(117, 227, 173, 0.08); border-radius: 999px; padding: 7px 14px; }
 
 /* ------------------------------------------------------------------------------------------------------------------------------------------
-   HOLDER PORTAL "DID YOU KNOW" TIP
+   HOLDER PORTAL WELCOME POPUP
 ------------------------------------------------------------------------------------------------------------------------------------------ */
 
-.portal-tip { max-width: 1120px; margin: 0 auto; padding: 16px 24px 0; }
-.portal-tip-inner {
+.portal-welcome-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 10, 7, 0.72);
+  backdrop-filter: blur(4px);
+}
+.portal-welcome {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  background: #0e261d;
+  border: 1px solid rgba(0, 229, 204, 0.3);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+  padding: 26px 24px 22px;
+  color: #d1fae5;
+}
+.portal-welcome-x { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #6fbfb4; cursor: pointer; padding: 2px; }
+.portal-welcome-x:hover { color: #00e5cc; }
+.portal-welcome-eyebrow { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #00e5cc; margin-bottom: 8px; }
+.portal-welcome h2 { margin: 0 0 18px; font-size: 21px; color: #ffffff; }
+.portal-welcome-tips { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.portal-welcome-tips li {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  background: linear-gradient(95deg, rgba(0, 229, 204, 0.12), rgba(0, 229, 204, 0.05));
-  border: 1px solid rgba(0, 229, 204, 0.35);
-  border-radius: 14px;
-  padding: 13px 14px 13px 16px;
-  box-shadow: 0 0 0 1px rgba(0, 229, 204, 0.06), 0 8px 24px rgba(0, 0, 0, 0.25);
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #cdeee8;
+  border-left: 3px solid #00e5cc;
+  border-radius: 0 10px 10px 0;
+  background: rgba(0, 229, 204, 0.08);
+  padding: 11px 13px;
 }
-.portal-tip-bulb { font-size: 18px; line-height: 1.4; flex-shrink: 0; filter: drop-shadow(0 0 6px rgba(0, 229, 204, 0.5)); }
-.portal-tip-text { margin: 0; font-size: 13.5px; line-height: 1.5; color: #cdeee8; }
-.portal-tip-text strong { color: #00e5cc; }
-.portal-tip-close { flex-shrink: 0; background: none; border: none; color: #6fbfb4; cursor: pointer; padding: 2px; margin-left: auto; }
-.portal-tip-close:hover { color: #00e5cc; }
+.portal-welcome-bulb { font-size: 15px; line-height: 1.45; flex-shrink: 0; filter: drop-shadow(0 0 5px rgba(0, 229, 204, 0.5)); }
+.portal-welcome-note { margin: 0 0 20px; font-size: 12.5px; line-height: 1.5; color: #9fb6ab; }
+.portal-welcome-note strong { color: #00e5cc; }
+.portal-welcome-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.portal-welcome-ghost { background: none; border: 1px solid rgba(117, 227, 173, 0.25); border-radius: 10px; color: #b8d4c8; cursor: pointer; font-size: 13px; font-weight: 700; padding: 10px 16px; }
+.portal-welcome-ghost:hover { background: rgba(117, 227, 173, 0.1); color: #ffffff; }
+.portal-welcome-primary { background: linear-gradient(95deg, #00e5cc, #4cc99a); border: none; border-radius: 10px; color: #06140e; cursor: pointer; font-size: 13px; font-weight: 800; padding: 10px 18px; }
+.portal-welcome-primary:hover { box-shadow: 0 8px 22px rgba(0, 229, 204, 0.3); }
 
 @media (max-width: 700px) {
-  .portal-tip { padding: 12px 14px 0; }
-  .portal-tip-text { font-size: 12.5px; }
+  .portal-welcome { padding: 22px 18px 18px; }
+  .portal-welcome h2 { font-size: 19px; }
+  .portal-welcome-actions { justify-content: stretch; }
+  .portal-welcome-actions button { flex: 1; }
 }
 
 /* ------------------------------------------------------------------------------------------------------------------------------------------

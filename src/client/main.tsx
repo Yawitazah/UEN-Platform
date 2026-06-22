@@ -5308,10 +5308,12 @@ function LiveHolderPortal({ token }: { token: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [helpExpanded, setHelpExpanded] = useState(false);
-  const [tipDismissed, setTipDismissed] = useState(() => localStorage.getItem("uen_tip_dismissed") === "1");
-  const dismissTip = () => {
-    localStorage.setItem("uen_tip_dismissed", "1");
-    setTipDismissed(true);
+  // Auto-launch the welcome popup on first visit (until "don't show again").
+  const [welcomeOpen, setWelcomeOpen] = useState(() => localStorage.getItem("uen_welcome_seen") !== "1");
+  const closeWelcome = () => setWelcomeOpen(false);
+  const dismissWelcomeForever = () => {
+    localStorage.setItem("uen_welcome_seen", "1");
+    setWelcomeOpen(false);
   };
   const signOut = () => {
     localStorage.removeItem("uen_portal_token");
@@ -5526,19 +5528,6 @@ function LiveHolderPortal({ token }: { token: string }) {
         </div>
       )}
 
-      {/* Did-you-know tip — dismissible, remembered in localStorage */}
-      {!tipDismissed && (
-        <div className="portal-tip">
-          <div className="portal-tip-inner">
-            <span className="portal-tip-bulb" aria-hidden="true">💡</span>
-            <p className="portal-tip-text">
-              <strong>Did you know?</strong> Your Love Notes are Universal Exchange Notes. Use them at participating merchants to unlock discounts — each merchant sets their own value, so check "Where to Redeem" to see what you can save.
-            </p>
-            <button className="portal-tip-close" onClick={dismissTip} aria-label="Dismiss tip"><X size={16} /></button>
-          </div>
-        </div>
-      )}
-
       {/* Tab bar — redemption features unlock once the profile is verified */}
       <div className="portal-tabs" id="tour-tabs">
         <button id="tour-tab-collection" className={`portal-tab ${activeTab === "collection" ? "active" : ""}`} onClick={() => setActiveTab("collection")}>
@@ -5676,11 +5665,41 @@ function LiveHolderPortal({ token }: { token: string }) {
           onClose={() => setTourOpen(false)}
         />
       )}
+
+      {welcomeOpen && (
+        <div className="portal-welcome-backdrop" onClick={closeWelcome}>
+          <div className="portal-welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Welcome to your wallet">
+            <button className="portal-welcome-x" onClick={closeWelcome} aria-label="Close"><X size={18} /></button>
+            <span className="portal-welcome-eyebrow">Welcome to your wallet</span>
+            <h2>A few quick things to know</h2>
+            <ul className="portal-welcome-tips">
+              {WELCOME_TIPS.map((tip) => (
+                <li key={tip}>
+                  <span className="portal-welcome-bulb" aria-hidden="true">💡</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="portal-welcome-note">You can always relaunch the guided tour using the <strong>?</strong> icon in the top right of your wallet.</p>
+            <div className="portal-welcome-actions">
+              <button className="portal-welcome-ghost" onClick={closeWelcome}>Close</button>
+              <button className="portal-welcome-primary" onClick={dismissWelcomeForever}>Got it, don't show again</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // --- Holder portal guided tour ---
+
+const WELCOME_TIPS = [
+  "Your Love Notes are Universal Exchange Notes (UENs) — same thing, different name.",
+  "Use your UENs at participating merchants to unlock discounts.",
+  "Each merchant sets their own value — check \"Where to Redeem\" to see your savings.",
+  "Copy your code from \"My Codes\" and paste it at checkout to redeem.",
+];
 
 type TourStep = { target: string; title: string; description: string; tip?: string };
 
