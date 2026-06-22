@@ -5682,18 +5682,18 @@ function LiveHolderPortal({ token }: { token: string }) {
 
 // --- Holder portal guided tour ---
 
-type TourStep = { target: string; title: string; description: string };
+type TourStep = { target: string; title: string; description: string; tip?: string };
 
 const PORTAL_TOUR_STEPS: TourStep[] = [
   { target: "tour-bell", title: "Notifications", description: "The bell shows updates from merchants and the platform — new offers, redemptions, and important announcements about your notes." },
   { target: "tour-menu", title: "Your Menu", description: "Open the menu for your profile and account details, Help & the guided tour, support contacts, and to sign out." },
-  { target: "tour-active", title: "Universal Exchange Notes", description: "Your Love Notes are Universal Exchange Notes (UENs) — they hold real value you can spend at participating merchants." },
-  { target: "tour-value", title: "Your Wallet Value", description: "Each merchant assigns their own value to your UEN — the total shown is an estimate across all participating merchants. Value may vary per store." },
+  { target: "tour-active", title: "Universal Exchange Notes", description: "Your Love Notes are Universal Exchange Notes (UENs) — they hold real value you can spend at participating merchants.", tip: "Love Notes and Universal Exchange Notes are the same thing — UEN is just the official name." },
+  { target: "tour-value", title: "Your Wallet Value", description: "Each merchant assigns their own value to your UEN — the total shown is an estimate across all participating merchants. Value may vary per store.", tip: "Each merchant sets their own value. Your total may be higher or lower depending on which stores you redeem at." },
   { target: "tour-redeemed", title: "Redemption History", description: "How many times you've used your notes at merchants so far." },
   { target: "tour-tab-collection", title: "Your Collection", description: "View your digital collectibles, exclusive music, and special content unlocked by your notes." },
-  { target: "tour-tab-merchants", title: "Participating Merchants", description: "See which stores accept your UENs and how much you can save at each one." },
+  { target: "tour-tab-merchants", title: "Participating Merchants", description: "See which stores accept your UENs and how much you can save at each one.", tip: "Merchants each offer different discounts. Check each one to find the best value for your notes." },
   { target: "tour-tab-wallet", title: "Your Codes", description: "Your unique UEN codes. Copy and paste one at checkout to redeem your discount." },
-  { target: "tour-tabs", title: "How to Redeem", description: "Go to \"Where to Redeem\", pick a merchant, then go to \"My Codes\", copy your code and paste it at checkout. Each code can be used once per merchant." },
+  { target: "tour-tabs", title: "How to Redeem", description: "Go to \"Where to Redeem\", pick a merchant, then go to \"My Codes\", copy your code and paste it at checkout. Each code can be used once per merchant.", tip: "Each UEN code can only be used once per merchant, but you can redeem at multiple merchants." },
 ];
 
 function PortalTour({ steps, onClose, onBeforeStep }: { steps: TourStep[]; onClose: () => void; onBeforeStep?: (step: TourStep) => void }) {
@@ -5763,6 +5763,12 @@ function PortalTour({ steps, onClose, onBeforeStep }: { steps: TourStep[]; onClo
         <span className="portal-tour-step">{i + 1} of {steps.length}</span>
         <h3>{step.title}</h3>
         <p>{step.description}</p>
+        {step.tip && (
+          <div className="portal-tour-tip">
+            <span className="portal-tour-tip-bulb" aria-hidden="true">💡</span>
+            <span className="portal-tour-tip-text">{step.tip}</span>
+          </div>
+        )}
         <div className="portal-tour-actions">
           <button className="portal-tour-prev" disabled={i === 0} onClick={() => setI((n) => Math.max(0, n - 1))}>← Previous</button>
           {last ? (
