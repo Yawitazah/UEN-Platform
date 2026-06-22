@@ -7759,6 +7759,13 @@ html { background: #050e09; }
 }
 .vault-chip { border-color: rgba(117, 227, 173, 0.28); background: rgba(117, 227, 173, 0.07); }
 .vault-chip svg { color: #75e3ad; }
+/* Clickable breakdown pills — jump straight to that category in the open vault. */
+.vault-chip-btn { cursor: pointer; font-family: inherit; transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.18s; }
+.vault-chip-btn:hover { background: rgba(117, 227, 173, 0.16); border-color: rgba(117, 227, 173, 0.6); box-shadow: 0 0 0 1px rgba(117, 227, 173, 0.22), 0 6px 18px rgba(117, 227, 173, 0.18); transform: translateY(-1px); }
+.vault-chip-btn:active { transform: translateY(0); }
+.vault-chip-btn:focus-visible { outline: 2px solid rgba(117, 227, 173, 0.6); outline-offset: 2px; }
+.vault-chip-btn::after { content: "→"; max-width: 0; margin-left: 0; opacity: 0; overflow: hidden; color: #75e3ad; font-weight: 700; transition: max-width 0.18s, opacity 0.18s, margin-left 0.18s; }
+.vault-chip-btn:hover::after, .vault-chip-btn:focus-visible::after { max-width: 1.2em; margin-left: 4px; opacity: 1; }
 .collection-back:hover, .collection-cat-tabs button:hover { border-color: rgba(117, 227, 173, 0.45); }
 
 /* --- Lyrics: focused karaoke density (fewer prominent lines) --- */

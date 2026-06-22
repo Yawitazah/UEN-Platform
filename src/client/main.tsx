@@ -1999,7 +1999,17 @@ function HolderCollectionExperience({ holderName = "Holder", items = demoCollect
           <p>Your notes, music, downloads and badges all live here — proof of what you supported and the value it unlocked.</p>
           <div className="vault-breakdown">
             {present.length > 0
-              ? present.map((c) => <span key={c.key} className="vault-chip">{c.icon} {counts[c.key]} {c.label}</span>)
+              ? present.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    className="vault-chip vault-chip-btn"
+                    onClick={() => { setFilter(c.key); setOpened(true); }}
+                    aria-label={`Open ${counts[c.key]} ${c.label}`}
+                  >
+                    {c.icon} {counts[c.key]} {c.label}
+                  </button>
+                ))
               : <span className="vault-chip">Your collection is waiting</span>}
           </div>
           <div className="vault-meta">
