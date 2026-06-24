@@ -691,6 +691,7 @@ router.post("/exchange-hubs/:exchangeHubId/issue-by-email", requireRole(writeRol
       externalRef?: string;
       codePrefix?: string;
       expiresAt?: string;
+      walletUrl?: string; // where the recipient views their note (e.g. the brand site's /wallet)
     };
     const email = body.email?.trim().toLowerCase();
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -748,9 +749,8 @@ router.post("/exchange-hubs/:exchangeHubId/issue-by-email", requireRole(writeRol
     let emailed = false;
     try {
       await sendLoveNoteEmail(email, {
-        code: note.code,
         firstName: holder.firstName && holder.firstName !== "Friend" ? holder.firstName : undefined,
-        walletUrl: publicBaseUrl(req)
+        walletUrl: body.walletUrl ? String(body.walletUrl) : `${publicBaseUrl(req)}/wallet`
       });
       emailed = true;
     } catch (mailErr) {
