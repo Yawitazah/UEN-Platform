@@ -215,3 +215,62 @@ export async function sendPasswordChangedEmail(to: string) {
     text: `This confirms the password on your UEN account was just changed.\n\nIf you didn't make this change, please contact us right away at ${config.zeptomail.fromAddress}.`
   });
 }
+
+// ----- Love note (Stripe tip → UEN) -----
+// Sent to a tipper right after their "Show Love" payment issues them a note.
+// Zah-branded (orange/navy) rather than the violet wallet style, since it comes
+// from Zah personally.
+
+function loveNoteHtml(opts: { code?: string; firstName?: string; walletUrl: string }) {
+  const greeting = opts.firstName ? `${escapeHtml(opts.firstName)}, thank you` : "Thank you";
+  const code = opts.code ? escapeHtml(opts.code) : "your note is waiting in your wallet";
+  return `
+  <div style="margin:0;padding:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+    <div style="max-width:480px;margin:0 auto;padding:32px 20px;">
+      <div style="background:#ffffff;border-radius:16px;padding:36px 32px;border:1px solid #e7e9ee;">
+        <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#DB4A2B;font-weight:700;">A love note from Zah</div>
+        <h1 style="margin:14px 0 8px;font-size:22px;color:#073763;">${greeting} for showing love.</h1>
+        <p style="margin:0 0 22px;font-size:15px;line-height:1.55;color:#4a5160;">
+          As promised, here's your love note — a Universal Exchange Note from me. It's good for <strong>up to 50% off</strong> at my store: books, merch, and select services.
+        </p>
+        <div style="border:1px solid #e7e9ee;border-radius:14px;padding:20px;text-align:center;margin:0 0 22px;background:#faf7f2;">
+          <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#DB4A2B;font-weight:700;">Your love note</div>
+          <div style="font-size:24px;font-weight:700;letter-spacing:.05em;color:#073763;margin-top:6px;">${code}</div>
+        </div>
+        <a href="${opts.walletUrl}" style="display:inline-block;background:#DB4A2B;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 26px;border-radius:10px;">Open my wallet</a>
+        <p style="margin:22px 0 0;font-size:13px;line-height:1.5;color:#8a909c;">
+          Sign in with this email to view and redeem it. If the button doesn't work, paste this link into your browser:<br>
+          <span style="color:#DB4A2B;word-break:break-all;">${opts.walletUrl}</span>
+        </p>
+        <hr style="border:none;border-top:1px solid #eceef2;margin:26px 0 18px;">
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#a2a8b4;">
+          You're receiving this because you sent a tip at zahbrandsolutions.com. Thank you for the love.
+        </p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Sends the tipper their love note (UEN) + a link to open their wallet.
+export async function sendLoveNoteEmail(to: string, opts: { code?: string; firstName?: string; walletUrl: string }) {
+  const code = opts.code ?? "(waiting in your wallet)";
+  await sendZeptoMail({
+    to,
+    subject: "Your love note from Zah",
+    html: loveNoteHtml(opts),
+    text: [
+      opts.firstName ? `${opts.firstName}, thank you for showing love.` : "Thank you for showing love.",
+      "",
+      "As promised, here's your love note — a Universal Exchange Note from me.",
+      "",
+      `Your note: ${code}`,
+      "",
+      "It's good for up to 50% off at my store: books, merch, and select services.",
+      `Open your wallet to view and redeem it: ${opts.walletUrl}`,
+      "(Sign in with this email to see it.)",
+      "",
+      "With gratitude,",
+      "Zah"
+    ].join("\n")
+  });
+}

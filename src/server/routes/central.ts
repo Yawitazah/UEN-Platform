@@ -11,7 +11,7 @@ import { prisma } from "../db";
 import bcrypt from "bcryptjs";
 import { createMerchantSession, createEmailVerifyToken, hashSecret, requireMerchantAccess, requireRole } from "../security";
 import { publicBaseUrl } from "../util/http";
-import { sendEmailVerifyEmail } from "../services/mailer";
+import { sendEmailVerifyEmail, sendLoveNoteEmail } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
@@ -664,6 +664,101 @@ router.post("/exchange-hubs/:exchangeHubId/uens", requireRole(writeRoles), async
     });
     const sync = await syncNewUensToEligibleShopifyStores(exchangeHubId, [note], "MANUAL");
     res.status(201).json({ ...note, sync });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Issue a UEN to a recipient by EMAIL in a single idempotent call — built for
+// external integrations (e.g. zahbrandsolutions.com Stripe tips). Upserts the
+// holder so a repeat customer reuses one wallet, and dedupes on `externalRef`
+// (e.g. the Stripe checkout-session id) so webhook retries never mint duplicate
+// notes. Auth: admin bearer token (writeRoles), same as the routes above.
+router.post("/exchange-hubs/:exchangeHubId/issue-by-email", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+    if (hub.status === HubStatus.SUSPENDED || hub.status === HubStatus.DISABLED) {
+      return res.status(409).json({ error: "Suspended or disabled Exchange Hubs cannot generate new UENs" });
+    }
+
+    const body = (req.body ?? {}) as {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      campaignId?: string;
+      externalRef?: string;
+      codePrefix?: string;
+      expiresAt?: string;
+    };
+    const email = body.email?.trim().toLowerCase();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return res.status(400).json({ error: "A valid email is required" });
+    }
+    const externalRef = body.externalRef?.trim() || undefined;
+
+    // Idempotency: if we've already issued for this external reference in this
+    // hub, return the existing note instead of creating a new one.
+    if (externalRef) {
+      const existing = await prisma.universalExchangeNote.findFirst({
+        where: { exchangeHubId, campaignId: externalRef },
+        include: { holder: true }
+      });
+      if (existing) {
+        return res.status(200).json({ ...existing, idempotent: true });
+      }
+    }
+
+    const holder = await prisma.holder.upsert({
+      where: { exchangeHubId_email: { exchangeHubId, email } },
+      update: {
+        firstName: body.firstName?.trim() || undefined,
+        lastName: body.lastName?.trim() || undefined
+      },
+      create: {
+        exchangeHubId,
+        email,
+        firstName: body.firstName?.trim() || "Friend",
+        lastName: body.lastName?.trim() || ""
+      }
+    });
+
+    const note = await prisma.universalExchangeNote.create({
+      data: {
+        exchangeHubId,
+        holderId: holder.id,
+        code: await generatedCode(body.codePrefix ?? hub.codePrefix ?? ""),
+        campaignId: externalRef ?? body.campaignId,
+        expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined
+      }
+    });
+
+    await audit({
+      action: AuditAction.UEN_GENERATED,
+      actorId: req.auth?.actorId,
+      actorType: req.auth?.actorType,
+      entityType: "UniversalExchangeNote",
+      entityId: note.id,
+      message: `Issued ${note.code} to ${email}`
+    });
+
+    // Email the recipient their love note via ZeptoMail. Best-effort — a mail
+    // hiccup must not fail issuance (the note is already created).
+    let emailed = false;
+    try {
+      await sendLoveNoteEmail(email, {
+        code: note.code,
+        firstName: holder.firstName && holder.firstName !== "Friend" ? holder.firstName : undefined,
+        walletUrl: publicBaseUrl(req)
+      });
+      emailed = true;
+    } catch (mailErr) {
+      console.error("[issue-by-email] love-note email failed:", mailErr);
+    }
+
+    const sync = await syncNewUensToEligibleShopifyStores(exchangeHubId, [note], "MANUAL");
+    return res.status(201).json({ ...note, holder, sync, emailed });
   } catch (error) {
     handleError(res, error);
   }
