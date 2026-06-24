@@ -798,6 +798,74 @@ router.get("/exchange-hubs/:exchangeHubId/wallet", requireRole(adminRoles), asyn
   }
 });
 
+// Validate a UEN by code — for an external store checkout (e.g.
+// zahbrandsolutions.com) to confirm a love note is real and still spendable
+// before applying a discount. Admin-read auth (called server-side).
+router.post("/exchange-hubs/:exchangeHubId/notes/validate", requireRole(adminRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const code = String(req.body?.code ?? "").trim().toUpperCase();
+    if (!code) return res.status(400).json({ valid: false, error: "code is required" });
+
+    const note = await prisma.universalExchangeNote.findFirst({ where: { exchangeHubId, code } });
+    if (!note) return res.json({ valid: false, code, reason: "not_found" });
+    if (note.status !== UenStatus.ACTIVE) {
+      return res.json({
+        valid: false,
+        code,
+        status: note.status,
+        reason: note.status === UenStatus.DISABLED ? "already_used" : "inactive",
+      });
+    }
+    if (note.expiresAt && note.expiresAt.getTime() < Date.now()) {
+      return res.json({ valid: false, code, reason: "expired" });
+    }
+    return res.json({ valid: true, code, noteId: note.id });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Redeem a UEN (mark it spent) after a successful external store purchase.
+// v1: redeeming sets the note to DISABLED (one note = one purchase, then spent).
+// Idempotent — redeeming an already-spent note returns success, not an error,
+// so Stripe webhook retries are safe.
+// TODO(multi-merchant): when stores beyond zahbrandsolutions.com accept this
+// hub's notes, switch to per-merchant redemption tracking (like ShopifySyncedNote).
+router.post("/exchange-hubs/:exchangeHubId/notes/redeem", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const code = String(req.body?.code ?? "").trim().toUpperCase();
+    const externalRef = req.body?.externalRef ? String(req.body.externalRef).trim() : undefined;
+    if (!code) return res.status(400).json({ error: "code is required" });
+
+    const note = await prisma.universalExchangeNote.findFirst({ where: { exchangeHubId, code } });
+    if (!note) return res.status(404).json({ error: "Note not found" });
+    if (note.status === UenStatus.DISABLED) {
+      return res.json({ redeemed: true, code, idempotent: true });
+    }
+    if (note.status !== UenStatus.ACTIVE) {
+      return res.status(409).json({ error: `Note is ${note.status}`, status: note.status });
+    }
+
+    const updated = await prisma.universalExchangeNote.update({
+      where: { id: note.id },
+      data: { status: UenStatus.DISABLED, disabledAt: new Date() },
+    });
+    await audit({
+      action: AuditAction.UEN_DISABLED,
+      actorId: req.auth?.actorId,
+      actorType: req.auth?.actorType,
+      entityType: "UniversalExchangeNote",
+      entityId: note.id,
+      message: `Redeemed ${note.code}${externalRef ? ` · order ${externalRef}` : ""}`,
+    });
+    return res.json({ redeemed: true, code: updated.code });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.post("/uens/:uenId/disable", requireRole(writeRoles), async (req, res) => {
   try {
     const note = await prisma.universalExchangeNote.update({
