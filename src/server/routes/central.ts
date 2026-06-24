@@ -764,6 +764,40 @@ router.post("/exchange-hubs/:exchangeHubId/issue-by-email", requireRole(writeRol
   }
 });
 
+// Read a holder's UEN wallet summary by EMAIL for a hub — powers the holder
+// wallet on an external site (e.g. zahbrandsolutions.com/wallet). Admin-read
+// auth: the external site calls this server-side with the admin token so the
+// token never reaches the browser.
+router.get("/exchange-hubs/:exchangeHubId/wallet", requireRole(adminRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "email query param is required" });
+
+    const holder = await prisma.holder.findUnique({
+      where: { exchangeHubId_email: { exchangeHubId, email } }
+    });
+    if (!holder) {
+      return res.json({ email, holder: null, count: 0, notes: [] });
+    }
+
+    const notes = await prisma.universalExchangeNote.findMany({
+      where: { exchangeHubId, holderId: holder.id, status: UenStatus.ACTIVE },
+      orderBy: { issuedAt: "desc" },
+      select: { code: true, status: true, issuedAt: true }
+    });
+
+    res.json({
+      email,
+      holder: { id: holder.id, firstName: holder.firstName, lastName: holder.lastName },
+      count: notes.length,
+      notes
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 router.post("/uens/:uenId/disable", requireRole(writeRoles), async (req, res) => {
   try {
     const note = await prisma.universalExchangeNote.update({
