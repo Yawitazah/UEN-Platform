@@ -452,3 +452,36 @@ model DigitalProductComment {
 
   @@index([trackId, timestampSeconds])
 }
+
+// Universal "share as a gift" referral layer. See schema.postgres.prisma for the
+// full rationale. Keyed by email (no Holder FK) so it works for any shareable
+// asset across the ecosystem.
+model Referral {
+  id            String               @id @default(cuid())
+  exchangeHubId String
+  code          String               @unique
+  referrerEmail String
+  referrerName  String?
+  assetKey      String               @default("workbook")
+  conversions   Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  events        ReferralConversion[]
+
+  @@unique([exchangeHubId, referrerEmail, assetKey])
+  @@index([exchangeHubId])
+  @@index([referrerEmail])
+}
+
+model ReferralConversion {
+  id            String   @id @default(cuid())
+  referralId    String
+  exchangeHubId String
+  referredEmail String
+  rewardUenId   String?
+  createdAt     DateTime @default(now())
+  referral      Referral @relation(fields: [referralId], references: [id])
+
+  @@unique([referralId, referredEmail])
+  @@index([exchangeHubId, referredEmail])
+}

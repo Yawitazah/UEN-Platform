@@ -58,7 +58,34 @@ export async function ensureSchema() {
     )`,
     'CREATE UNIQUE INDEX IF NOT EXISTS "DigitalProductLike_holderId_trackId_key" ON "DigitalProductLike" ("holderId", "trackId")',
     'CREATE INDEX IF NOT EXISTS "DigitalProductTrack_digitalProductId_idx" ON "DigitalProductTrack" ("digitalProductId")',
-    'CREATE INDEX IF NOT EXISTS "DigitalProductComment_trackId_timestampSeconds_idx" ON "DigitalProductComment" ("trackId", "timestampSeconds")'
+    'CREATE INDEX IF NOT EXISTS "DigitalProductComment_trackId_timestampSeconds_idx" ON "DigitalProductComment" ("trackId", "timestampSeconds")',
+    // Universal "share as a gift" referral layer (see prisma schema). Additive +
+    // idempotent so prod gets the tables on the next deploy with no migrate step.
+    `CREATE TABLE IF NOT EXISTS "Referral" (
+      "id" TEXT PRIMARY KEY,
+      "exchangeHubId" TEXT NOT NULL,
+      "code" TEXT NOT NULL,
+      "referrerEmail" TEXT NOT NULL,
+      "referrerName" TEXT,
+      "assetKey" TEXT NOT NULL DEFAULT 'workbook',
+      "conversions" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'CREATE UNIQUE INDEX IF NOT EXISTS "Referral_code_key" ON "Referral" ("code")',
+    'CREATE UNIQUE INDEX IF NOT EXISTS "Referral_exchangeHubId_referrerEmail_assetKey_key" ON "Referral" ("exchangeHubId", "referrerEmail", "assetKey")',
+    'CREATE INDEX IF NOT EXISTS "Referral_exchangeHubId_idx" ON "Referral" ("exchangeHubId")',
+    'CREATE INDEX IF NOT EXISTS "Referral_referrerEmail_idx" ON "Referral" ("referrerEmail")',
+    `CREATE TABLE IF NOT EXISTS "ReferralConversion" (
+      "id" TEXT PRIMARY KEY,
+      "referralId" TEXT NOT NULL,
+      "exchangeHubId" TEXT NOT NULL,
+      "referredEmail" TEXT NOT NULL,
+      "rewardUenId" TEXT,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'CREATE UNIQUE INDEX IF NOT EXISTS "ReferralConversion_referralId_referredEmail_key" ON "ReferralConversion" ("referralId", "referredEmail")',
+    'CREATE INDEX IF NOT EXISTS "ReferralConversion_exchangeHubId_referredEmail_idx" ON "ReferralConversion" ("exchangeHubId", "referredEmail")'
   ];
   for (const sql of statements) {
     try {

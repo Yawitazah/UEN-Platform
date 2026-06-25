@@ -76,6 +76,26 @@ async function generatedCode(prefix = "") {
   throw new Error("Could not generate a unique UEN code");
 }
 
+// Short, human-shareable code embedded in gift links (e.g. ?gift=GIFT9A3F1B2C).
+async function generatedReferralCode() {
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const code = `GIFT${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    const existing = await prisma.referral.findUnique({ where: { code } });
+    if (!existing) return code;
+  }
+  throw new Error("Could not generate a unique referral code");
+}
+
+const createReferralSchema = z.object({
+  referrerEmail: z.string().email(),
+  referrerName: z.string().trim().max(120).optional(),
+  assetKey: z.string().trim().max(60).optional()
+});
+
+const convertReferralSchema = z.object({
+  referredEmail: z.string().email()
+});
+
 function publicConnection(connection: { accessToken: string; [key: string]: unknown }) {
   const { accessToken: _accessToken, ...safe } = connection;
   return safe;
@@ -759,6 +779,164 @@ router.post("/exchange-hubs/:exchangeHubId/issue-by-email", requireRole(writeRol
 
     const sync = await syncNewUensToEligibleShopifyStores(exchangeHubId, [note], "MANUAL");
     return res.status(201).json({ ...note, holder, sync, emailed });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// ── Universal "share as a gift" referral ───────────────────────────────────
+// A holder shares any asset via a stable per-(hub, sharer, asset) code; when a
+// genuinely NEW person signs up through it, the sharer earns one UEN. Built as
+// a hub primitive so every surface (workbook today, albums/notes tomorrow)
+// inherits it. Called server-side by the brand site with the admin token.
+
+// Create or fetch a sharer's gift code. Idempotent per (hub, sharer, asset), so
+// the same person always reshares the same link and refreshes their cached name.
+router.post("/exchange-hubs/:exchangeHubId/referrals", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+
+    const data = createReferralSchema.parse(req.body);
+    const referrerEmail = data.referrerEmail.trim().toLowerCase();
+    const assetKey = data.assetKey?.trim() || "workbook";
+    const referrerName = data.referrerName?.trim() || undefined;
+
+    const existing = await prisma.referral.findUnique({
+      where: { exchangeHubId_referrerEmail_assetKey: { exchangeHubId, referrerEmail, assetKey } }
+    });
+    if (existing) {
+      const referral =
+        referrerName && referrerName !== existing.referrerName
+          ? await prisma.referral.update({ where: { id: existing.id }, data: { referrerName } })
+          : existing;
+      return res.status(200).json({
+        code: referral.code,
+        assetKey: referral.assetKey,
+        referrerName: referral.referrerName,
+        conversions: referral.conversions
+      });
+    }
+
+    const referral = await prisma.referral.create({
+      data: { exchangeHubId, code: await generatedReferralCode(), referrerEmail, referrerName, assetKey }
+    });
+    return res.status(201).json({
+      code: referral.code,
+      assetKey: referral.assetKey,
+      referrerName: referral.referrerName,
+      conversions: 0
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Look up a gift code to render the recipient's landing ("[Name] is sharing…").
+router.get("/exchange-hubs/:exchangeHubId/referrals/:code", requireRole(adminRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const code = (param(req, "code") ?? "").toUpperCase();
+    const referral = await prisma.referral.findUnique({ where: { code } });
+    if (!referral || referral.exchangeHubId !== exchangeHubId) {
+      return res.status(404).json({ error: "Referral not found" });
+    }
+    const firstName = (referral.referrerName ?? "").trim().split(/\s+/)[0] || null;
+    return res.json({
+      code: referral.code,
+      assetKey: referral.assetKey,
+      referrerName: referral.referrerName,
+      referrerFirstName: firstName,
+      conversions: referral.conversions
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Convert on recipient signup → grant the sharer exactly one UEN, once.
+// Guards (all return rewarded:false, never an error, so the signup UX never
+// breaks): no self-referral; recipient must be genuinely new (not already a
+// holder); first link wins (a recipient can reward only one sharer hub-wide);
+// per-(code, recipient) idempotent. The note itself dedupes on campaignId.
+router.post("/exchange-hubs/:exchangeHubId/referrals/:code/convert", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const code = (param(req, "code") ?? "").toUpperCase();
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+    if (hub.status === HubStatus.SUSPENDED || hub.status === HubStatus.DISABLED) {
+      return res.status(409).json({ error: "Suspended or disabled Exchange Hubs cannot grant referral rewards" });
+    }
+
+    const referral = await prisma.referral.findUnique({ where: { code } });
+    if (!referral || referral.exchangeHubId !== exchangeHubId) {
+      return res.status(404).json({ error: "Referral not found" });
+    }
+
+    const data = convertReferralSchema.parse(req.body);
+    const referredEmail = data.referredEmail.trim().toLowerCase();
+
+    if (referredEmail === referral.referrerEmail) {
+      return res.status(200).json({ rewarded: false, reason: "self_referral" });
+    }
+
+    const existingConversion = await prisma.referralConversion.findUnique({
+      where: { referralId_referredEmail: { referralId: referral.id, referredEmail } }
+    });
+    if (existingConversion) {
+      return res.status(200).json({ rewarded: true, idempotent: true });
+    }
+
+    const priorAnywhere = await prisma.referralConversion.findFirst({
+      where: { exchangeHubId, referredEmail }
+    });
+    if (priorAnywhere) {
+      return res.status(200).json({ rewarded: false, reason: "already_referred" });
+    }
+
+    const existingHolder = await prisma.holder.findUnique({
+      where: { exchangeHubId_email: { exchangeHubId, email: referredEmail } }
+    });
+    if (existingHolder) {
+      return res.status(200).json({ rewarded: false, reason: "existing_holder" });
+    }
+
+    // Mint the sharer's reward note (dedupe on campaignId against any retry).
+    const campaignId = `ref:${referral.id}:${referredEmail}`;
+    const referrer = await prisma.holder.upsert({
+      where: { exchangeHubId_email: { exchangeHubId, email: referral.referrerEmail } },
+      update: {},
+      create: {
+        exchangeHubId,
+        email: referral.referrerEmail,
+        firstName: referral.referrerName?.trim().split(/\s+/)[0] || "Friend",
+        lastName: referral.referrerName?.trim().split(/\s+/).slice(1).join(" ") || ""
+      }
+    });
+    const note =
+      (await prisma.universalExchangeNote.findFirst({ where: { exchangeHubId, campaignId } })) ??
+      (await prisma.universalExchangeNote.create({
+        data: { exchangeHubId, holderId: referrer.id, code: await generatedCode(hub.codePrefix ?? ""), campaignId }
+      }));
+
+    await prisma.referralConversion.create({
+      data: { referralId: referral.id, exchangeHubId, referredEmail, rewardUenId: note.id }
+    });
+    await prisma.referral.update({ where: { id: referral.id }, data: { conversions: { increment: 1 } } });
+
+    await audit({
+      action: AuditAction.UEN_GENERATED,
+      actorId: req.auth?.actorId,
+      actorType: req.auth?.actorType,
+      entityType: "UniversalExchangeNote",
+      entityId: note.id,
+      message: `Referral reward ${note.code} to ${referral.referrerEmail} for new signup ${referredEmail}`
+    });
+
+    const sync = await syncNewUensToEligibleShopifyStores(exchangeHubId, [note], "MANUAL");
+    return res.status(201).json({ rewarded: true, code: note.code, sync });
   } catch (error) {
     handleError(res, error);
   }

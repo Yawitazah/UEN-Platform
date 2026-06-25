@@ -453,3 +453,41 @@ model DigitalProductComment {
 
   @@index([trackId, timestampSeconds])
 }
+
+// Universal "share as a gift" referral layer. A holder shares any asset
+// (workbook, album, note…) via a stable per-(hub, sharer, asset) code; when a
+// genuinely NEW person signs up through that code, the sharer earns one UEN.
+// Decoupled from Holder on purpose (keyed by email) so the same primitive works
+// for any surface in the ecosystem, even before the sharer is a formal holder.
+model Referral {
+  id            String               @id @default(cuid())
+  exchangeHubId String
+  code          String               @unique
+  referrerEmail String
+  referrerName  String?
+  assetKey      String               @default("workbook")
+  conversions   Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  events        ReferralConversion[]
+
+  @@unique([exchangeHubId, referrerEmail, assetKey])
+  @@index([exchangeHubId])
+  @@index([referrerEmail])
+}
+
+// One row per rewarded signup. The composite unique makes a repeat convert call
+// idempotent; the (hub, referredEmail) index enforces "first link wins" so one
+// new person can only ever reward a single sharer hub-wide.
+model ReferralConversion {
+  id            String   @id @default(cuid())
+  referralId    String
+  exchangeHubId String
+  referredEmail String
+  rewardUenId   String?
+  createdAt     DateTime @default(now())
+  referral      Referral @relation(fields: [referralId], references: [id])
+
+  @@unique([referralId, referredEmail])
+  @@index([exchangeHubId, referredEmail])
+}
