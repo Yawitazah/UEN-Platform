@@ -295,7 +295,7 @@ router.post("/holder/login-password", async (req, res) => {
     if (!holder.portalToken) {
       await prisma.holder.update({ where: { id: holder.id }, data: { portalToken } });
     }
-    res.json({ portalToken });
+    res.json({ portalToken, firstName: holder.firstName });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Could not sign in" });

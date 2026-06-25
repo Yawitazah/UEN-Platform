@@ -105,6 +105,50 @@ export function verifyHolderLoginToken(value?: string) {
   }
 }
 
+// Email-verification token for a NEW wallet signup that set a password. Carries
+// everything needed to create the holder once the link is clicked (the password
+// is already bcrypt-hashed before it goes in here), signed + 30-min expiry. The
+// holder + password are only written on confirm, so nothing exists until the
+// person proves they own the inbox.
+export type HolderSignupTokenInput = {
+  email: string;
+  exchangeHubId: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  passwordHash: string;
+};
+export function createHolderSignupToken(input: HolderSignupTokenInput) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      ...input,
+      kind: "holder-signup",
+      exp: Date.now() + 1000 * 60 * 30
+    })
+  ).toString("base64url");
+  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+}
+export function verifyHolderSignupToken(value?: string) {
+  if (!value) return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  if (!safeEqual(signature, expected)) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as HolderSignupTokenInput & {
+      kind: string;
+      exp: number;
+    };
+    if (parsed.kind !== "holder-signup") return null;
+    if (!parsed.exp || parsed.exp < Date.now()) return null;
+    if (!parsed.email || !parsed.exchangeHubId || !parsed.passwordHash) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 // Confirms a holder's NEW email address before switching it. Signed and
 // time-limited like the sign-in token, bound to the holder id + new email, so
 // the email only changes once the link sent to that new address is clicked.

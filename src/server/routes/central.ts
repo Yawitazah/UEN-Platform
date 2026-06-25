@@ -9,9 +9,9 @@ import { config } from "../config";
 import { AdminRole, AuditAction, HubStatus, UenStatus } from "../constants";
 import { prisma } from "../db";
 import bcrypt from "bcryptjs";
-import { createMerchantSession, createEmailVerifyToken, hashSecret, requireMerchantAccess, requireRole } from "../security";
+import { createMerchantSession, createEmailVerifyToken, createHolderSignupToken, verifyHolderSignupToken, hashSecret, requireMerchantAccess, requireRole } from "../security";
 import { publicBaseUrl } from "../util/http";
-import { sendEmailVerifyEmail, sendLoveNoteEmail } from "../services/mailer";
+import { sendEmailVerifyEmail, sendLoveNoteEmail, sendHolderLoginEmail } from "../services/mailer";
 import { syncCodesToGroupedShopifyDiscount, syncGrandfatheredCodesToMerchant, syncNewUensToEligibleShopifyStores } from "../services/sync";
 import { getValidUensForMerchant, validateUenForMerchant } from "../services/uens";
 import {
@@ -815,6 +815,103 @@ router.post("/exchange-hubs/:exchangeHubId/register-holder", requireRole(writeRo
     });
 
     return res.status(200).json({ ok: true, holder });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// ── Wallet password auth for an external site (the brand-site wallet) ───────
+// These let zahbrandsolutions.com run a real email+password wallet against this
+// hub: tell it whether an email already has a (password-protected) wallet, start
+// an email-verified signup that sets a password, and confirm it from the link.
+// Password login itself uses the existing public POST /api/holder/login-password.
+// Auth: admin bearer token (writeRoles), same as the routes above.
+
+// Does this email already have a wallet here, and has it set a password?
+router.post("/exchange-hubs/:exchangeHubId/holder-status", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const email = String((req.body as { email?: string }).email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "email required" });
+    const holder = await prisma.holder.findFirst({
+      where: { exchangeHubId, email, status: "ACTIVE" },
+      orderBy: { createdAt: "asc" }
+    });
+    return res.json({ exists: !!holder, hasPassword: !!holder?.passwordHash });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Start an email-verified signup. Hashes the password and emails a verification
+// link to verifyUrl?wv=<token>; the holder + password are only written on confirm.
+router.post("/exchange-hubs/:exchangeHubId/holder-signup-start", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub || hub.status !== HubStatus.ACTIVE) return res.status(404).json({ error: "Exchange Hub not found or inactive" });
+    const body = (req.body ?? {}) as {
+      email?: string; firstName?: string; lastName?: string; phone?: string; password?: string; verifyUrl?: string;
+    };
+    const email = (body.email ?? "").trim().toLowerCase();
+    const password = body.password ?? "";
+    const verifyUrl = (body.verifyUrl ?? "").trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: "A valid email is required" });
+    if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
+    if (!/^https?:\/\//.test(verifyUrl)) return res.status(400).json({ error: "A valid verifyUrl is required" });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const token = createHolderSignupToken({
+      email,
+      exchangeHubId,
+      firstName: (body.firstName ?? "").trim() || "Friend",
+      lastName: (body.lastName ?? "").trim(),
+      phone: (body.phone ?? "").trim() || undefined,
+      passwordHash
+    });
+    const link = `${verifyUrl}${verifyUrl.includes("?") ? "&" : "?"}wv=${encodeURIComponent(token)}`;
+    await sendHolderLoginEmail(email, link, hub.displayName);
+    return res.json({ sent: true });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+// Confirm the email-verified signup: validate the token, upsert the holder with
+// the chosen password, and hand back a portal token so the site can open the wallet.
+router.post("/exchange-hubs/:exchangeHubId/holder-signup-confirm", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const token = String((req.body as { token?: string }).token ?? "");
+    const parsed = verifyHolderSignupToken(token);
+    if (!parsed || parsed.exchangeHubId !== exchangeHubId) {
+      return res.status(400).json({ error: "This link is invalid or has expired. Please sign up again." });
+    }
+    const newPortalToken = crypto.randomBytes(24).toString("base64url");
+    const holder = await prisma.holder.upsert({
+      where: { exchangeHubId_email: { exchangeHubId, email: parsed.email } },
+      update: {
+        passwordHash: parsed.passwordHash,
+        firstName: parsed.firstName || undefined,
+        lastName: parsed.lastName || undefined,
+        phone: parsed.phone || undefined
+      },
+      create: {
+        exchangeHubId,
+        email: parsed.email,
+        firstName: parsed.firstName || "Friend",
+        lastName: parsed.lastName || "",
+        phone: parsed.phone || undefined,
+        passwordHash: parsed.passwordHash,
+        portalToken: newPortalToken
+      }
+    });
+    let portalToken = holder.portalToken;
+    if (!portalToken) {
+      portalToken = newPortalToken;
+      await prisma.holder.update({ where: { id: holder.id }, data: { portalToken } });
+    }
+    return res.json({ ok: true, email: holder.email, firstName: holder.firstName, phone: holder.phone ?? "", portalToken });
   } catch (error) {
     handleError(res, error);
   }
