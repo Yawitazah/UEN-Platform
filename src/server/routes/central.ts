@@ -784,6 +784,42 @@ router.post("/exchange-hubs/:exchangeHubId/issue-by-email", requireRole(writeRol
   }
 });
 
+// Register (or update) a holder by email WITHOUT minting a note. The brand site
+// calls this when someone creates a wallet there, so every new wallet immediately
+// exists as a holder in this hub (visible in the admin, ready to receive notes).
+// Idempotent via the (exchangeHubId, email) unique key. Auth: admin bearer token.
+router.post("/exchange-hubs/:exchangeHubId/register-holder", requireRole(writeRoles), async (req, res) => {
+  try {
+    const exchangeHubId = param(req, "exchangeHubId");
+    const hub = await prisma.exchangeHub.findUnique({ where: { id: exchangeHubId } });
+    if (!hub) return res.status(404).json({ error: "Exchange Hub not found" });
+
+    const body = (req.body ?? {}) as { email?: string; firstName?: string; lastName?: string; source?: string };
+    const email = body.email?.trim().toLowerCase();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return res.status(400).json({ error: "A valid email is required" });
+    }
+
+    const holder = await prisma.holder.upsert({
+      where: { exchangeHubId_email: { exchangeHubId, email } },
+      update: {
+        firstName: body.firstName?.trim() || undefined,
+        lastName: body.lastName?.trim() || undefined
+      },
+      create: {
+        exchangeHubId,
+        email,
+        firstName: body.firstName?.trim() || "Friend",
+        lastName: body.lastName?.trim() || ""
+      }
+    });
+
+    return res.status(200).json({ ok: true, holder });
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 // ── Universal "share as a gift" referral ───────────────────────────────────
 // A holder shares any asset via a stable per-(hub, sharer, asset) code; when a
 // genuinely NEW person signs up through it, the sharer earns one UEN. Built as
